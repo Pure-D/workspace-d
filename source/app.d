@@ -11,8 +11,10 @@ import std.json;
 
 static immutable Version = [1, 0, 0];
 
-void send(int id, JSONValue value) {
-	synchronized {
+void send(int id, JSONValue value)
+{
+	synchronized
+	{
 		ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
 		stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
 	}
@@ -58,8 +60,7 @@ JSONValue handleRequest(JSONValue value)
 		case JSON_TYPE.ARRAY:
 			foreach (val; coms.array)
 			{
-				assert(val.type == JSON_TYPE.STRING,
-					"Components must either be a string or a string array");
+				assert(val.type == JSON_TYPE.STRING, "Components must either be a string or a string array");
 				toLoad ~= val.str;
 			}
 			break;
@@ -67,7 +68,7 @@ JSONValue handleRequest(JSONValue value)
 		}
 		foreach (name; toLoad)
 		{
-			if((name in components) is null)
+			if ((name in components) is null)
 				throw new Exception("Component '" ~ name ~ "' not found!");
 			components[name].initialize(value);
 		}
@@ -80,13 +81,27 @@ JSONValue handleRequest(JSONValue value)
 		switch (coms.type)
 		{
 		case JSON_TYPE.STRING:
-			toLoad ~= coms.str;
+			if (coms.str == "*")
+			{
+				foreach(name, com; components)
+				{
+					if(com.initialized)
+					{
+						toLoad ~= name;
+						com.deinitialize(value);
+					}
+				}
+				return JSONValue(["unloaded" : toLoad.toJSONArray()]);
+			}
+			else
+			{
+				toLoad ~= coms.str;
+			}
 			break;
 		case JSON_TYPE.ARRAY:
 			foreach (val; coms.array)
 			{
-				assert(val.type == JSON_TYPE.STRING,
-					"Components must either be a string or a string array");
+				assert(val.type == JSON_TYPE.STRING, "Components must either be a string or a string array");
 				toLoad ~= val.str;
 			}
 			break;
@@ -115,6 +130,7 @@ JSONValue handleRequest(JSONValue value)
 int main(string[] args)
 {
 	import etc.linux.memoryerror;
+
 	static if (is(typeof(registerMemoryErrorHandler)))
 		registerMemoryErrorHandler();
 
