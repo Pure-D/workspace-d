@@ -3,7 +3,7 @@ import std.process;
 import std.string;
 import std.stdio;
 import std.conv;
-import std.file;
+import std.json;
 import std.uni;
 import core.thread;
 
@@ -24,11 +24,16 @@ void main(string[] args)
 		registerMemoryErrorHandler();
 
 	string[] preprogrammed = [
-		`{"cmd":"load","components":["dub"],"dir":"` ~ getcwd() ~ `","port":9621}`,
-		`{"cmd":"dub","subcmd":"list-dep"}`,
-		`{"cmd":"dub","subcmd":"list-import"}`,
-		`{"cmd":"dub","subcmd":"list-string-import"}`,
-		`{"cmd":"dub","subcmd":"update"}`,
+		/* 0  */`{"cmd":"load","components":["dub","dcd"],"dir":"` ~ std.file.getcwd() ~ `","port":9621}`,
+		/* 1  */`{"cmd":"dub","subcmd":"list:dep"}`,
+		/* 2  */`{"cmd":"dub","subcmd":"list:import"}`,
+		/* 3  */`{"cmd":"dub","subcmd":"list:string-import"}`,
+		/* 4  */`{"cmd":"dub","subcmd":"update"}`,
+		/* 5  */`{"cmd":"dcd","subcmd":"setup-server"}`,
+		/* 6  */`{"cmd":"dcd","subcmd":"add-imports","imports":["/usr/include/dmd/druntime/import","/usr/include/dmd/phobos"]}`,
+		/* 7  */`{"cmd":"dcd","subcmd":"search-symbol","query":"toImpl"}`,
+		/* 8  */`{"cmd":"dcd","subcmd":"find-declaration","pos":14,"code":"void main() {foo();} void foo() {}"}`,
+		/* 9  */`{"cmd":"dcd","subcmd":"list-completion","pos":21,"code":"int integer; integer."}`,
 	];
 
 	auto pipes = pipeProcess(["./workspace-d"] ~ args, Redirect.stdin | Redirect.stdout | Redirect.stderr);
@@ -67,6 +72,13 @@ void main(string[] args)
 		dataBuffer.length = length - 4;
 		dataBuffer = pipes.stdout.rawRead(dataBuffer);
 
-		writeln("Received: ", cast(string) dataBuffer);
+		try
+		{
+			writeln(parseJSON(cast(string) dataBuffer).toPrettyString());
+		}
+		catch(Exception e)
+		{
+			writeln("[INVALID]: ", cast(string) dataBuffer);
+		}
 	}
 }

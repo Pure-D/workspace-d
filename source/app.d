@@ -11,10 +11,11 @@ import std.json;
 
 static immutable Version = [1, 0, 0];
 
-void send(int id, JSONValue value)
-{
-	ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
-	stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
+void send(int id, JSONValue value) {
+	synchronized {
+		ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
+		stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
+	}
 }
 
 JSONValue toJSONArray(T)(T value)
@@ -139,7 +140,6 @@ int main(string[] args)
 			dataBuffer = stdin.rawRead(dataBuffer);
 
 			auto data = parseJSON(cast(string) dataBuffer);
-
 			send(id, handleRequest(data));
 		}
 		catch (Exception e)

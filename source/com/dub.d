@@ -11,6 +11,8 @@ import painlessjson;
 import core.thread;
 
 import dub.dub;
+import dub.project;
+import dub.package_;
 import dub.compilers.compiler;
 import dub.compilers.buildsettings;
 import dub.internal.vibecompat.core.log;
@@ -20,6 +22,8 @@ private struct DubInit
 {
 	string dir;
 	bool watchFile = true;
+	bool registerImportProvider = true;
+	bool registerStringImportProvider = true;
 }
 
 private struct DubPackageInfo
@@ -29,13 +33,18 @@ private struct DubPackageInfo
 	string name;
 }
 
-class DubComponent : Component
+class DubComponent : Component, IImportPathProvider, IStringImportPathProvider
 {
 public:
 	override void load(JSONValue args)
 	{
 		DubInit value = fromJSON!DubInit(args);
 		assert(value.dir, "dub initialization requires a 'dir' field");
+
+		if(value.registerImportProvider)
+			setImportPathProvider(this);
+		if(value.registerStringImportProvider)
+			setStringImportPathProvider(this);
 
 		_dub = new Dub(null, value.dir, SkipRegistry.none);
 		_dub.packageManager.getOrLoadPackage(Path(value.dir));
@@ -77,30 +86,15 @@ public:
 
 	@property auto dependencies()
 	{
-		auto deps = dub.project.dependencies;
-		DubPackageInfo[] dependencies;
-		if (deps is null)
-			return dependencies;
-		foreach (dep; deps)
-		{
-			DubPackageInfo info;
-			info.name = dep.name;
-			info.ver = dep.vers;
-			foreach (name, subDep; dep.dependencies)
-			{
-				info.dependencies[name] = subDep.toString();
-			}
-			dependencies ~= info;
-		}
-		return dependencies;
+		return dub.project.listDependencies();
 	}
 
-	@property auto importPaths()
+	@property string[] importPaths()
 	{
 		return _importPaths;
 	}
 
-	@property auto stringImportPaths()
+	@property string[] stringImportPaths()
 	{
 		return _stringImportPaths;
 	}
@@ -130,7 +124,27 @@ public:
 		if (!dub.project.configurations.canFind(value))
 			return false;
 		_configuration = value;
+		updateImportPaths();
 		return true;
+	}
+
+	@property auto buildType()
+	{
+		return _buildType;
+	}
+
+	bool setBuildType(string value)
+	{
+		try
+		{
+			_buildType = value;
+			updateImportPaths();
+			return true;
+		}
+		catch(Exception e)
+		{
+			return false;
+		}
 	}
 
 	@property auto compiler()
@@ -174,12 +188,20 @@ public:
 			return setConfiguration(args.getString("configuration")).toJSON();
 		case "get:configuration":
 			return configuration.toJSON();
+		case "set:build-type":
+			return setBuildType(args.getString("build-type")).toJSON();
+		case "get:build-type":
+			return buildType.toJSON();
 		case "set:compiler":
 			return setCompiler(args.getString("compiler")).toJSON();
 		case "get:compiler":
 			return compiler.toJSON();
+		case "get:name":
+			return dub.projectName.toJSON();
+		case "get:path":
+			return dub.projectPath.toJSON();
 		default:
-			throw new Exception("Unknown command");
+			throw new Exception("Unknown command: '" ~ cmd ~ "'");
 		}
 		return JSONValue(null);
 	}
@@ -204,20 +226,29 @@ private:
 	string[] _importPaths, _stringImportPaths;
 }
 
-string getString(JSONValue value, string key)
+DubPackageInfo getInfo(in Package dep)
 {
-	auto ptr = key in value;
-	assert(ptr, key ~ " not specified!");
-	assert(ptr.type == JSON_TYPE.STRING, key ~ " must be a string!");
-	return ptr.str;
+	DubPackageInfo info;
+	info.name = dep.name;
+	info.ver = dep.vers;
+	foreach (name, subDep; dep.dependencies)
+	{
+		info.dependencies[name] = subDep.toString();
+	}
+	return info;
 }
 
-JSONValue get(JSONValue value, string key)
+auto listDependencies(Project project)
 {
-	auto ptr = key in value;
-	assert(ptr, key ~ " not specified!");
-	assert(ptr.type == JSON_TYPE.OBJECT, key ~ " must be an object!");
-	return *ptr;
+	auto deps = project.dependencies;
+	DubPackageInfo[] dependencies;
+	if (deps is null)
+		return dependencies;
+	foreach (dep; deps)
+	{
+		dependencies ~= getInfo(dep);
+	}
+	return dependencies;
 }
 
 shared static this()

@@ -3,3 +3,7 @@ function b
 		dub run :test
 	end
 end
+
+function r
+	dub build --build=release
+end

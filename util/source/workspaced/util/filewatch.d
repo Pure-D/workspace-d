@@ -48,15 +48,12 @@ struct WatchedFile
 
 		this(string file, uint flags = IN_MODIFY)
 		{
-			import std.stdio : stderr;
 			this.file = file;
 			fd = inotify_init();
-			stderr.writeln("inotify_init: ", fd);
 			if (fd < 0)
 				throw new Exception("Can't watch file!");
 
 			wd = inotify_add_watch(fd, file.toStringz(), flags);
-			stderr.writeln("inotify_add_watch: ", wd);
 			isWatching = true;
 		}
 
