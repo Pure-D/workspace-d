@@ -9,10 +9,10 @@ import core.thread;
 
 bool isNumeric(in string s)
 {
-	if(s.length == 0)
+	if (s.length == 0)
 		return false;
-	foreach(c; s)
-		if(!c.isNumber)
+	foreach (c; s)
+		if (!c.isNumber)
 			return false;
 	return true;
 }
@@ -20,9 +20,11 @@ bool isNumeric(in string s)
 void main(string[] args)
 {
 	import etc.linux.memoryerror;
+
 	static if (is(typeof(registerMemoryErrorHandler)))
 		registerMemoryErrorHandler();
 
+	//dfmt off
 	string[] preprogrammed = [
 		/* 0  */`{"cmd":"load","components":["dub","dcd"],"dir":"` ~ std.file.getcwd() ~ `","port":9621}`,
 		/* 1  */`{"cmd":"dub","subcmd":"list:dep"}`,
@@ -35,23 +37,22 @@ void main(string[] args)
 		/* 8  */`{"cmd":"dcd","subcmd":"find-declaration","pos":14,"code":"void main() {foo();} void foo() {}"}`,
 		/* 9  */`{"cmd":"dcd","subcmd":"list-completion","pos":21,"code":"int integer; integer."}`,
 	];
+	//dfmt on
 
 	auto pipes = pipeProcess(["./workspace-d"] ~ args, Redirect.stdin | Redirect.stdout | Redirect.stderr);
 	int requestID = 0;
 	ubyte[4] intBuffer;
 	ubyte[] dataBuffer;
-	new Thread({
-		while(!pipes.stderr.eof)
-			write("Error: ", pipes.stderr.readln());
-	}).start();
-	while(true)
+	new Thread({ while (!pipes.stderr.eof)
+		write("Error: ", pipes.stderr.readln()); }).start();
+	while (true)
 	{
 		write("Enter JSON: ");
 		string instr = readln().strip();
-		if(instr.isNumeric)
+		if (instr.isNumeric)
 			instr = preprogrammed[toImpl!int(instr)];
 		ubyte[] input = cast(ubyte[]) instr;
-		if(input.length == 0)
+		if (input.length == 0)
 			continue;
 		requestID++;
 		input = nativeToBigEndian(requestID) ~ input;
@@ -76,7 +77,7 @@ void main(string[] args)
 		{
 			writeln(parseJSON(cast(string) dataBuffer).toPrettyString());
 		}
-		catch(Exception e)
+		catch (Exception e)
 		{
 			writeln("[INVALID]: ", cast(string) dataBuffer);
 		}

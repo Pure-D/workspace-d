@@ -41,9 +41,9 @@ public:
 		DubInit value = fromJSON!DubInit(args);
 		assert(value.dir, "dub initialization requires a 'dir' field");
 
-		if(value.registerImportProvider)
+		if (value.registerImportProvider)
 			setImportPathProvider(this);
-		if(value.registerStringImportProvider)
+		if (value.registerStringImportProvider)
 			setStringImportPathProvider(this);
 
 		_dub = new Dub(null, value.dir, SkipRegistry.none);
@@ -141,7 +141,7 @@ public:
 			updateImportPaths();
 			return true;
 		}
-		catch(Exception e)
+		catch (Exception e)
 		{
 			return false;
 		}

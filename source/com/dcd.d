@@ -65,9 +65,7 @@ public:
 			throw new Exception("Already running dcd on port " ~ to!string(port));
 		runningPort = port;
 		serverPipes = raw([serverPath, "--port", to!string(runningPort)]);
-		new Thread({
-			stderr.writeln("DCD-Server stopped with code ", serverPipes.pid.wait());
-		}).start();
+		new Thread({ stderr.writeln("DCD-Server stopped with code ", serverPipes.pid.wait()); }).start();
 	}
 
 	auto stopServer()
@@ -84,9 +82,9 @@ public:
 	void addImports(string[] imports)
 	{
 		string[] args;
-		foreach(path; knownImports)
+		foreach (path; knownImports)
 			args ~= "-I" ~ path;
-		foreach(path; imports)
+		foreach (path; imports)
 			args ~= "-I" ~ path;
 		knownImports ~= imports;
 		doClient(args);
@@ -105,10 +103,10 @@ public:
 		pipes.stdin.write(code);
 		pipes.stdin.close();
 		string data;
-		while(pipes.stdout.isOpen && !pipes.stdout.eof)
+		while (pipes.stdout.isOpen && !pipes.stdout.eof)
 		{
 			string line = pipes.stdout.readln();
-			if(line.length)
+			if (line.length)
 				data ~= line[0 .. $ - 1];
 		}
 		return data.replace("\\n", "\n");
@@ -120,10 +118,10 @@ public:
 		pipes.stdin.write(code);
 		pipes.stdin.close();
 		string line = pipes.stdout.readln();
-		if(line.length == 0)
+		if (line.length == 0)
 			return JSONValue(null);
 		string[] splits = line[0 .. $ - 1].split('\t');
-		if(splits.length != 2)
+		if (splits.length != 2)
 			return JSONValue(null);
 		return JSONValue([JSONValue(splits[0]), JSONValue(toImpl!int(splits[1]))]);
 	}
@@ -136,7 +134,7 @@ public:
 		while (pipes.stdout.isOpen && !pipes.stdout.eof)
 		{
 			string line = pipes.stdout.readln();
-			if(line.length == 0)
+			if (line.length == 0)
 				continue;
 			string[] splits = line[0 .. $ - 1].split('\t');
 			results ~= DCDSearchResult(splits[0], toImpl!(int)(splits[2]), splits[1]);
@@ -183,30 +181,30 @@ public:
 			while (pipes.stdout.isOpen && !pipes.stdout.eof)
 			{
 				string line = pipes.stdout.readln();
-				if(line.length == 0)
+				if (line.length == 0)
 					continue;
 				data ~= line[0 .. $ - 1];
 			}
 			int[] emptyArr;
 			if (data.length == 0)
-				return JSONValue(["type" : JSONValue("identifiers"), "identifiers": emptyArr.toJSON()]);
-			if(data[0] == "calltips")
+				return JSONValue(["type" : JSONValue("identifiers"), "identifiers" : emptyArr.toJSON()]);
+			if (data[0] == "calltips")
 			{
-				return JSONValue(["type": JSONValue("calltips"), "calltips": data[1 .. $].toJSON()]);
+				return JSONValue(["type" : JSONValue("calltips"), "calltips" : data[1 .. $].toJSON()]);
 			}
-			else if(data[0] == "identifiers")
+			else if (data[0] == "identifiers")
 			{
 				DCDIdentifier[] identifiers;
-				foreach(line; data[1 .. $])
+				foreach (line; data[1 .. $])
 				{
 					string[] splits = line.split('\t');
 					identifiers ~= DCDIdentifier(splits[0], splits[1]);
 				}
-				return JSONValue(["type": JSONValue("identifiers"), "identifiers": identifiers.toJSON()]);
+				return JSONValue(["type" : JSONValue("identifiers"), "identifiers" : identifiers.toJSON()]);
 			}
 			else
 			{
-				return JSONValue(["type": JSONValue("raw"), "raw": data.toJSON()]);
+				return JSONValue(["type" : JSONValue("raw"), "raw" : data.toJSON()]);
 			}
 		case "get-documentation":
 			return getDocumentation(args.getString("code"), cast(int) args.getInt("pos")).toJSON();

@@ -80,9 +80,9 @@ JSONValue handleRequest(JSONValue value)
 		case JSON_TYPE.STRING:
 			if (coms.str == "*")
 			{
-				foreach(name, com; components)
+				foreach (name, com; components)
 				{
-					if(com.initialized)
+					if (com.initialized)
 					{
 						toLoad ~= name;
 						com.deinitialize(value);

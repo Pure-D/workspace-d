@@ -16,7 +16,7 @@ public:
 
 	void initialize(JSONValue args)
 	{
-		if(_initialized)
+		if (_initialized)
 			return;
 		load(args);
 		_initialized = true;
@@ -24,7 +24,7 @@ public:
 
 	void deinitialize(JSONValue args)
 	{
-		if(!_initialized)
+		if (!_initialized)
 			return;
 		unload(args);
 		_initialized = false;
