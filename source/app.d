@@ -160,7 +160,7 @@ int main(string[] args)
 			stderr.writeln(e);
 			// dfmt off
 			send(id, JSONValue([
-				"error" : JSONValue(true),
+				"error": JSONValue(true),
 				"msg": JSONValue(e.msg),
 				"exception": JSONValue(e.toString())
 			]));
@@ -171,7 +171,7 @@ int main(string[] args)
 			stderr.writeln(e);
 			// dfmt off
 			send(id, JSONValue([
-				"error" : JSONValue(true),
+				"error": JSONValue(true),
 				"msg": JSONValue(e.msg),
 				"exception": JSONValue(e.toString())
 			]));

@@ -101,12 +101,16 @@ public:
 
 	string getDocumentation(string code, int location)
 	{
-		auto pipes = doClient(["-c", to!string(location), "--doc"]);
+		auto pipes = doClient(["--doc", "-c", to!string(location)]);
 		pipes.stdin.write(code);
 		pipes.stdin.close();
 		string data;
 		while(pipes.stdout.isOpen && !pipes.stdout.eof)
-			data ~= pipes.stdout.readln()[0 .. $ - 1];
+		{
+			string line = pipes.stdout.readln();
+			if(line.length)
+				data ~= line[0 .. $ - 1];
+		}
 		return data.replace("\\n", "\n");
 	}
 
@@ -115,7 +119,12 @@ public:
 		auto pipes = doClient(["-c", to!string(location), "--symbolLocation"]);
 		pipes.stdin.write(code);
 		pipes.stdin.close();
-		string[] splits = pipes.stdout.readln()[0 .. $ - 1].split('\t');
+		string line = pipes.stdout.readln();
+		if(line.length == 0)
+			return JSONValue(null);
+		string[] splits = line[0 .. $ - 1].split('\t');
+		if(splits.length != 2)
+			return JSONValue(null);
 		return JSONValue([JSONValue(splits[0]), JSONValue(toImpl!int(splits[1]))]);
 	}
 
