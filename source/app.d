@@ -13,11 +13,8 @@ static immutable Version = [1, 0, 0];
 
 void send(int id, JSONValue value)
 {
-	synchronized
-	{
-		ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
-		stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
-	}
+	ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
+	stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
 }
 
 JSONValue toJSONArray(T)(T value)
