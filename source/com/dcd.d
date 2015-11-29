@@ -84,8 +84,11 @@ public:
 	void addImports(string[] imports)
 	{
 		string[] args;
+		foreach(path; knownImports)
+			args ~= "-I" ~ path;
 		foreach(path; imports)
 			args ~= "-I" ~ path;
+		knownImports ~= imports;
 		doClient(args);
 	}
 
@@ -249,6 +252,7 @@ private:
 	string clientPath, serverPath, cwd;
 	ProcessPipes serverPipes;
 	ushort port, runningPort;
+	string[] knownImports;
 }
 
 shared static this()
