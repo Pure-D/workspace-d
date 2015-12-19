@@ -4,6 +4,7 @@ import workspaced.com.component;
 
 import std.json;
 import std.conv;
+import std.path;
 import std.stdio;
 import std.regex;
 import std.string;
@@ -67,7 +68,7 @@ public:
 		case "lint":
 			{
 				string file = args.getString("file");
-				ProcessPipes pipes = raw([execPath, "-S", file]);
+				ProcessPipes pipes = raw([execPath, "-S", file, "--config", buildPath(cwd, "dscanner.ini")]);
 				string[] res;
 				while (pipes.stdout.isOpen && !pipes.stdout.eof)
 					res ~= pipes.stdout.readln();
