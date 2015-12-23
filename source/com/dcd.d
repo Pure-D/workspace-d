@@ -64,8 +64,14 @@ public:
 		if (isPortRunning(port))
 			throw new Exception("Already running dcd on port " ~ to!string(port));
 		runningPort = port;
-		serverPipes = raw([serverPath, "--port", to!string(runningPort)]);
-		new Thread({ stderr.writeln("DCD-Server stopped with code ", serverPipes.pid.wait()); }).start();
+		serverPipes = raw([serverPath, "--port", to!string(runningPort)], Redirect.stdin | Redirect.stdoutToStderr);
+		new Thread({
+			while (!serverPipes.stderr.eof)
+			{
+				stderr.writeln("Server: ", serverPipes.stderr.readln());
+			}
+			stderr.writeln("DCD-Server stopped with code ", serverPipes.pid.wait());
+		}).start();
 	}
 
 	auto stopServer()
@@ -93,7 +99,10 @@ public:
 	@property auto serverStatus()
 	{
 		DCDServerStatus status;
-		status.isRunning = isPortRunning(runningPort) == 0;
+		if (serverPipes.pid.tryWait().terminated)
+			status.isRunning = false;
+		else
+			status.isRunning = isPortRunning(runningPort) == 0;
 		return status;
 	}
 

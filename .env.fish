@@ -1,9 +1,9 @@
 function b
-	if dub build
+	if dub build $argv
 		dub run :test
 	end
 end
 
 function r
-	dub build --build=release
+	dub build --build=release $argv
 end
