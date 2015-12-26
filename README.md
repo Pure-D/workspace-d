@@ -144,7 +144,9 @@ Load arguments:
 
 **Arguments:** *none*
 
-**Description:** Lists all dependencies as `{dependencies: [string], ver: string, name: string}` array.
+**Description:** Lists all dependencies as array.
+
+**Returns:** `[{dependencies: [string], ver: string, name: string}]`
 
 ---
 
@@ -154,6 +156,8 @@ Load arguments:
 
 **Description:** Lists all import paths as string array.
 
+**Returns:** `[string]`
+
 ---
 
 `subcmd: "list:string-import"`
@@ -162,6 +166,8 @@ Load arguments:
 
 **Description:** Lists all string import paths as string array.
 
+**Returns:** `[string]`
+
 ---
 
 `subcmd: "list:configurations"`
@@ -169,6 +175,8 @@ Load arguments:
 **Arguments:** *none*
 
 **Description:** Lists all available configurations.
+
+**Returns:** `[string]`
 
 ---
 
@@ -186,6 +194,8 @@ Load arguments:
 
 **Description:** Returns the current configuration.
 
+**Returns:** `string`
+
 ---
 
 `subcmd: "set:build-type"`
@@ -201,6 +211,8 @@ Load arguments:
 **Arguments:** *none*
 
 **Description:** Returns the current build type.
+
+**Returns:** `string`
 
 ---
 
@@ -218,6 +230,8 @@ Load arguments:
 
 **Description:** Returns the compiler.
 
+**Returns:** `string`
+
 ---
 
 `subcmd: "get:name"`
@@ -226,6 +240,8 @@ Load arguments:
 
 **Description:** Returns the package name.
 
+**Returns:** `string`
+
 ---
 
 `subcmd: "get:path"`
@@ -233,6 +249,8 @@ Load arguments:
 **Arguments:** *none*
 
 **Description:** Returns the project path of the package.
+
+**Returns:** `string`
 
 ### dcd
 
