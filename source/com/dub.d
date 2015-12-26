@@ -206,7 +206,7 @@ public:
 		case "set:compiler":
 			return setCompiler(args.getString("compiler")).toJSON();
 		case "get:compiler":
-			return compiler.name.toJSON();
+			return compiler.toJSON();
 		case "get:name":
 			return dub.projectName.toJSON();
 		case "get:path":
