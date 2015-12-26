@@ -74,6 +74,9 @@ public:
 
 	bool updateImportPaths()
 	{
+		_dub.loadPackageFromCwd();
+		_dub.project.validate();
+		
 		ProjectDescription desc = dub.project.describe(_platform, _configuration, _buildType);
 		if (desc.targets.length > 0 && desc.targetLookup.length > 0 && (desc.rootPackage in desc.targetLookup) !is null)
 		{
