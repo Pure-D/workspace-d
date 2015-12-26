@@ -55,7 +55,7 @@ public:
 		_compiler = getCompiler(compilerName);
 		BuildPlatform platform = _compiler.determinePlatform(_settings, compilerName);
 		_platform = platform; // Workaround for strange bug
-		assert(setConfiguration(dub.project.getDefaultConfiguration(_platform)), "Could not find default configuration");
+		setConfiguration(dub.project.getDefaultConfiguration(_platform));
 
 		static if (__traits(compiles, { WatchedFile f = WatchedFile("path"); }))
 		{
