@@ -13,6 +13,7 @@ import core.thread;
 import dub.dub;
 import dub.project;
 import dub.package_;
+import dub.description;
 import dub.compilers.compiler;
 import dub.compilers.buildsettings;
 import dub.internal.vibecompat.core.log;
@@ -54,9 +55,7 @@ public:
 		_compiler = getCompiler(compilerName);
 		BuildPlatform platform = _compiler.determinePlatform(_settings, compilerName);
 		_platform = platform; // Workaround for strange bug
-		_configuration = dub.project.getDefaultConfiguration(_platform);
-
-		updateImportPaths();
+		assert(setConfiguration(dub.project.getDefaultConfiguration(_platform)), "Could not find default configuration");
 
 		static if (__traits(compiles, { WatchedFile f = WatchedFile("path"); }))
 		{
@@ -73,10 +72,22 @@ public:
 		}
 	}
 
-	void updateImportPaths()
+	bool updateImportPaths()
 	{
-		_importPaths = dub.project.listImportPaths(_platform, _configuration, _buildType, false);
-		_stringImportPaths = dub.project.listStringImportPaths(_platform, _configuration, _buildType, false);
+		ProjectDescription desc = dub.project.describe(_platform, _configuration, _buildType);
+		if (desc.targets.length > 0 && desc.targetLookup.length > 0 && (desc.rootPackage in desc.targetLookup) !is null)
+		{
+			// target-type: none (no import paths)
+			_importPaths = dub.project.listImportPaths(_platform, _configuration, _buildType, false);
+			_stringImportPaths = dub.project.listStringImportPaths(_platform, _configuration, _buildType, false);
+			return _importPaths.length > 0;
+		}
+		else
+		{
+			_importPaths = [];
+			_stringImportPaths = [];
+			return false;
+		}
 	}
 
 	override void unload(JSONValue args)
@@ -124,8 +135,7 @@ public:
 		if (!dub.project.configurations.canFind(value))
 			return false;
 		_configuration = value;
-		updateImportPaths();
-		return true;
+		return updateImportPaths();
 	}
 
 	@property auto buildType()
@@ -138,8 +148,7 @@ public:
 		try
 		{
 			_buildType = value;
-			updateImportPaths();
-			return true;
+			return updateImportPaths();
 		}
 		catch (Exception e)
 		{
@@ -171,8 +180,7 @@ public:
 		switch (cmd)
 		{
 		case "update":
-			updateImportPaths();
-			break;
+			return updateImportPaths().toJSON();
 		case "upgrade":
 			upgrade();
 			break;

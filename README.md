@@ -128,6 +128,8 @@ Load arguments:
 
 **Description:** Manually updates import and string import paths.
 
+**Returns:** `boolean` Returns true whenever the current configuration has any import paths 
+
 ---
 
 `subcmd: "upgrade"`
