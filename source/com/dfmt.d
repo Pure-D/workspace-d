@@ -39,6 +39,8 @@ public:
 	{
 		string code = args.getString("code");
 		ProcessPipes pipes = raw([execPath]);
+		scope (exit)
+			pipes.pid.wait();
 		pipes.stdin.write(code);
 		pipes.stdin.close();
 		ubyte[4096] buffer;

@@ -69,6 +69,8 @@ public:
 			{
 				string file = args.getString("file");
 				ProcessPipes pipes = raw([execPath, "-S", file, "--config", buildPath(cwd, "dscanner.ini")]);
+				scope (exit)
+					pipes.pid.wait();
 				string[] res;
 				while (pipes.stdout.isOpen && !pipes.stdout.eof)
 					res ~= pipes.stdout.readln();
@@ -94,6 +96,8 @@ public:
 			{
 				string file = args.getString("file");
 				ProcessPipes pipes = raw([execPath, "-c", file]);
+				scope (exit)
+					pipes.pid.wait();
 				string[] res;
 				while (pipes.stdout.isOpen && !pipes.stdout.eof)
 					res ~= pipes.stdout.readln();

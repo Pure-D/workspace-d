@@ -93,7 +93,7 @@ public:
 		foreach (path; imports)
 			args ~= "-I" ~ path;
 		knownImports ~= imports;
-		doClient(args);
+		doClient(args).pid.wait();
 	}
 
 	@property auto serverStatus()
@@ -124,6 +124,8 @@ public:
 	JSONValue findDeclaration(string code, int location)
 	{
 		auto pipes = doClient(["-c", to!string(location), "--symbolLocation"]);
+		scope (exit)
+			pipes.pid.wait();
 		pipes.stdin.write(code);
 		pipes.stdin.close();
 		string line = pipes.stdout.readln();
@@ -138,6 +140,8 @@ public:
 	DCDSearchResult[] searchSymbol(string query)
 	{
 		auto pipes = doClient(["--search", query]);
+		scope (exit)
+			pipes.pid.wait();
 		pipes.stdin.close();
 		DCDSearchResult[] results;
 		while (pipes.stdout.isOpen && !pipes.stdout.eof)
@@ -166,7 +170,7 @@ public:
 			startServer();
 			break;
 		case "stop-server":
-			stopServer();
+			stopServer().pid.wait();
 			break;
 		case "kill-server":
 			killServer();
@@ -184,6 +188,8 @@ public:
 			string code = args.getString("code");
 			auto pos = args.getInt("pos");
 			auto pipes = doClient(["-c", to!string(pos)]);
+			scope (exit)
+				pipes.pid.wait();
 			pipes.stdin.write(code);
 			pipes.stdin.close();
 			string[] data;
