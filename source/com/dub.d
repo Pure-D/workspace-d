@@ -48,7 +48,9 @@ public:
 			setStringImportPathProvider(this);
 
 		_dub = new Dub(null, value.dir, SkipRegistry.none);
-		_dub.packageManager.getOrLoadPackage(Path(value.dir));
+		_cwdStr = value.dir;
+		_cwd = Path(value.dir);
+		_dub.packageManager.getOrLoadPackage(_cwd);
 		_dub.loadPackageFromCwd();
 		_dub.project.validate();
 		string compilerName = defaultCompiler;
@@ -72,10 +74,10 @@ public:
 		}
 	}
 
-	bool updateImportPaths()
+	bool updateImportPaths(bool restartDub = true)
 	{
-		_dub.loadPackageFromCwd();
-		_dub.project.validate();
+		if(restartDub)
+			restart();
 		
 		ProjectDescription desc = dub.project.describe(_platform, _configuration, _buildType);
 		if (desc.targets.length > 0 && desc.targetLookup.length > 0 && (desc.rootPackage in desc.targetLookup) !is null)
@@ -96,6 +98,16 @@ public:
 	override void unload(JSONValue args)
 	{
 		_dub.shutdown();
+	}
+	
+	void restart()
+	{
+		_dub.shutdown();
+		
+		_dub = new Dub(null, _cwdStr, SkipRegistry.none);
+		_dub.packageManager.getOrLoadPackage(_cwd);
+		_dub.loadPackageFromCwd();
+		_dub.project.validate();
 	}
 
 	@property auto dependencies()
@@ -138,7 +150,7 @@ public:
 		if (!dub.project.configurations.canFind(value))
 			return false;
 		_configuration = value;
-		return updateImportPaths();
+		return updateImportPaths(false);
 	}
 
 	@property auto buildType()
@@ -151,7 +163,7 @@ public:
 		try
 		{
 			_buildType = value;
-			return updateImportPaths();
+			return updateImportPaths(false);
 		}
 		catch (Exception e)
 		{
@@ -228,9 +240,11 @@ private:
 	}
 
 	Dub _dub;
+	Path _cwd;
 	WatchedFile _dubFileWatch;
 	string _configuration;
 	string _buildType = "debug";
+	string _cwdStr;
 	BuildSettings _settings;
 	Compiler _compiler;
 	BuildPlatform _platform;
