@@ -1,7 +1,6 @@
 module workspaced.com.dub;
 
 import workspaced.com.component;
-import workspaced.util.filewatch;
 
 import std.json;
 import std.algorithm;
@@ -58,20 +57,6 @@ public:
 		BuildPlatform platform = _compiler.determinePlatform(_settings, compilerName);
 		_platform = platform; // Workaround for strange bug
 		setConfiguration(dub.project.getDefaultConfiguration(_platform));
-
-		static if (__traits(compiles, { WatchedFile f = WatchedFile("path"); }))
-		{
-			if (value.watchFile)
-			{
-				_dubFileWatch = WatchedFile(dub.project.rootPackage.packageInfoFilename.toString());
-				new Thread(&checkUpdate).start();
-			}
-		}
-		else
-		{
-			if (value.watchFile)
-				stderr.writeln("Unsupported file watch!");
-		}
 	}
 
 	bool updateImportPaths(bool restartDub = true)
@@ -230,18 +215,8 @@ public:
 	}
 
 private:
-	void checkUpdate()
-	{
-		while (_dubFileWatch.isWatching)
-		{
-			_dubFileWatch.wait();
-			updateImportPaths();
-		}
-	}
-
 	Dub _dub;
 	Path _cwd;
-	WatchedFile _dubFileWatch;
 	string _configuration;
 	string _buildType = "debug";
 	string _cwdStr;
