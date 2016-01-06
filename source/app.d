@@ -1,20 +1,27 @@
 module workspaced.app;
 
-import workspaced.com.component;
-
+import core.sync.mutex;
 import core.exception;
+
+import workspaced.api;
+
+import workspaced.com.dub;
+
 import std.exception;
 import std.bitmanip;
 import std.process;
+import std.traits;
 import std.stdio;
 import std.json;
 
-static immutable Version = [1, 2, 0];
+static immutable Version = [2, 0, 0];
+static Mutex writeMutex;
 
 void send(int id, JSONValue value)
 {
 	ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
-	stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
+	synchronized (writeMutex)
+		stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
 }
 
 JSONValue toJSONArray(T)(T value)
@@ -27,6 +34,7 @@ JSONValue toJSONArray(T)(T value)
 	return JSONValue(vals);
 }
 
+/*
 JSONValue handleRequest(JSONValue value)
 {
 	assert(value.type == JSON_TYPE.OBJECT, "Request must be an object!");
@@ -122,6 +130,49 @@ JSONValue handleRequest(JSONValue value)
 			throw new Exception("Unknown command: " ~ command);
 		}
 	}
+}*/
+
+alias Identity(I...) = I;
+
+void handleRequest(int id, JSONValue request)
+{
+	JSONValue[] values;
+	bool isAsync = false;
+	foreach (name; __traits(allMembers, workspaced.com.dub))
+	{
+		static if (__traits(compiles, __traits(getMember, workspaced.com.dub, name)))
+		{
+			alias symbol = Identity!(__traits(getMember, workspaced.com.dub, name));
+			static if (isSomeFunction!symbol)
+			{
+				foreach (UDA; getUDAs!(symbol, Arguments))
+				{
+					writeln(UDA.stringof);
+					writeln(UDA);
+				}
+			}
+		}
+	}
+	if (isAsync)
+	{
+		if (values.length > 0)
+			throw new Exception("Cannot mix sync and async functions!");
+	}
+	else
+	{
+		if (values.length == 0)
+		{
+			throw new Exception("Unknown arguments!");
+		}
+		else if (values.length == 1)
+		{
+			send(id, values[0]);
+		}
+		else
+		{
+			send(id, JSONValue(values));
+		}
+	}
 }
 
 int main(string[] args)
@@ -131,7 +182,11 @@ int main(string[] args)
 	static if (is(typeof(registerMemoryErrorHandler)))
 		registerMemoryErrorHandler();
 
-	int length = 0;
+	writeMutex = new Mutex;
+
+	handleRequest(0, JSONValue(5));
+
+	/*int length = 0;
 	int id = 0;
 	ubyte[4] intBuffer;
 	ubyte[] dataBuffer;
@@ -178,6 +233,6 @@ int main(string[] args)
 			// dfmt on
 		}
 		stdout.flush();
-	}
+	}*/
 	return 0;
 }

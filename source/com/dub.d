@@ -1,14 +1,13 @@
 module workspaced.com.dub;
 
-import workspaced.com.component;
-import workspaced.util.filewatch;
+import core.sync.mutex;
+import core.thread;
 
-import std.json;
 import std.algorithm;
 
 import painlessjson;
 
-import core.thread;
+import workspaced.api;
 
 import dub.dub;
 import dub.project;
@@ -16,239 +15,190 @@ import dub.package_;
 import dub.description;
 import dub.compilers.compiler;
 import dub.compilers.buildsettings;
-import dub.internal.vibecompat.core.log;
 import dub.internal.vibecompat.inet.url;
 
-private struct DubInit
+@component("dub") :
+
+@load void load(string dir, bool registerImportProvider = true, bool registerStringImportProvider = true)
 {
-	string dir;
-	bool watchFile = true;
-	bool registerImportProvider = true;
-	bool registerStringImportProvider = true;
+	if (registerImportProvider)
+		importPathProvider = "dub";
+	if (registerStringImportProvider)
+		stringImportPathProvider = "dub";
+
+	_cwdStr = dir;
+	_cwd = Path(dir);
+
+	start();
+
+	string compilerName = defaultCompiler;
+	_compiler = getCompiler(compilerName);
+	_platform = _compiler.determinePlatform(_settings, compilerName);
+
+	setConfiguration(_dub.project.getDefaultConfiguration(_platform));
 }
 
-private struct DubPackageInfo
+@unload void stop()
+{
+	_dub.shutdown();
+}
+
+private void start()
+{
+	_dub = new Dub(null, _cwdStr, SkipRegistry.none);
+	_dub.packageManager.getOrLoadPackage(_cwd);
+	_dub.loadPackageFromCwd();
+	_dub.project.validate();
+}
+
+private void restart()
+{
+	stop();
+	start();
+}
+
+@arguments("subcmd", "update")
+@async void update(AsyncCallback callback)
+{
+	new Thread({ callback(updateImportPaths(true).toJSON); }).start();
+}
+
+bool updateImportPaths(bool restartDub = true)
+{
+	if (restartDub)
+		restart();
+
+	ProjectDescription desc = _dub.project.describe(_platform, _configuration, _buildType);
+
+	// target-type: none (no import paths)
+	if (desc.targets.length > 0 && desc.targetLookup.length > 0 && (desc.rootPackage in desc.targetLookup) !is null)
+	{
+		_importPaths = _dub.project.listImportPaths(_platform, _configuration, _buildType, false);
+		_stringImportPaths = _dub.project.listStringImportPaths(_platform, _configuration, _buildType, false);
+		return _importPaths.length > 0;
+	}
+	else
+	{
+		_importPaths = [];
+		_stringImportPaths = [];
+		return false;
+	}
+}
+
+@arguments("subcmd", "upgrade")
+void upgrade()
+{
+	_dub.upgrade(UpgradeOptions.upgrade);
+}
+
+@arguments("subcmd", "list:dep")
+auto dependencies() @property
+{
+	return _dub.project.listDependencies();
+}
+
+@arguments("subcmd", "list:import")
+auto imports() @property
+{
+	return _importPaths;
+}
+
+@arguments("subcmd", "list:string-import")
+auto stringImports() @property
+{
+	return _stringImportPaths;
+}
+
+@arguments("subcmd", "list:configurations")
+auto configurations() @property
+{
+	return _dub.project.configurations;
+}
+
+@arguments("subcmd", "get:configuration")
+auto configuration() @property
+{
+	return _configuration;
+}
+
+@arguments("subcmd", "set:configuration")
+bool setConfiguration(string value)
+{
+	if (!_dub.project.configurations.canFind(value))
+		return false;
+	_configuration = value;
+	return updateImportPaths(false);
+}
+
+@arguments("subcmd", "get:build-type")
+auto buildType() @property
+{
+	return _buildType;
+}
+
+@arguments("subcmd", "set:build-type")
+bool setBuildType(string value)
+{
+	try
+	{
+		_buildType = value;
+		return updateImportPaths(false);
+	}
+	catch (Exception e)
+	{
+		return false;
+	}
+}
+
+@arguments("subcmd", "get:compiler")
+auto compiler() @property
+{
+	return _compiler.name;
+}
+
+@arguments("subcmd", "set:compiler")
+bool setCompiler(string value)
+{
+	try
+	{
+		_compiler = getCompiler(value);
+		return true;
+	}
+	catch (Exception e)
+	{
+		return false;
+	}
+}
+
+@arguments("subcmd", "get:name")
+string name() @property
+{
+	return _dub.projectName;
+}
+
+@arguments("subcmd", "get:path")
+auto path() @property
+{
+	return _dub.projectPath;
+}
+
+private:
+
+Dub _dub;
+Path _cwd;
+string _configuration;
+string _buildType = "debug";
+string _cwdStr;
+BuildSettings _settings;
+Compiler _compiler;
+BuildPlatform _platform;
+string[] _importPaths, _stringImportPaths;
+
+struct DubPackageInfo
 {
 	string[string] dependencies;
 	string ver;
 	string name;
-}
-
-class DubComponent : Component, IImportPathProvider, IStringImportPathProvider
-{
-public:
-	override void load(JSONValue args)
-	{
-		DubInit value = fromJSON!DubInit(args);
-		assert(value.dir, "dub initialization requires a 'dir' field");
-
-		if (value.registerImportProvider)
-			setImportPathProvider(this);
-		if (value.registerStringImportProvider)
-			setStringImportPathProvider(this);
-
-		_dub = new Dub(null, value.dir, SkipRegistry.none);
-		_cwdStr = value.dir;
-		_cwd = Path(value.dir);
-		_dub.packageManager.getOrLoadPackage(_cwd);
-		_dub.loadPackageFromCwd();
-		_dub.project.validate();
-		string compilerName = defaultCompiler;
-		_compiler = getCompiler(compilerName);
-		BuildPlatform platform = _compiler.determinePlatform(_settings, compilerName);
-		_platform = platform; // Workaround for strange bug
-		setConfiguration(dub.project.getDefaultConfiguration(_platform));
-
-		static if (__traits(compiles, { WatchedFile f = WatchedFile("path"); }))
-		{
-			if (value.watchFile)
-			{
-				_dubFileWatch = WatchedFile(dub.project.rootPackage.packageInfoFilename.toString());
-				new Thread(&checkUpdate).start();
-			}
-		}
-		else
-		{
-			if (value.watchFile)
-				stderr.writeln("Unsupported file watch!");
-		}
-	}
-
-	bool updateImportPaths(bool restartDub = true)
-	{
-		if(restartDub)
-			restart();
-		
-		ProjectDescription desc = dub.project.describe(_platform, _configuration, _buildType);
-		if (desc.targets.length > 0 && desc.targetLookup.length > 0 && (desc.rootPackage in desc.targetLookup) !is null)
-		{
-			// target-type: none (no import paths)
-			_importPaths = dub.project.listImportPaths(_platform, _configuration, _buildType, false);
-			_stringImportPaths = dub.project.listStringImportPaths(_platform, _configuration, _buildType, false);
-			return _importPaths.length > 0;
-		}
-		else
-		{
-			_importPaths = [];
-			_stringImportPaths = [];
-			return false;
-		}
-	}
-
-	override void unload(JSONValue args)
-	{
-		_dub.shutdown();
-	}
-	
-	void restart()
-	{
-		_dub.shutdown();
-		
-		_dub = new Dub(null, _cwdStr, SkipRegistry.none);
-		_dub.packageManager.getOrLoadPackage(_cwd);
-		_dub.loadPackageFromCwd();
-		_dub.project.validate();
-	}
-
-	@property auto dependencies()
-	{
-		return dub.project.listDependencies();
-	}
-
-	@property string[] importPaths()
-	{
-		return _importPaths;
-	}
-
-	@property string[] stringImportPaths()
-	{
-		return _stringImportPaths;
-	}
-
-	@property auto configurations()
-	{
-		return dub.project.configurations;
-	}
-
-	void upgrade()
-	{
-		_dub.upgrade(UpgradeOptions.upgrade);
-	}
-
-	@property auto dub()
-	{
-		return _dub;
-	}
-
-	@property auto configuration()
-	{
-		return _configuration;
-	}
-
-	bool setConfiguration(string value)
-	{
-		if (!dub.project.configurations.canFind(value))
-			return false;
-		_configuration = value;
-		return updateImportPaths(false);
-	}
-
-	@property auto buildType()
-	{
-		return _buildType;
-	}
-
-	bool setBuildType(string value)
-	{
-		try
-		{
-			_buildType = value;
-			return updateImportPaths(false);
-		}
-		catch (Exception e)
-		{
-			return false;
-		}
-	}
-
-	@property auto compiler()
-	{
-		return _compiler.name;
-	}
-
-	bool setCompiler(string value)
-	{
-		try
-		{
-			_compiler = getCompiler(value);
-			return true;
-		}
-		catch (Exception e)
-		{ // No public function to get compilers
-			return false;
-		}
-	}
-
-	override JSONValue process(JSONValue args)
-	{
-		string cmd = args.getString("subcmd");
-		switch (cmd)
-		{
-		case "update":
-			return updateImportPaths().toJSON();
-		case "upgrade":
-			upgrade();
-			break;
-		case "list:dep":
-			return dependencies.toJSON();
-		case "list:import":
-			return importPaths.toJSON();
-		case "list:string-import":
-			return stringImportPaths.toJSON();
-		case "list:configurations":
-			return configurations.toJSON();
-		case "set:configuration":
-			return setConfiguration(args.getString("configuration")).toJSON();
-		case "get:configuration":
-			return configuration.toJSON();
-		case "set:build-type":
-			return setBuildType(args.getString("build-type")).toJSON();
-		case "get:build-type":
-			return buildType.toJSON();
-		case "set:compiler":
-			return setCompiler(args.getString("compiler")).toJSON();
-		case "get:compiler":
-			return compiler.toJSON();
-		case "get:name":
-			return dub.projectName.toJSON();
-		case "get:path":
-			return dub.projectPath.toJSON();
-		default:
-			throw new Exception("Unknown command: '" ~ cmd ~ "'");
-		}
-		return JSONValue(null);
-	}
-
-private:
-	void checkUpdate()
-	{
-		while (_dubFileWatch.isWatching)
-		{
-			_dubFileWatch.wait();
-			updateImportPaths();
-		}
-	}
-
-	Dub _dub;
-	Path _cwd;
-	WatchedFile _dubFileWatch;
-	string _configuration;
-	string _buildType = "debug";
-	string _cwdStr;
-	BuildSettings _settings;
-	Compiler _compiler;
-	BuildPlatform _platform;
-	string[] _importPaths, _stringImportPaths;
 }
 
 DubPackageInfo getInfo(in Package dep)
@@ -274,9 +224,4 @@ auto listDependencies(Project project)
 		dependencies ~= getInfo(dep);
 	}
 	return dependencies;
-}
-
-shared static this()
-{
-	components["dub"] = new DubComponent();
 }
