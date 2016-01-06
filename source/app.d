@@ -9,7 +9,7 @@ import std.process;
 import std.stdio;
 import std.json;
 
-static immutable Version = [1, 1, 0];
+static immutable Version = [1, 2, 0];
 
 void send(int id, JSONValue value)
 {
