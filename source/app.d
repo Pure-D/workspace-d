@@ -173,8 +173,8 @@ template JSONCallBody(alias T, string fn, string jsonvar, size_t i, Args...)
 	static if (Args.length == i)
 		enum JSONCallBody = "";
 	else static if (is(ParameterDefaults!T[i] == void))
-		enum JSONCallBody = "(assert(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `" ~ Args[i] ~ " has no default value and is not in the JSON request`), " ~ JSONType!(Parameters!T[i], jsonvar ~ "[`" ~ Args[i] ~ "`]") ~ ")," ~ JSONCallBody!(T,
-				fn, jsonvar, i + 1, Args);
+		enum JSONCallBody = "(assert(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `" ~ Args[i] ~ " has no default value and is not in the JSON request`), " ~ JSONType!(
+				Parameters!T[i], jsonvar ~ "[`" ~ Args[i] ~ "`]") ~ ")," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
 	else
 		enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? " ~ JSONType!(Parameters!T[i], jsonvar ~ "[`" ~ Args[i] ~ "`]") ~ " : ParameterDefaults!(" ~ fn ~ ")[" ~ i
 				.to!string ~ "]," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
@@ -209,15 +209,19 @@ void handleRequest(int id, JSONValue request)
 	int asyncWaiting = 0;
 	bool isAsync = false;
 	bool hasArgs = false;
+	Mutex asyncMutex = new Mutex;
 
 	//dfmt off
 	AsyncCallback asyncCallback = (value)
 	{
-		assert(isAsync);
-		values ~= value;
-		asyncWaiting--;
-		if (asyncWaiting == 0)
-			send(id, values);
+		synchronized (asyncMutex)
+		{
+			assert(isAsync);
+			values ~= value;
+			asyncWaiting--;
+			if (asyncWaiting == 0)
+				send(id, values);
+		}
 	};
 	//dfmt on
 
@@ -308,7 +312,7 @@ int main(string[] args)
 
 	writeMutex = new Mutex;
 
-	handleRequest(0, JSONValue(["cmd" : "load", "component" : "dub", "dir": getcwd()]));
+	handleRequest(0, JSONValue(["cmd" : "load", "component" : "dub", "dir" : getcwd()]));
 
 	/*int length = 0;
 	int id = 0;
