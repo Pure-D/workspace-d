@@ -68,7 +68,7 @@ void main(string[] args)
 		assert(dataBuffer.length == 4, "Invalid buffer data");
 		int receivedID = bigEndianToNative!int(dataBuffer[0 .. 4]);
 
-		assert(requestID == receivedID, "Processed invalid id!");
+		assert(requestID == receivedID, "Processed invalid id! Got those bytes instead: " ~ cast(string) dataBuffer);
 
 		dataBuffer.length = length - 4;
 		dataBuffer = pipes.stdout.rawRead(dataBuffer);
