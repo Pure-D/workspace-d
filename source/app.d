@@ -157,7 +157,9 @@ alias Identity(I...) = I;
 
 template JSONCallBody(alias T, string fn, string jsonvar, size_t i, Args...)
 {
-	static if (Args.length == i)
+	static if (Args.length == 1 && Args[0] == "request" && is(Parameters!T[0] == JSONValue))
+		enum JSONCallBody = jsonvar;
+	else static if (Args.length == i)
 		enum JSONCallBody = "";
 	else static if (is(ParameterDefaults!T[i] == void))
 		enum JSONCallBody = "(assert(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `" ~ Args[i] ~ " has no default value and is not in the JSON request`), fromJSON!(Parameters!(" ~ fn ~ ")[" ~ i
@@ -306,6 +308,7 @@ void handleRequest(int id, JSONValue request)
 	handleRequestMod!(workspaced.com.dub)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.dcd)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.dfmt)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dscanner)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 
 	if (isAsync)
 	{
@@ -333,6 +336,19 @@ void processException(int id, Throwable e)
 	// dfmt on
 }
 
+void processException(int id, JSONValue request, Throwable e)
+{
+	stderr.writeln(e);
+	// dfmt off
+	sendFinal(id, JSONValue([
+		"error": JSONValue(true),
+		"msg": JSONValue(e.msg),
+		"exception": JSONValue(e.toString()),
+		"request": request
+	]));
+	// dfmt on
+}
+
 int main(string[] args)
 {
 	import std.file;
@@ -347,6 +363,7 @@ int main(string[] args)
 	int id = 0;
 	ubyte[4] intBuffer;
 	ubyte[] dataBuffer;
+	JSONValue data;
 	while (stdin.isOpen && stdout.isOpen && !stdin.eof)
 	{
 		dataBuffer = stdin.rawRead(intBuffer);
@@ -364,8 +381,7 @@ int main(string[] args)
 
 		try
 		{
-			auto data = parseJSON(cast(string) dataBuffer);
-			handleRequest(id, data);
+			data = parseJSON(cast(string) dataBuffer);
 		}
 		catch (Exception e)
 		{
@@ -374,6 +390,19 @@ int main(string[] args)
 		catch (AssertError e)
 		{
 			processException(id, e);
+		}
+
+		try
+		{
+			handleRequest(id, data);
+		}
+		catch (Exception e)
+		{
+			processException(id, data, e);
+		}
+		catch (AssertError e)
+		{
+			processException(id, data, e);
 		}
 		stdout.flush();
 	}

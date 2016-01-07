@@ -3,6 +3,7 @@ module workspaced.com.dub;
 import core.sync.mutex;
 import core.thread;
 
+import std.json : JSONValue;
 import std.stdio;
 import std.parallelism;
 import std.algorithm;
@@ -137,11 +138,11 @@ auto configuration() @property
 }
 
 @arguments("subcmd", "set:configuration")
-bool setConfiguration(string value)
+bool setConfiguration(string configuration)
 {
-	if (!_dub.project.configurations.canFind(value))
+	if (!_dub.project.configurations.canFind(configuration))
 		return false;
-	_configuration = value;
+	_configuration = configuration;
 	return updateImportPaths(false);
 }
 
@@ -152,11 +153,12 @@ auto buildType() @property
 }
 
 @arguments("subcmd", "set:build-type")
-bool setBuildType(string value)
+bool setBuildType(JSONValue request)
 {
 	try
 	{
-		_buildType = value;
+		assert("build-type" in request, "build-type not in request");
+		_buildType = request["build-type"].str;
 		return updateImportPaths(false);
 	}
 	catch (Exception e)
@@ -172,11 +174,11 @@ auto compiler() @property
 }
 
 @arguments("subcmd", "set:compiler")
-bool setCompiler(string value)
+bool setCompiler(string compiler)
 {
 	try
 	{
-		_compiler = getCompiler(value);
+		_compiler = getCompiler(compiler);
 		return true;
 	}
 	catch (Exception e)

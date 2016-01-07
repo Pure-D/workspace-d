@@ -1,10 +1,6 @@
 module workspaced.com.dfmt;
 
 import std.json;
-import std.conv;
-import std.stdio;
-import std.regex;
-import std.string;
 import std.process;
 import core.thread;
 

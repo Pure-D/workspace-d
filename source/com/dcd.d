@@ -29,6 +29,12 @@ import workspaced.api;
 }
 
 @arguments("subcmd", "setup-server")
+void setupServer()
+{
+	startServer();
+	updateImports();
+}
+
 @arguments("subcmd", "start-server")
 void startServer()
 {
@@ -36,7 +42,6 @@ void startServer()
 		throw new Exception("Already running dcd on port " ~ port.to!string);
 	runningPort = port;
 	serverPipes = raw([serverPath, "--port", runningPort.to!string], Redirect.stdin | Redirect.stdoutToStderr);
-	updateImports();
 	new Thread({
 		while (!serverPipes.stderr.eof)
 		{
@@ -81,7 +86,7 @@ void restartServer(AsyncCallback cb)
 		try
 		{
 			stopServerSync();
-			startServer();
+			setupServer();
 			cb(null, JSONValue(null));
 		}
 		catch (Throwable t)
