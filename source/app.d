@@ -19,12 +19,16 @@ import std.meta;
 import std.conv;
 
 static immutable Version = [2, 0, 0];
+__gshared Mutex writeMutex;
 
 void sendFinal(int id, JSONValue value)
 {
 	ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
-	stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
-	stdout.flush();
+	synchronized (writeMutex)
+	{
+		stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
+		stdout.flush();
+	}
 }
 
 void send(int id, JSONValue[] values)
@@ -208,11 +212,12 @@ void handleRequest(int id, JSONValue request)
 	int asyncWaiting = 0;
 	bool isAsync = false;
 	bool hasArgs = false;
+	Mutex asyncMutex = new Mutex;
 
 	//dfmt off
 	AsyncCallback asyncCallback = (value)
 	{
-		synchronized
+		synchronized(asyncMutex)
 		{
 			assert(isAsync);
 			values ~= value;
@@ -321,6 +326,8 @@ int main(string[] args)
 
 	static if (is(typeof(registerMemoryErrorHandler)))
 		registerMemoryErrorHandler();
+
+	writeMutex = new Mutex;
 
 	int length = 0;
 	int id = 0;
