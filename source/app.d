@@ -305,6 +305,7 @@ void handleRequest(int id, JSONValue request)
 
 	handleRequestMod!(workspaced.com.dub)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.dcd)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dfmt)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 
 	if (isAsync)
 	{
