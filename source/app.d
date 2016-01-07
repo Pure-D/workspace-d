@@ -7,8 +7,6 @@ import painlessjson;
 
 import workspaced.api;
 
-import workspaced.com.dub;
-
 import std.exception;
 import std.bitmanip;
 import std.process;
@@ -157,29 +155,15 @@ JSONValue handleRequest(JSONValue value)
 
 alias Identity(I...) = I;
 
-template JSONType(T, string value)
-{
-	static if (isSomeString!T)
-		enum JSONType = value ~ ".str";
-	else static if (isNumeric!T)
-		enum JSONType = value ~ ".integer";
-	else static if (isBoolean!T)
-		enum JSONType = value ~ ".type != JSON_TYPE.FALSE && " ~ value ~ ".type != JSON_TYPE.NULL";
-	else static if (isFloatingPoint!T)
-		enum JSONType = value ~ ".floating";
-	else
-		static assert("Not implemented type " ~ T.stringof);
-}
-
 template JSONCallBody(alias T, string fn, string jsonvar, size_t i, Args...)
 {
 	static if (Args.length == i)
 		enum JSONCallBody = "";
 	else static if (is(ParameterDefaults!T[i] == void))
-		enum JSONCallBody = "(assert(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `" ~ Args[i] ~ " has no default value and is not in the JSON request`), " ~ JSONType!(
-				Parameters!T[i], jsonvar ~ "[`" ~ Args[i] ~ "`]") ~ ")," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
+		enum JSONCallBody = "(assert(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `" ~ Args[i] ~ " has no default value and is not in the JSON request`), fromJSON!(Parameters!(" ~ fn ~ ")[" ~ i
+				.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]" ~ "))," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
 	else
-		enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? " ~ JSONType!(Parameters!T[i], jsonvar ~ "[`" ~ Args[i] ~ "`]") ~ " : ParameterDefaults!(" ~ fn ~ ")[" ~ i
+		enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? fromJSON!(Parameters!(" ~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]" ~ ") : ParameterDefaults!(" ~ fn ~ ")[" ~ i
 				.to!string ~ "]," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
 }
 
@@ -206,33 +190,13 @@ template JSONCall(alias T, string fn, string jsonvar, bool async)
 	}
 }
 
-void handleRequest(int id, JSONValue request)
+void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values, ref int asyncWaiting, ref bool isAsync, ref bool hasArgs, ref AsyncCallback asyncCallback)
 {
-	JSONValue[] values;
-	int asyncWaiting = 0;
-	bool isAsync = false;
-	bool hasArgs = false;
-	Mutex asyncMutex = new Mutex;
-
-	//dfmt off
-	AsyncCallback asyncCallback = (value)
+	foreach (name; __traits(allMembers, T))
 	{
-		synchronized(asyncMutex)
+		static if (__traits(compiles, __traits(getMember, T, name)))
 		{
-			assert(isAsync);
-			values ~= value;
-			asyncWaiting--;
-			if (asyncWaiting == 0)
-				send(id, values);
-		}
-	};
-	//dfmt on
-
-	foreach (name; __traits(allMembers, workspaced.com.dub))
-	{
-		static if (__traits(compiles, __traits(getMember, workspaced.com.dub, name)))
-		{
-			alias symbol = Identity!(__traits(getMember, workspaced.com.dub, name));
+			alias symbol = Identity!(__traits(getMember, T, name));
 			static if (isSomeFunction!symbol)
 			{
 				bool matches = false;
@@ -305,6 +269,43 @@ void handleRequest(int id, JSONValue request)
 			}
 		}
 	}
+}
+
+void handleRequest(int id, JSONValue request)
+{
+	JSONValue[] values;
+	int asyncWaiting = 0;
+	bool isAsync = false;
+	bool hasArgs = false;
+	Mutex asyncMutex = new Mutex;
+
+	AsyncCallback asyncCallback = (err, value) {
+		synchronized (asyncMutex)
+		{
+			try
+			{
+				assert(isAsync);
+				if (err)
+					throw err;
+				values ~= value;
+				asyncWaiting--;
+				if (asyncWaiting == 0)
+					send(id, values);
+			}
+			catch (Exception e)
+			{
+				processException(id, e);
+			}
+			catch (AssertError e)
+			{
+				processException(id, e);
+			}
+		}
+	};
+
+	handleRequestMod!(workspaced.com.dub)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dcd)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
+
 	if (isAsync)
 	{
 		if (values.length > 0)
@@ -317,6 +318,18 @@ void handleRequest(int id, JSONValue request)
 		else
 			send(id, values);
 	}
+}
+
+void processException(int id, Throwable e)
+{
+	stderr.writeln(e);
+	// dfmt off
+	sendFinal(id, JSONValue([
+		"error": JSONValue(true),
+		"msg": JSONValue(e.msg),
+		"exception": JSONValue(e.toString())
+	]));
+	// dfmt on
 }
 
 int main(string[] args)
@@ -335,45 +348,31 @@ int main(string[] args)
 	ubyte[] dataBuffer;
 	while (stdin.isOpen && stdout.isOpen && !stdin.eof)
 	{
+		dataBuffer = stdin.rawRead(intBuffer);
+		assert(dataBuffer.length == 4, "Unexpected buffer data");
+		length = bigEndianToNative!int(dataBuffer[0 .. 4]);
+
+		assert(length >= 4, "Invalid request");
+
+		dataBuffer = stdin.rawRead(intBuffer);
+		assert(dataBuffer.length == 4, "Unexpected buffer data");
+		id = bigEndianToNative!int(dataBuffer[0 .. 4]);
+
+		dataBuffer.length = length - 4;
+		dataBuffer = stdin.rawRead(dataBuffer);
+
 		try
 		{
-			dataBuffer = stdin.rawRead(intBuffer);
-			assert(dataBuffer.length == 4, "Unexpected buffer data");
-			length = bigEndianToNative!int(dataBuffer[0 .. 4]);
-
-			assert(length >= 4, "Invalid request");
-
-			dataBuffer = stdin.rawRead(intBuffer);
-			assert(dataBuffer.length == 4, "Unexpected buffer data");
-			id = bigEndianToNative!int(dataBuffer[0 .. 4]);
-
-			dataBuffer.length = length - 4;
-			dataBuffer = stdin.rawRead(dataBuffer);
-
 			auto data = parseJSON(cast(string) dataBuffer);
 			handleRequest(id, data);
 		}
 		catch (Exception e)
 		{
-			stderr.writeln(e);
-			// dfmt off
-			sendFinal(id, JSONValue([
-				"error": JSONValue(true),
-				"msg": JSONValue(e.msg),
-				"exception": JSONValue(e.toString())
-			]));
-			// dfmt on
+			processException(id, e);
 		}
 		catch (AssertError e)
 		{
-			stderr.writeln(e);
-			// dfmt off
-			sendFinal(id, JSONValue([
-				"error": JSONValue(true),
-				"msg": JSONValue(e.msg),
-				"exception": JSONValue(e.toString())
-			]));
-			// dfmt on
+			processException(id, e);
 		}
 		stdout.flush();
 	}

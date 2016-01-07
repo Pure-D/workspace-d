@@ -24,9 +24,9 @@ import dub.internal.vibecompat.inet.url;
 @load void startup(string dir, bool registerImportProvider = true, bool registerStringImportProvider = true)
 {
 	if (registerImportProvider)
-		importPathProvider = "dub";
+		importPathProvider = &imports;
 	if (registerStringImportProvider)
-		stringImportPathProvider = "dub";
+		stringImportPathProvider = &stringImports;
 
 	_cwdStr = dir;
 	_cwd = Path(dir);
@@ -65,16 +65,15 @@ private void restart()
 @async void update(AsyncCallback callback)
 {
 	restart();
-	new Thread({
+	new Thread({ /**/
 		try
 		{
 			auto result = updateImportPaths(false);
-			callback(result.toJSON);
+			callback(null, result.toJSON);
 		}
 		catch (Throwable t)
 		{
-			stderr.writeln(t);
-			callback((false).toJSON);
+			callback(t, null.toJSON);
 		}
 	}).start();
 }
