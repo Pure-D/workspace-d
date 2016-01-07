@@ -19,13 +19,12 @@ import std.meta;
 import std.conv;
 
 static immutable Version = [2, 0, 0];
-static Mutex writeMutex;
 
 void sendFinal(int id, JSONValue value)
 {
 	ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
-	synchronized (writeMutex)
-		stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
+	stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
+	stdout.flush();
 }
 
 void send(int id, JSONValue[] values)
@@ -209,12 +208,11 @@ void handleRequest(int id, JSONValue request)
 	int asyncWaiting = 0;
 	bool isAsync = false;
 	bool hasArgs = false;
-	Mutex asyncMutex = new Mutex;
 
 	//dfmt off
 	AsyncCallback asyncCallback = (value)
 	{
-		synchronized (asyncMutex)
+		synchronized
 		{
 			assert(isAsync);
 			values ~= value;
@@ -257,15 +255,31 @@ void handleRequest(int id, JSONValue request)
 				}
 				static if (hasUDA!(symbol, load) && hasUDA!(symbol, component))
 				{
-					if (("component" in request) !is null && request["component"].type == JSON_TYPE.STRING && ("cmd" in request) !is null
-							&& request["cmd"].type == JSON_TYPE.STRING && getUDAs!(symbol, component)[0].name == request["component"].str && request["cmd"].str == "load")
-						matches = true;
+					if (("components" in request) !is null && ("cmd" in request) !is null && request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "load")
+					{
+						if (request["components"].type == JSON_TYPE.ARRAY)
+						{
+							foreach (com; request["components"].array)
+								if (com.type == JSON_TYPE.STRING && com.str == getUDAs!(symbol, component)[0].name)
+									matches = true;
+						}
+						else if (request["components"].type == JSON_TYPE.STRING && request["components"].str == getUDAs!(symbol, component)[0].name)
+							matches = true;
+					}
 				}
 				static if (hasUDA!(symbol, unload) && hasUDA!(symbol, component))
 				{
-					if (("component" in request) !is null && request["component"].type == JSON_TYPE.STRING && ("cmd" in request) !is null
-							&& request["cmd"].type == JSON_TYPE.STRING && getUDAs!(symbol, component)[0].name == request["component"].str && request["cmd"].str == "unload")
-						matches = true;
+					if (("components" in request) !is null && ("cmd" in request) !is null && request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "unload")
+					{
+						if (request["components"].type == JSON_TYPE.ARRAY)
+						{
+							foreach (com; request["components"].array)
+								if (com.type == JSON_TYPE.STRING && com.str == getUDAs!(symbol, component)[0].name)
+									matches = true;
+						}
+						else if (request["components"].type == JSON_TYPE.STRING && request["components"].str == getUDAs!(symbol, component)[0].name)
+							matches = true;
+					}
 				}
 				if (matches)
 				{
@@ -274,14 +288,12 @@ void handleRequest(int id, JSONValue request)
 						assert(!hasArgs);
 						isAsync = true;
 						asyncWaiting++;
-						writeln("Running " ~ name);
 						mixin(JSONCall!(symbol[0], "symbol[0]", "request", true));
 					}
 					else
 					{
 						assert(!isAsync);
 						hasArgs = true;
-						writeln("Running " ~ name);
 						mixin(JSONCall!(symbol[0], "symbol[0]", "request", false));
 					}
 				}
@@ -310,11 +322,7 @@ int main(string[] args)
 	static if (is(typeof(registerMemoryErrorHandler)))
 		registerMemoryErrorHandler();
 
-	writeMutex = new Mutex;
-
-	handleRequest(0, JSONValue(["cmd" : "load", "component" : "dub", "dir" : getcwd()]));
-
-	/*int length = 0;
+	int length = 0;
 	int id = 0;
 	ubyte[4] intBuffer;
 	ubyte[] dataBuffer;
@@ -336,13 +344,13 @@ int main(string[] args)
 			dataBuffer = stdin.rawRead(dataBuffer);
 
 			auto data = parseJSON(cast(string) dataBuffer);
-			send(id, handleRequest(data));
+			handleRequest(id, data);
 		}
 		catch (Exception e)
 		{
 			stderr.writeln(e);
 			// dfmt off
-			send(id, JSONValue([
+			sendFinal(id, JSONValue([
 				"error": JSONValue(true),
 				"msg": JSONValue(e.msg),
 				"exception": JSONValue(e.toString())
@@ -353,7 +361,7 @@ int main(string[] args)
 		{
 			stderr.writeln(e);
 			// dfmt off
-			send(id, JSONValue([
+			sendFinal(id, JSONValue([
 				"error": JSONValue(true),
 				"msg": JSONValue(e.msg),
 				"exception": JSONValue(e.toString())
@@ -361,6 +369,6 @@ int main(string[] args)
 			// dfmt on
 		}
 		stdout.flush();
-	}*/
+	}
 	return 0;
 }

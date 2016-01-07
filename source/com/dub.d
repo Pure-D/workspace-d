@@ -4,6 +4,7 @@ import core.sync.mutex;
 import core.thread;
 
 import std.stdio;
+import std.parallelism;
 import std.algorithm;
 
 import painlessjson;
@@ -22,8 +23,6 @@ import dub.internal.vibecompat.inet.url;
 
 @load void startup(string dir, bool registerImportProvider = true, bool registerStringImportProvider = true)
 {
-	writeln("Starting up dub...");
-
 	if (registerImportProvider)
 		importPathProvider = "dub";
 	if (registerStringImportProvider)
@@ -35,25 +34,25 @@ import dub.internal.vibecompat.inet.url;
 	start();
 
 	string compilerName = defaultCompiler;
-	_compiler = getCompiler(compilerName);
-	_platform = _compiler.determinePlatform(_settings, compilerName);
+	_compiler = cast(shared Compiler) getCompiler(compilerName);
+	BuildSettings settings;
+	_platform = cast(shared BuildPlatform) (cast(Compiler) _compiler).determinePlatform(settings, compilerName);
+	_settings = cast(shared BuildSettings) settings;
 
-	setConfiguration(_dub.project.getDefaultConfiguration(_platform));
-	
-	writeln("Started up dub!");
+	setConfiguration((cast(Dub) _dub).project.getDefaultConfiguration(cast(BuildPlatform) _platform));
 }
 
 @unload void stop()
 {
-	_dub.shutdown();
+	(cast(Dub) _dub).shutdown();
 }
 
 private void start()
 {
-	_dub = new Dub(null, _cwdStr, SkipRegistry.none);
-	_dub.packageManager.getOrLoadPackage(_cwd);
-	_dub.loadPackageFromCwd();
-	_dub.project.validate();
+	_dub = cast(shared Dub) new Dub(null, _cwdStr, SkipRegistry.none);
+	(cast(Dub) _dub).packageManager.getOrLoadPackage(_cwd);
+	(cast(Dub) _dub).loadPackageFromCwd();
+	(cast(Dub) _dub).project.validate();
 }
 
 private void restart()
@@ -65,7 +64,19 @@ private void restart()
 @arguments("subcmd", "update")
 @async void update(AsyncCallback callback)
 {
-	new Thread({ callback(updateImportPaths(true).toJSON); }).start();
+	restart();
+	new Thread({
+		try
+		{
+			auto result = updateImportPaths(false);
+			callback(result.toJSON);
+		}
+		catch (Throwable t)
+		{
+			stderr.writeln(t);
+			callback((false).toJSON);
+		}
+	}).start();
 }
 
 bool updateImportPaths(bool restartDub = true)
@@ -73,13 +84,13 @@ bool updateImportPaths(bool restartDub = true)
 	if (restartDub)
 		restart();
 
-	ProjectDescription desc = _dub.project.describe(_platform, _configuration, _buildType);
+	ProjectDescription desc = (cast(Dub) _dub).project.describe(cast(BuildPlatform) _platform, cast(string) _configuration, cast(string) _buildType);
 
 	// target-type: none (no import paths)
 	if (desc.targets.length > 0 && desc.targetLookup.length > 0 && (desc.rootPackage in desc.targetLookup) !is null)
 	{
-		_importPaths = _dub.project.listImportPaths(_platform, _configuration, _buildType, false);
-		_stringImportPaths = _dub.project.listStringImportPaths(_platform, _configuration, _buildType, false);
+		_importPaths = (cast(Dub) _dub).project.listImportPaths(cast(BuildPlatform) _platform, cast(string) _configuration, cast(string) _buildType, false);
+		_stringImportPaths = (cast(Dub) _dub).project.listStringImportPaths(cast(BuildPlatform) _platform, cast(string) _configuration, cast(string) _buildType, false);
 		return _importPaths.length > 0;
 	}
 	else
@@ -93,13 +104,13 @@ bool updateImportPaths(bool restartDub = true)
 @arguments("subcmd", "upgrade")
 void upgrade()
 {
-	_dub.upgrade(UpgradeOptions.upgrade);
+	(cast(Dub) _dub).upgrade(UpgradeOptions.upgrade);
 }
 
 @arguments("subcmd", "list:dep")
 auto dependencies() @property
 {
-	return _dub.project.listDependencies();
+	return (cast(Dub) _dub).project.listDependencies();
 }
 
 @arguments("subcmd", "list:import")
@@ -117,7 +128,7 @@ auto stringImports() @property
 @arguments("subcmd", "list:configurations")
 auto configurations() @property
 {
-	return _dub.project.configurations;
+	return (cast(Dub) _dub).project.configurations;
 }
 
 @arguments("subcmd", "get:configuration")
@@ -129,7 +140,7 @@ auto configuration() @property
 @arguments("subcmd", "set:configuration")
 bool setConfiguration(string value)
 {
-	if (!_dub.project.configurations.canFind(value))
+	if (!(cast(Dub) _dub).project.configurations.canFind(value))
 		return false;
 	_configuration = value;
 	return updateImportPaths(false);
@@ -158,7 +169,7 @@ bool setBuildType(string value)
 @arguments("subcmd", "get:compiler")
 auto compiler() @property
 {
-	return _compiler.name;
+	return (cast(Compiler) _compiler).name;
 }
 
 @arguments("subcmd", "set:compiler")
@@ -166,7 +177,7 @@ bool setCompiler(string value)
 {
 	try
 	{
-		_compiler = getCompiler(value);
+		_compiler = cast(shared Compiler) getCompiler(value);
 		return true;
 	}
 	catch (Exception e)
@@ -178,25 +189,25 @@ bool setCompiler(string value)
 @arguments("subcmd", "get:name")
 string name() @property
 {
-	return _dub.projectName;
+	return (cast(Dub) _dub).projectName;
 }
 
 @arguments("subcmd", "get:path")
 auto path() @property
 {
-	return _dub.projectPath;
+	return (cast(Dub) _dub).projectPath;
 }
 
 private:
 
-Dub _dub;
+shared Dub _dub;
 Path _cwd;
-string _configuration;
-string _buildType = "debug";
-string _cwdStr;
-BuildSettings _settings;
-Compiler _compiler;
-BuildPlatform _platform;
+shared string _configuration;
+shared string _buildType = "debug";
+shared string _cwdStr;
+shared BuildSettings _settings;
+shared Compiler _compiler;
+shared BuildPlatform _platform;
 string[] _importPaths, _stringImportPaths;
 
 struct DubPackageInfo
