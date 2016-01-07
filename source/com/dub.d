@@ -3,6 +3,7 @@ module workspaced.com.dub;
 import core.sync.mutex;
 import core.thread;
 
+import std.stdio;
 import std.algorithm;
 
 import painlessjson;
@@ -19,8 +20,10 @@ import dub.internal.vibecompat.inet.url;
 
 @component("dub") :
 
-@load void load(string dir, bool registerImportProvider = true, bool registerStringImportProvider = true)
+@load void startup(string dir, bool registerImportProvider = true, bool registerStringImportProvider = true)
 {
+	writeln("Starting up dub...");
+
 	if (registerImportProvider)
 		importPathProvider = "dub";
 	if (registerStringImportProvider)
@@ -36,6 +39,8 @@ import dub.internal.vibecompat.inet.url;
 	_platform = _compiler.determinePlatform(_settings, compilerName);
 
 	setConfiguration(_dub.project.getDefaultConfiguration(_platform));
+	
+	writeln("Started up dub!");
 }
 
 @unload void stop()

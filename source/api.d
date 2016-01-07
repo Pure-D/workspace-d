@@ -1,5 +1,6 @@
 module workspaced.api;
 
+import std.conv;
 import std.json;
 import painlessjson;
 
@@ -42,25 +43,28 @@ private struct Argument
 
 private template ArgumentPair(size_t i)
 {
-	static if(i > 2)
-		enum ArgumentPair = "ret.arguments ~= Argument(args[" ~ i.to!string ~ "], args[" ~ (i + 1).to!string ~ "].toJSON);" ~ ArgumentPair!(i - 2);
+	static if(i > 0)
+		enum ArgumentPair = "ret.arguments[" ~ (i / 2 - 1).to!string ~ "] = Argument(args[" ~ (i - 2).to!string ~ "], args[" ~ (i - 1).to!string ~ "].toJSON);" ~ ArgumentPair!(i - 2);
 	else
 		enum ArgumentPair = "";
 }
 
 Arguments arguments(T...)(T args)
 {
+	if(args.length < 2)
+		return Arguments.init;
 	Arguments ret;
+	ret.arguments.length = args.length / 2;
 	mixin(ArgumentPair!(args.length));
 	return ret;
 }
 
 unittest
 {
-	Arguments args = Arguments("foo", 5, "bar", "str");
+	Arguments args = arguments("foo", 5, "bar", "str");
 	assert(args.arguments[0].key == "foo");
 	assert(args.arguments[0].value.integer == 5);
-	assert(args.arguments[1].key == "foo");
+	assert(args.arguments[1].key == "bar");
 	assert(args.arguments[1].value.str == "str");
 }
 

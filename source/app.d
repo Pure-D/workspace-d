@@ -3,6 +3,8 @@ module workspaced.app;
 import core.sync.mutex;
 import core.exception;
 
+import painlessjson;
+
 import workspaced.api;
 
 import workspaced.com.dub;
@@ -13,15 +15,33 @@ import std.process;
 import std.traits;
 import std.stdio;
 import std.json;
+import std.meta;
+import std.conv;
 
 static immutable Version = [2, 0, 0];
 static Mutex writeMutex;
 
-void send(int id, JSONValue value)
+void sendFinal(int id, JSONValue value)
 {
 	ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
 	synchronized (writeMutex)
 		stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
+}
+
+void send(int id, JSONValue[] values)
+{
+	if (values.length == 0)
+	{
+		throw new Exception("Unknown arguments!");
+	}
+	else if (values.length == 1)
+	{
+		sendFinal(id, values[0]);
+	}
+	else
+	{
+		sendFinal(id, JSONValue(values));
+	}
 }
 
 JSONValue toJSONArray(T)(T value)
@@ -134,10 +154,73 @@ JSONValue handleRequest(JSONValue value)
 
 alias Identity(I...) = I;
 
+template JSONType(T, string value)
+{
+	static if (isSomeString!T)
+		enum JSONType = value ~ ".str";
+	else static if (isNumeric!T)
+		enum JSONType = value ~ ".integer";
+	else static if (isBoolean!T)
+		enum JSONType = value ~ ".type != JSON_TYPE.FALSE && " ~ value ~ ".type != JSON_TYPE.NULL";
+	else static if (isFloatingPoint!T)
+		enum JSONType = value ~ ".floating";
+	else
+		static assert("Not implemented type " ~ T.stringof);
+}
+
+template JSONCallBody(alias T, string fn, string jsonvar, size_t i, Args...)
+{
+	static if (Args.length == i)
+		enum JSONCallBody = "";
+	else static if (is(ParameterDefaults!T[i] == void))
+		enum JSONCallBody = "(assert(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `" ~ Args[i] ~ " has no default value and is not in the JSON request`), " ~ JSONType!(Parameters!T[i], jsonvar ~ "[`" ~ Args[i] ~ "`]") ~ ")," ~ JSONCallBody!(T,
+				fn, jsonvar, i + 1, Args);
+	else
+		enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? " ~ JSONType!(Parameters!T[i], jsonvar ~ "[`" ~ Args[i] ~ "`]") ~ " : ParameterDefaults!(" ~ fn ~ ")[" ~ i
+				.to!string ~ "]," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
+}
+
+template JSONCallNoRet(alias T, string fn, string jsonvar, bool async)
+{
+	alias Args = ParameterIdentifierTuple!T;
+	static if (Args.length > 0)
+		enum JSONCallNoRet = fn ~ "(" ~ (async ? "asyncCallback," : "") ~ JSONCallBody!(T, fn, jsonvar, async ? 1 : 0, Args) ~ ")";
+	else
+		enum JSONCallNoRet = fn ~ "(" ~ (async ? "asyncCallback" : "") ~ ")";
+}
+
+template JSONCall(alias T, string fn, string jsonvar, bool async)
+{
+	static if (async)
+		enum JSONCall = JSONCallNoRet!(T, fn, jsonvar, async) ~ ";";
+	else
+	{
+		alias Ret = ReturnType!T;
+		static if (is(Ret == void))
+			enum JSONCall = JSONCallNoRet!(T, fn, jsonvar, async) ~ ";";
+		else
+			enum JSONCall = "values ~= " ~ JSONCallNoRet!(T, fn, jsonvar, async) ~ ".toJSON;";
+	}
+}
+
 void handleRequest(int id, JSONValue request)
 {
 	JSONValue[] values;
+	int asyncWaiting = 0;
 	bool isAsync = false;
+	bool hasArgs = false;
+
+	//dfmt off
+	AsyncCallback asyncCallback = (value)
+	{
+		assert(isAsync);
+		values ~= value;
+		asyncWaiting--;
+		if (asyncWaiting == 0)
+			send(id, values);
+	};
+	//dfmt on
+
 	foreach (name; __traits(allMembers, workspaced.com.dub))
 	{
 		static if (__traits(compiles, __traits(getMember, workspaced.com.dub, name)))
@@ -145,10 +228,58 @@ void handleRequest(int id, JSONValue request)
 			alias symbol = Identity!(__traits(getMember, workspaced.com.dub, name));
 			static if (isSomeFunction!symbol)
 			{
-				foreach (UDA; getUDAs!(symbol, Arguments))
+				bool matches = false;
+				foreach (Arguments args; getUDAs!(symbol, Arguments))
 				{
-					writeln(UDA.stringof);
-					writeln(UDA);
+					if (!matches)
+					{
+						foreach (arg; args.arguments)
+						{
+							if (!matches)
+							{
+								auto nodeptr = arg.key in request;
+								if (nodeptr && *nodeptr == arg.value)
+									matches = true;
+							}
+						}
+					}
+				}
+				static if (hasUDA!(symbol, any))
+					matches = true;
+				static if (hasUDA!(symbol, component))
+				{
+					if (("cmd" in request) !is null && request["cmd"].type == JSON_TYPE.STRING && getUDAs!(symbol, component)[0].name != request["cmd"].str)
+						matches = false;
+				}
+				static if (hasUDA!(symbol, load) && hasUDA!(symbol, component))
+				{
+					if (("component" in request) !is null && request["component"].type == JSON_TYPE.STRING && ("cmd" in request) !is null
+							&& request["cmd"].type == JSON_TYPE.STRING && getUDAs!(symbol, component)[0].name == request["component"].str && request["cmd"].str == "load")
+						matches = true;
+				}
+				static if (hasUDA!(symbol, unload) && hasUDA!(symbol, component))
+				{
+					if (("component" in request) !is null && request["component"].type == JSON_TYPE.STRING && ("cmd" in request) !is null
+							&& request["cmd"].type == JSON_TYPE.STRING && getUDAs!(symbol, component)[0].name == request["component"].str && request["cmd"].str == "unload")
+						matches = true;
+				}
+				if (matches)
+				{
+					static if (hasUDA!(symbol, async))
+					{
+						assert(!hasArgs);
+						isAsync = true;
+						asyncWaiting++;
+						writeln("Running " ~ name);
+						mixin(JSONCall!(symbol[0], "symbol[0]", "request", true));
+					}
+					else
+					{
+						assert(!isAsync);
+						hasArgs = true;
+						writeln("Running " ~ name);
+						mixin(JSONCall!(symbol[0], "symbol[0]", "request", false));
+					}
 				}
 			}
 		}
@@ -160,23 +291,16 @@ void handleRequest(int id, JSONValue request)
 	}
 	else
 	{
-		if (values.length == 0)
-		{
-			throw new Exception("Unknown arguments!");
-		}
-		else if (values.length == 1)
-		{
-			send(id, values[0]);
-		}
+		if (hasArgs && values.length == 0)
+			sendFinal(id, JSONValue(null));
 		else
-		{
-			send(id, JSONValue(values));
-		}
+			send(id, values);
 	}
 }
 
 int main(string[] args)
 {
+	import std.file;
 	import etc.linux.memoryerror;
 
 	static if (is(typeof(registerMemoryErrorHandler)))
@@ -184,7 +308,7 @@ int main(string[] args)
 
 	writeMutex = new Mutex;
 
-	handleRequest(0, JSONValue(5));
+	handleRequest(0, JSONValue(["cmd" : "load", "component" : "dub", "dir": getcwd()]));
 
 	/*int length = 0;
 	int id = 0;
