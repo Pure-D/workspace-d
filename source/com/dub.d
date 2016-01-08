@@ -4,7 +4,10 @@ import core.sync.mutex;
 import core.thread;
 
 import std.json : JSONValue;
+import std.conv;
 import std.stdio;
+import std.regex;
+import std.string;
 import std.parallelism;
 import std.algorithm;
 
@@ -16,14 +19,21 @@ import dub.dub;
 import dub.project;
 import dub.package_;
 import dub.description;
+
+import dub.generators.generator;
 import dub.compilers.compiler;
+
 import dub.compilers.buildsettings;
+
 import dub.internal.vibecompat.inet.url;
+import dub.internal.vibecompat.core.log;
 
 @component("dub") :
 
 @load void startup(string dir, bool registerImportProvider = true, bool registerStringImportProvider = true)
 {
+	setLogLevel(LogLevel.none);
+
 	if (registerImportProvider)
 		importPathProvider = &imports;
 	if (registerStringImportProvider)
@@ -135,7 +145,7 @@ auto configurations() @property
 auto buildTypes() @property
 {
 	string[] types = ["plain", "debug", "release", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov"];
-	foreach(type, info; _dub.project.rootPackage.info.buildTypes)
+	foreach (type, info; _dub.project.rootPackage.info.buildTypes)
 		types ~= type;
 	return types;
 }
@@ -166,7 +176,7 @@ bool setBuildType(JSONValue request)
 {
 	assert("build-type" in request, "build-type not in request");
 	auto type = request["build-type"].fromJSON!string;
-	if(buildTypes.canFind(type))
+	if (buildTypes.canFind(type))
 	{
 		_buildType = type;
 		return updateImportPaths(false);
@@ -209,6 +219,68 @@ auto path() @property
 	return _dub.projectPath;
 }
 
+@arguments("subcmd", "build")
+@async void build(AsyncCallback cb)
+{
+	new Thread({
+		try
+		{
+			string compilerName = .compiler;
+			auto compiler = getCompiler(compilerName);
+			auto buildPlatform = compiler.determinePlatform(_settings, compilerName);
+
+			GeneratorSettings settings;
+			settings.platform = buildPlatform;
+			settings.config = _configuration;
+			settings.buildType = _buildType;
+			settings.compiler = compiler;
+			settings.buildSettings = _settings;
+			settings.buildSettings.options |= BuildOption.syntaxOnly;
+			settings.combined = true;
+			settings.run = false;
+
+			BuildIssue[] issues;
+
+			settings.compileCallback = (status, output) {
+				string[] lines = output.splitLines;
+				foreach (line;
+				lines)
+				{
+					auto match = line.matchFirst(errorFormat);
+					if (match)
+					{
+						issues ~= BuildIssue(match[2].to!int, match[3].to!int, match[1], match[4].to!ErrorType, match[5]);
+					}
+					else
+					{
+						if (line.canFind("from"))
+						{
+							auto contMatch = line.matchFirst(errorFormatCont);
+							if (contMatch)
+							{
+								issues ~= BuildIssue(contMatch[2].to!int, contMatch[3].to!int, contMatch[1], ErrorType.Error, contMatch[4]);
+							}
+						}
+					}
+				}
+			};
+			try
+			{
+				_dub.generateProject("build", settings);
+			}
+			catch (Exception e)
+			{
+			}
+			cb(null, issues.toJSON);
+		}
+		catch (Throwable t)
+		{
+			ubyte[] empty;
+			cb(t, empty.toJSON);
+		}
+	}).start();
+}
+
 private __gshared:
 
 Dub _dub;
@@ -220,6 +292,24 @@ BuildSettings _settings;
 Compiler _compiler;
 BuildPlatform _platform;
 string[] _importPaths, _stringImportPaths;
+
+auto errorFormat = ctRegex!(`(.*?)\((\d+),(\d+)\): (Deprecation|Warning|Error): (.*)`, "gi"); // `
+auto errorFormatCont = ctRegex!(`(.*?)\((\d+),(\d+)\): (.*)`, "g"); // `
+
+enum ErrorType : ubyte
+{
+	Error = 0,
+	Warning = 1,
+	Deprecation = 2
+}
+
+struct BuildIssue
+{
+	int line, column;
+	string file;
+	ErrorType type;
+	string text;
+}
 
 struct DubPackageInfo
 {
