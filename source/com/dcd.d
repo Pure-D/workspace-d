@@ -155,8 +155,8 @@ void addImports(string[] imports)
 		try
 		{
 			auto newPort = findOpen(port);
-			port = newPort;
-			cb(null, port.toJSON());
+			.port = newPort;
+			cb(null, .port.toJSON());
 		}
 		catch (Throwable t)
 		{
