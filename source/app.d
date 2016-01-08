@@ -275,6 +275,12 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 
 void handleRequest(int id, JSONValue request)
 {
+	if (("cmd" in request) && request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "version")
+	{
+		sendFinal(id, JSONValue(["major" : JSONValue(Version[0]), "minor" : JSONValue(Version[1]), "patch" : JSONValue(Version[2])]));
+		return;
+	}
+
 	JSONValue[] values;
 	int asyncWaiting = 0;
 	bool isAsync = false;
