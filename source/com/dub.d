@@ -131,6 +131,15 @@ auto configurations() @property
 	return _dub.project.configurations;
 }
 
+@arguments("subcmd", "list:build-types")
+auto buildTypes() @property
+{
+	string[] types = ["plain", "debug", "release", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov"];
+	foreach(type, info; _dub.project.rootPackage.info.buildTypes)
+		types ~= type;
+	return types;
+}
+
 @arguments("subcmd", "get:configuration")
 auto configuration() @property
 {
@@ -155,13 +164,14 @@ auto buildType() @property
 @arguments("subcmd", "set:build-type")
 bool setBuildType(JSONValue request)
 {
-	try
+	assert("build-type" in request, "build-type not in request");
+	auto type = request["build-type"].fromJSON!string;
+	if(buildTypes.canFind(type))
 	{
-		assert("build-type" in request, "build-type not in request");
-		_buildType = request["build-type"].str;
+		_buildType = type;
 		return updateImportPaths(false);
 	}
-	catch (Exception e)
+	else
 	{
 		return false;
 	}
