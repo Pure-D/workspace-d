@@ -43,6 +43,7 @@ import dub.internal.vibecompat.core.log;
 	_cwd = Path(dir);
 
 	start();
+	upgrade();
 
 	string compilerName = defaultCompiler;
 	_compiler = getCompiler(compilerName);
