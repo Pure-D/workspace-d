@@ -32,7 +32,7 @@ import workspaced.api;
 void setupServer()
 {
 	startServer();
-	updateImports();
+	refreshImports();
 }
 
 @arguments("subcmd", "start-server")

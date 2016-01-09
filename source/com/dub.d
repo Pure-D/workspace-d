@@ -50,7 +50,9 @@ import dub.internal.vibecompat.core.log;
 	_platform = _compiler.determinePlatform(settings, compilerName);
 	_settings = settings;
 
-	setConfiguration(_dub.project.getDefaultConfiguration(_platform));
+	_configuration = _dub.project.getDefaultConfiguration(_platform);
+	assert (_dub.project.configurations.canFind(_configuration), "No configuration available");
+	updateImportPaths(false);
 }
 
 @unload void stop()
