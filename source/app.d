@@ -245,10 +245,11 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 						if (request["components"].type == JSON_TYPE.ARRAY)
 						{
 							foreach (com; request["components"].array)
-								if (com.type == JSON_TYPE.STRING && com.str == getUDAs!(symbol, component)[0].name)
+								if (com.type == JSON_TYPE.STRING && (com.str == getUDAs!(symbol, component)[0].name || com.str == "*"))
 									matches = true;
 						}
-						else if (request["components"].type == JSON_TYPE.STRING && request["components"].str == getUDAs!(symbol, component)[0].name)
+						else if (request["components"].type == JSON_TYPE.STRING && (request["components"].str == getUDAs!(symbol, component)[0].name
+								|| request["components"].str == "*"))
 							matches = true;
 					}
 				}
