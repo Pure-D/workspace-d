@@ -192,6 +192,20 @@ template JSONCall(alias T, string fn, string jsonvar, bool async)
 	}
 }
 
+template compatibleGetUDAs(alias symbol, alias attribute)
+{
+	import std.typetuple : Filter;
+
+	template isDesiredUDA(alias S) {
+		static if(__traits(compiles, is(typeof(S) == attribute))) {
+			enum isDesiredUDA = is(typeof(S) == attribute);
+		} else {
+			enum isDesiredUDA = isInstanceOf!(attribute, typeof(S));
+		}
+	}
+	alias compatibleGetUDAs = Filter!(isDesiredUDA, __traits(getAttributes, symbol));
+}
+
 void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values, ref int asyncWaiting, ref bool isAsync, ref bool hasArgs, ref AsyncCallback asyncCallback)
 {
 	foreach (name; __traits(allMembers, T))
@@ -202,7 +216,7 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 			static if (isSomeFunction!symbol)
 			{
 				bool matches = false;
-				foreach (Arguments args; getUDAs!(symbol, Arguments))
+				foreach (Arguments args; compatibleGetUDAs!(symbol, Arguments))
 				{
 					if (!matches)
 					{
@@ -221,7 +235,7 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 					matches = true;
 				static if (hasUDA!(symbol, component))
 				{
-					if (("cmd" in request) !is null && request["cmd"].type == JSON_TYPE.STRING && getUDAs!(symbol, component)[0].name != request["cmd"].str)
+					if (("cmd" in request) !is null && request["cmd"].type == JSON_TYPE.STRING && compatibleGetUDAs!(symbol, component)[0].name != request["cmd"].str)
 						matches = false;
 				}
 				static if (hasUDA!(symbol, load) && hasUDA!(symbol, component))
@@ -231,10 +245,10 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 						if (request["components"].type == JSON_TYPE.ARRAY)
 						{
 							foreach (com; request["components"].array)
-								if (com.type == JSON_TYPE.STRING && com.str == getUDAs!(symbol, component)[0].name)
+								if (com.type == JSON_TYPE.STRING && com.str == compatibleGetUDAs!(symbol, component)[0].name)
 									matches = true;
 						}
-						else if (request["components"].type == JSON_TYPE.STRING && request["components"].str == getUDAs!(symbol, component)[0].name)
+						else if (request["components"].type == JSON_TYPE.STRING && request["components"].str == compatibleGetUDAs!(symbol, component)[0].name)
 							matches = true;
 					}
 				}
@@ -245,10 +259,10 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 						if (request["components"].type == JSON_TYPE.ARRAY)
 						{
 							foreach (com; request["components"].array)
-								if (com.type == JSON_TYPE.STRING && (com.str == getUDAs!(symbol, component)[0].name || com.str == "*"))
+								if (com.type == JSON_TYPE.STRING && (com.str == compatibleGetUDAs!(symbol, component)[0].name || com.str == "*"))
 									matches = true;
 						}
-						else if (request["components"].type == JSON_TYPE.STRING && (request["components"].str == getUDAs!(symbol, component)[0].name
+						else if (request["components"].type == JSON_TYPE.STRING && (request["components"].str == compatibleGetUDAs!(symbol, component)[0].name
 								|| request["components"].str == "*"))
 							matches = true;
 					}
