@@ -204,6 +204,8 @@ void addImports(string[] imports)
 		try
 		{
 			auto pipes = doClient(["--doc", "-c", pos.to!string]);
+			scope (exit)
+				pipes.pid.wait();
 			pipes.stdin.write(code);
 			pipes.stdin.close();
 			string data;
