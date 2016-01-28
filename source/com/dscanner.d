@@ -31,6 +31,7 @@ import workspaced.api;
 
 /// Asynchronously lints the file passed.
 /// Returns: `[{file: string, line: int, column: int, type: string, description: string}]`
+/// Call_With: `{"subcmd": "lint"}`
 @arguments("subcmd", "lint")
 @async void lint(AsyncCallback cb, string file)
 {
@@ -71,6 +72,7 @@ import workspaced.api;
 
 /// Asynchronously lists all definitions in the specified file.
 /// Returns: `[{name: string, line: int, type: string, attributes: string[string]}]`
+/// Call_With: `{"subcmd": "list-definitions"}`
 @arguments("subcmd", "list-definitions")
 @async void listDefinitions(AsyncCallback cb, string file)
 {

@@ -81,6 +81,7 @@ private void restart()
 
 /// Reloads the dub.json or dub.sdl file from the cwd
 /// Returns: `false` if there are no import paths available
+/// Call_With: `{"subcmd": "update"}`
 @arguments("subcmd", "update")
 @async void update(AsyncCallback callback)
 {
@@ -121,6 +122,7 @@ bool updateImportPaths(bool restartDub = true)
 }
 
 /// Calls `dub upgrade`
+/// Call_With: `{"subcmd": "upgrade"}`
 @arguments("subcmd", "upgrade")
 void upgrade()
 {
@@ -129,6 +131,7 @@ void upgrade()
 
 /// Lists all dependencies
 /// Returns: `[{dependencies: [string], ver: string, name: string}]`
+/// Call_With: `{"subcmd": "list:dep"}`
 @arguments("subcmd", "list:dep")
 auto dependencies() @property
 {
@@ -136,6 +139,7 @@ auto dependencies() @property
 }
 
 /// Lists all import paths
+/// Call_With: `{"subcmd": "list:import"}`
 @arguments("subcmd", "list:import")
 string[] imports() @property
 {
@@ -143,6 +147,7 @@ string[] imports() @property
 }
 
 /// Lists all string import paths
+/// Call_With: `{"subcmd": "list:string-import"}`
 @arguments("subcmd", "list:string-import")
 string[] stringImports() @property
 {
@@ -150,6 +155,7 @@ string[] stringImports() @property
 }
 
 /// Lists all configurations defined in the package description
+/// Call_With: `{"subcmd": "list:configurations"}`
 @arguments("subcmd", "list:configurations")
 string[] configurations() @property
 {
@@ -157,6 +163,7 @@ string[] configurations() @property
 }
 
 /// Lists all build types defined in the package description AND the predefined ones from dub ("plain", "debug", "release", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov")
+/// Call_With: `{"subcmd": "list:build-types"}`
 @arguments("subcmd", "list:build-types")
 string[] buildTypes() @property
 {
@@ -167,6 +174,7 @@ string[] buildTypes() @property
 }
 
 /// Gets the current selected configuration
+/// Call_With: `{"subcmd": "get:configuration"}`
 @arguments("subcmd", "get:configuration")
 string configuration() @property
 {
@@ -175,6 +183,7 @@ string configuration() @property
 
 /// Selects a new configuration and updates the import paths accordingly
 /// Returns: `false` if there are no import paths in the new configuration
+/// Call_With: `{"subcmd": "set:configuration"}`
 @arguments("subcmd", "set:configuration")
 bool setConfiguration(string configuration)
 {
@@ -185,6 +194,7 @@ bool setConfiguration(string configuration)
 }
 
 /// Returns the current selected build type
+/// Call_With: `{"subcmd": "get:build-type"}`
 @arguments("subcmd", "get:build-type")
 string buildType() @property
 {
@@ -194,6 +204,7 @@ string buildType() @property
 
 /// Selects a new build type and updates the import paths accordingly
 /// Returns: `false` if there are no import paths in the new build type
+/// Call_With: `{"subcmd": "set:build-type"}`
 @arguments("subcmd", "set:build-type")
 bool setBuildType(JSONValue request)
 {
@@ -211,6 +222,7 @@ bool setBuildType(JSONValue request)
 }
 
 /// Returns the current selected compiler
+/// Call_With: `{"subcmd": "get:compiler"}`
 @arguments("subcmd", "get:compiler")
 string compiler() @property
 {
@@ -219,6 +231,7 @@ string compiler() @property
 
 /// Selects a new compiler for building
 /// Returns: `false` if the compiler does not exist
+/// Call_With: `{"subcmd": "set:compiler"}`
 @arguments("subcmd", "set:compiler")
 bool setCompiler(string compiler)
 {
@@ -234,6 +247,7 @@ bool setCompiler(string compiler)
 }
 
 /// Returns the project name
+/// Call_With: `{"subcmd": "get:name"}`
 @arguments("subcmd", "get:name")
 string name() @property
 {
@@ -241,6 +255,7 @@ string name() @property
 }
 
 /// Returns the project path
+/// Call_With: `{"subcmd": "get:path"}`
 @arguments("subcmd", "get:path")
 auto path() @property
 {
@@ -249,6 +264,7 @@ auto path() @property
 
 /// Asynchroniously builds the project WITHOUT OUTPUT. This is intended for linting code and showing build errors quickly inside the IDE.
 /// Returns: `[{line: int, column: int, type: ErrorType, text: string}]` where type is an integer
+/// Call_With: `{"subcmd": "build"}`
 @arguments("subcmd", "build")
 @async void build(AsyncCallback cb)
 {

@@ -33,6 +33,7 @@ import workspaced.api;
 }
 
 /// This will start the dcd-server and load import paths from the current provider
+/// Call_With: `{"subcmd": "setup-server"}`
 @arguments("subcmd", "setup-server")
 void setupServer()
 {
@@ -41,6 +42,7 @@ void setupServer()
 }
 
 /// This will start the dcd-server
+/// Call_With: `{"subcmd": "start-server"}`
 @arguments("subcmd", "start-server")
 void startServer()
 {
@@ -64,6 +66,7 @@ void stopServerSync()
 
 /// This stops the dcd-server asynchronously
 /// Returns: null
+/// Call_With: `{"subcmd": "stop-server"}`
 @async @arguments("subcmd", "stop-server")
 void stopServer(AsyncCallback cb)
 {
@@ -81,6 +84,7 @@ void stopServer(AsyncCallback cb)
 }
 
 /// This will kill the process associated with the dcd-server instance
+/// Call_With: `{"subcmd": "kill-server"}`
 @arguments("subcmd", "kill-server")
 void killServer()
 {
@@ -90,6 +94,7 @@ void killServer()
 
 /// This will stop the dcd-server safely and restart it again using setup-server asynchronously
 /// Returns: null
+/// Call_With: `{"subcmd": "restart-server"}`
 @async @arguments("subcmd", "restart-server")
 void restartServer(AsyncCallback cb)
 {
@@ -109,6 +114,7 @@ void restartServer(AsyncCallback cb)
 
 /// This will query the current dcd-server status
 /// Returns: `{isRunning: bool}` If the dcd-server process is not running anymore it will return isRunning: false. Otherwise it will check for server status using `dcd-client --query`
+/// Call_With: `{"subcmd": "status"}`
 @arguments("subcmd", "status")
 auto serverStatus() @property
 {
@@ -122,6 +128,7 @@ auto serverStatus() @property
 
 /// Searches for a symbol across all files using `dcd-client --search`
 /// Returns: `[{file: string, position: int, type: string}]`
+/// Call_With: `{"subcmd": "search-symbol"}`
 @arguments("subcmd", "search-symbol")
 @async auto searchSymbol(AsyncCallback cb, string query)
 {
@@ -151,6 +158,7 @@ auto serverStatus() @property
 }
 
 /// Reloads import paths from the current provider. Call reload there before calling it here.
+/// Call_With: `{"subcmd": "refresh-imports"}`
 @arguments("subcmd", "refresh-imports")
 void refreshImports()
 {
@@ -158,6 +166,7 @@ void refreshImports()
 }
 
 /// Manually adds import paths as string array
+/// Call_With: `{"subcmd": "add-imports"}`
 @arguments("subcmd", "add-imports")
 void addImports(string[] imports)
 {
@@ -167,6 +176,7 @@ void addImports(string[] imports)
 
 /// Searches for an open port to spawn dcd-server in asynchronously starting with `port`, always increasing by one.
 /// Returns: null
+/// Call_With: `{"subcmd": "find-and-select-port"}`
 @arguments("subcmd", "find-and-select-port")
 @async void findAndSelectPort(AsyncCallback cb, ushort port = 9166)
 {
@@ -186,6 +196,7 @@ void addImports(string[] imports)
 
 /// Finds the declaration of the symbol at position `pos` in the code
 /// Returns: `[0: file: string, 1: position: int]`
+/// Call_With: `{"subcmd": "find-declaration"}`
 @arguments("subcmd", "find-declaration")
 @async void findDeclaration(AsyncCallback cb, string code, int pos)
 {
@@ -220,6 +231,7 @@ void addImports(string[] imports)
 
 /// Finds the documentation of the symbol at position `pos` in the code
 /// Returns: `[string]`
+/// Call_With: `{"subcmd": "get-documentation"}`
 @arguments("subcmd", "get-documentation")
 @async void getDocumentation(AsyncCallback cb, string code, int pos)
 {
@@ -253,6 +265,7 @@ void addImports(string[] imports)
 /// When calltips: `{type:"calltips", calltips:[string]}`
 /// When raw: `{type:"raw", raw:[string]}`
 /// Raw is anything else than identifiers and calltips which might not be implemented by this point.
+/// Call_With: `{"subcmd": "list-completion"}`
 @arguments("subcmd", "list-completion")
 @async void listCompletion(AsyncCallback cb, string code, int pos)
 {

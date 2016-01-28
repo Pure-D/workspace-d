@@ -25,6 +25,7 @@ import workspaced.api;
 
 /// Will format the code passed in asynchronously.
 /// Returns: the formatted code as string
+/// Call_With: `{"cmd": "dfmt"}`
 @any @async void format(AsyncCallback cb, string code)
 {
 	new Thread({
