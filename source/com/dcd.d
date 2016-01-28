@@ -13,6 +13,9 @@ import workspaced.api;
 
 @component("dcd") :
 
+/// Load function for dcd. Call with `{"cmd": "load", "components": ["dcd"]}`
+/// This will start dcd-server and load all import paths specified by previously loaded modules such as dub if autoStart is true. All dcd methods are used with `"cmd": "dcd"`
+/// Note: This will block any incoming requests while loading.
 @load void start(string dir, string clientPath = "dcd-client", string serverPath = "dcd-server", ushort port = 9166, bool autoStart = true)
 {
 	.cwd = dir;
@@ -23,11 +26,13 @@ import workspaced.api;
 		startServer();
 }
 
+/// This stops the dcd-server instance safely and waits for it to exit
 @unload void stop()
 {
 	stopServerSync();
 }
 
+/// This will start the dcd-server and load import paths from the current provider
 @arguments("subcmd", "setup-server")
 void setupServer()
 {
@@ -35,6 +40,7 @@ void setupServer()
 	refreshImports();
 }
 
+/// This will start the dcd-server
 @arguments("subcmd", "start-server")
 void startServer()
 {
@@ -56,6 +62,8 @@ void stopServerSync()
 	doClient(["--shutdown"]).pid.wait;
 }
 
+/// This stops the dcd-server asynchronously
+/// Returns: null
 @async @arguments("subcmd", "stop-server")
 void stopServer(AsyncCallback cb)
 {
@@ -72,6 +80,7 @@ void stopServer(AsyncCallback cb)
 	}).start();
 }
 
+/// This will kill the process associated with the dcd-server instance
 @arguments("subcmd", "kill-server")
 void killServer()
 {
@@ -79,6 +88,8 @@ void killServer()
 		serverPipes.pid.kill();
 }
 
+/// This will stop the dcd-server safely and restart it again using setup-server asynchronously
+/// Returns: null
 @async @arguments("subcmd", "restart-server")
 void restartServer(AsyncCallback cb)
 {
@@ -96,6 +107,8 @@ void restartServer(AsyncCallback cb)
 	}).start();
 }
 
+/// This will query the current dcd-server status
+/// Returns: `{isRunning: bool}` If the dcd-server process is not running anymore it will return isRunning: false. Otherwise it will check for server status using `dcd-client --query`
 @arguments("subcmd", "status")
 auto serverStatus() @property
 {
@@ -107,6 +120,8 @@ auto serverStatus() @property
 	return status;
 }
 
+/// Searches for a symbol across all files using `dcd-client --search`
+/// Returns: `[{file: string, position: int, type: string}]`
 @arguments("subcmd", "search-symbol")
 @async auto searchSymbol(AsyncCallback cb, string query)
 {
@@ -135,12 +150,14 @@ auto serverStatus() @property
 	}).start();
 }
 
+/// Reloads import paths from the current provider. Call reload there before calling it here.
 @arguments("subcmd", "refresh-imports")
 void refreshImports()
 {
 	addImports(importPathProvider());
 }
 
+/// Manually adds import paths as string array
 @arguments("subcmd", "add-imports")
 void addImports(string[] imports)
 {
@@ -148,6 +165,8 @@ void addImports(string[] imports)
 	updateImports();
 }
 
+/// Searches for an open port to spawn dcd-server in asynchronously starting with `port`, always increasing by one.
+/// Returns: null
 @arguments("subcmd", "find-and-select-port")
 @async void findAndSelectPort(AsyncCallback cb, ushort port = 9166)
 {
@@ -165,6 +184,8 @@ void addImports(string[] imports)
 	}).start();
 }
 
+/// Finds the declaration of the symbol at position `pos` in the code
+/// Returns: `[0: file: string, 1: position: int]`
 @arguments("subcmd", "find-declaration")
 @async void findDeclaration(AsyncCallback cb, string code, int pos)
 {
@@ -197,6 +218,8 @@ void addImports(string[] imports)
 	}).start();
 }
 
+/// Finds the documentation of the symbol at position `pos` in the code
+/// Returns: `[string]`
 @arguments("subcmd", "get-documentation")
 @async void getDocumentation(AsyncCallback cb, string code, int pos)
 {
@@ -224,6 +247,12 @@ void addImports(string[] imports)
 	}).start();
 }
 
+/// Queries for code completion at position `pos` in code
+/// Returns: `{type:string}` where type is either identifiers, calltips or raw.
+/// When identifiers: `{type:"identifiers", identifiers:[{identifier:string, type:string}]}`
+/// When calltips: `{type:"calltips", calltips:[string]}`
+/// When raw: `{type:"raw", raw:[string]}`
+/// Raw is anything else than identifiers and calltips which might not be implemented by this point.
 @arguments("subcmd", "list-completion")
 @async void listCompletion(AsyncCallback cb, string code, int pos)
 {

@@ -30,6 +30,9 @@ import dub.internal.vibecompat.core.log;
 
 @component("dub") :
 
+/// Load function for dub. Call with `{"cmd": "load", "components": ["dub"]}`
+/// This will start dub and load all import paths. All dub methods are used with `"cmd": "dub"`
+/// Note: This will block any incoming requests while loading.
 @load void startup(string dir, bool registerImportProvider = true, bool registerStringImportProvider = true)
 {
 	setLogLevel(LogLevel.none);
@@ -56,6 +59,7 @@ import dub.internal.vibecompat.core.log;
 	updateImportPaths(false);
 }
 
+/// Stops dub when called.
 @unload void stop()
 {
 	_dub.shutdown();
@@ -75,6 +79,8 @@ private void restart()
 	start();
 }
 
+/// Reloads the dub.json or dub.sdl file from the cwd
+/// Returns: `false` if there are no import paths available
 @arguments("subcmd", "update")
 @async void update(AsyncCallback callback)
 {
@@ -114,38 +120,45 @@ bool updateImportPaths(bool restartDub = true)
 	}
 }
 
+/// Calls `dub upgrade`
 @arguments("subcmd", "upgrade")
 void upgrade()
 {
 	_dub.upgrade(UpgradeOptions.upgrade);
 }
 
+/// Lists all dependencies
+/// Returns: `[{dependencies: [string], ver: string, name: string}]`
 @arguments("subcmd", "list:dep")
 auto dependencies() @property
 {
 	return _dub.project.listDependencies();
 }
 
+/// Lists all import paths
 @arguments("subcmd", "list:import")
-auto imports() @property
+string[] imports() @property
 {
 	return _importPaths;
 }
 
+/// Lists all string import paths
 @arguments("subcmd", "list:string-import")
-auto stringImports() @property
+string[] stringImports() @property
 {
 	return _stringImportPaths;
 }
 
+/// Lists all configurations defined in the package description
 @arguments("subcmd", "list:configurations")
-auto configurations() @property
+string[] configurations() @property
 {
 	return _dub.project.configurations;
 }
 
+/// Lists all build types defined in the package description AND the predefined ones from dub ("plain", "debug", "release", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov")
 @arguments("subcmd", "list:build-types")
-auto buildTypes() @property
+string[] buildTypes() @property
 {
 	string[] types = ["plain", "debug", "release", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov"];
 	foreach (type, info; _dub.project.rootPackage.info.buildTypes)
@@ -153,12 +166,15 @@ auto buildTypes() @property
 	return types;
 }
 
+/// Gets the current selected configuration
 @arguments("subcmd", "get:configuration")
-auto configuration() @property
+string configuration() @property
 {
 	return _configuration;
 }
 
+/// Selects a new configuration and updates the import paths accordingly
+/// Returns: `false` if there are no import paths in the new configuration
 @arguments("subcmd", "set:configuration")
 bool setConfiguration(string configuration)
 {
@@ -168,12 +184,16 @@ bool setConfiguration(string configuration)
 	return updateImportPaths(false);
 }
 
+/// Returns the current selected build type
 @arguments("subcmd", "get:build-type")
-auto buildType() @property
+string buildType() @property
 {
 	return _buildType;
 }
 
+
+/// Selects a new build type and updates the import paths accordingly
+/// Returns: `false` if there are no import paths in the new build type
 @arguments("subcmd", "set:build-type")
 bool setBuildType(JSONValue request)
 {
@@ -190,12 +210,15 @@ bool setBuildType(JSONValue request)
 	}
 }
 
+/// Returns the current selected compiler
 @arguments("subcmd", "get:compiler")
-auto compiler() @property
+string compiler() @property
 {
 	return _compiler.name;
 }
 
+/// Selects a new compiler for building
+/// Returns: `false` if the compiler does not exist
 @arguments("subcmd", "set:compiler")
 bool setCompiler(string compiler)
 {
@@ -210,18 +233,22 @@ bool setCompiler(string compiler)
 	}
 }
 
+/// Returns the project name
 @arguments("subcmd", "get:name")
 string name() @property
 {
 	return _dub.projectName;
 }
 
+/// Returns the project path
 @arguments("subcmd", "get:path")
 auto path() @property
 {
 	return _dub.projectPath;
 }
 
+/// Asynchroniously builds the project WITHOUT OUTPUT. This is intended for linting code and showing build errors quickly inside the IDE.
+/// Returns: `[{line: int, column: int, type: ErrorType, text: string}]` where type is an integer
 @arguments("subcmd", "build")
 @async void build(AsyncCallback cb)
 {
@@ -284,6 +311,17 @@ auto path() @property
 	}).start();
 }
 
+///
+enum ErrorType : ubyte
+{
+	///
+	Error = 0,
+	///
+	Warning = 1,
+	///
+	Deprecation = 2
+}
+
 private __gshared:
 
 Dub _dub;
@@ -298,13 +336,6 @@ string[] _importPaths, _stringImportPaths;
 
 auto errorFormat = ctRegex!(`(.*?)\((\d+),(\d+)\): (Deprecation|Warning|Error): (.*)`, "gi"); // `
 auto errorFormatCont = ctRegex!(`(.*?)\((\d+),(\d+)\): (.*)`, "g"); // `
-
-enum ErrorType : ubyte
-{
-	Error = 0,
-	Warning = 1,
-	Deprecation = 2
-}
 
 struct BuildIssue
 {

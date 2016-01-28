@@ -16,16 +16,21 @@ import workspaced.api;
 
 @component("dscanner") :
 
+/// Load function for dscanner. Call with `{"cmd": "load", "components": ["dscanner"]}`
+/// This will store the working directory and executable name for future use. All dub methods are used with `"cmd": "dscanner"`
 @load void start(string dir, string dscannerPath = "dscanner")
 {
 	cwd = dir;
 	execPath = dscannerPath;
 }
 
+/// Unloads dscanner. Has no purpose right now.
 @unload void stop()
 {
 }
 
+/// Asynchronously lints the file passed.
+/// Returns: `[{file: string, line: int, column: int, type: string, description: string}]`
 @arguments("subcmd", "lint")
 @async void lint(AsyncCallback cb, string file)
 {
@@ -64,6 +69,8 @@ import workspaced.api;
 	}).start();
 }
 
+/// Asynchronously lists all definitions in the specified file.
+/// Returns: `[{name: string, line: int, type: string, attributes: string[string]}]`
 @arguments("subcmd", "list-definitions")
 @async void listDefinitions(AsyncCallback cb, string file)
 {

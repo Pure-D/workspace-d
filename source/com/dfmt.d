@@ -10,16 +10,21 @@ import workspaced.api;
 
 @component("dfmt") :
 
+/// Load function for dfmt. Call with `{"cmd": "load", "components": ["dfmt"]}`
+/// This will store the working directory and executable name for future use. All dub methods are used with `"cmd": "dfmt"`
 @load void start(string dir, string dfmtPath = "dfmt")
 {
 	cwd = dir;
 	execPath = dfmtPath;
 }
 
+/// Unloads dfmt. Has no purpose right now.
 @unload void stop()
 {
 }
 
+/// Will format the code passed in asynchronously.
+/// Returns: the formatted code as string
 @any @async void format(AsyncCallback cb, string code)
 {
 	new Thread({
