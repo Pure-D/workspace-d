@@ -18,6 +18,21 @@
 			"targetType": "executable"
 		}
 	],
+	"buildTypes": {
+		"fix-unittest": {
+			"dflags": [
+				"-wi",
+				"-unittest"
+			],
+			"buildOptions": [
+				"warnings"
+			],
+			"buildRequirements": [
+				"allowWarnings",
+				"silenceWarnings"
+			]
+		}
+	},
 	"subPackages": [
 		"./test"
 	]

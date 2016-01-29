@@ -16,7 +16,7 @@ import std.json;
 import std.meta;
 import std.conv;
 
-static immutable Version = [2, 2, 2];
+static immutable Version = [2, 3, 0];
 __gshared Mutex writeMutex;
 
 void sendFinal(int id, JSONValue value)
@@ -55,104 +55,6 @@ JSONValue toJSONArray(T)(T value)
 	return JSONValue(vals);
 }
 
-/*
-JSONValue handleRequest(JSONValue value)
-{
-	assert(value.type == JSON_TYPE.OBJECT, "Request must be an object!");
-	auto cmd = "cmd" in value;
-	assert(cmd, "No command specified!");
-	assert(cmd.type == JSON_TYPE.STRING, "Command must be a string!");
-	string command = cmd.str;
-	switch (command)
-	{
-	case "version":
-		// dfmt off
-		return JSONValue([
-			"major": JSONValue(Version[0]),
-			"minor": JSONValue(Version[1]),
-			"patch": JSONValue(Version[2])
-		]);
-		// dfmt on
-	case "load":
-		auto comsp = "components" in value;
-		assert(comsp, "No components specified");
-		auto coms = *comsp;
-		string[] toLoad;
-		switch (coms.type)
-		{
-		case JSON_TYPE.STRING:
-			toLoad ~= coms.str;
-			break;
-		case JSON_TYPE.ARRAY:
-			foreach (val; coms.array)
-			{
-				assert(val.type == JSON_TYPE.STRING, "Components must either be a string or a string array");
-				toLoad ~= val.str;
-			}
-			break;
-		default:
-		}
-		foreach (name; toLoad)
-		{
-			if ((name in components) is null)
-				throw new Exception("Component '" ~ name ~ "' not found!");
-			components[name].initialize(value);
-		}
-		return JSONValue(["loaded" : toLoad.toJSONArray()]);
-	case "unload":
-		auto comsp = "components" in value;
-		assert(comsp, "No components specified");
-		auto coms = *comsp;
-		string[] toLoad;
-		switch (coms.type)
-		{
-		case JSON_TYPE.STRING:
-			if (coms.str == "*")
-			{
-				foreach (name, com; components)
-				{
-					if (com.initialized)
-					{
-						toLoad ~= name;
-						com.deinitialize(value);
-					}
-				}
-				return JSONValue(["unloaded" : toLoad.toJSONArray()]);
-			}
-			else
-			{
-				toLoad ~= coms.str;
-			}
-			break;
-		case JSON_TYPE.ARRAY:
-			foreach (val; coms.array)
-			{
-				assert(val.type == JSON_TYPE.STRING, "Components must either be a string or a string array");
-				toLoad ~= val.str;
-			}
-			break;
-		default:
-		}
-		foreach (name; toLoad)
-		{
-			components[name].deinitialize(value);
-		}
-		return JSONValue(["unloaded" : toLoad.toJSONArray()]);
-	default:
-		if ((command in components) !is null)
-		{
-			auto com = components[command];
-			if (!com.initialized)
-				throw new Exception("Component not initialized: " ~ command);
-			return com.process(value);
-		}
-		else
-		{
-			throw new Exception("Unknown command: " ~ command);
-		}
-	}
-}*/
-
 alias Identity(I...) = I;
 
 template JSONCallBody(alias T, string fn, string jsonvar, size_t i, Args...)
@@ -165,8 +67,8 @@ template JSONCallBody(alias T, string fn, string jsonvar, size_t i, Args...)
 		enum JSONCallBody = "(assert(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `" ~ Args[i] ~ " has no default value and is not in the JSON request`), fromJSON!(Parameters!(" ~ fn ~ ")[" ~ i
 				.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]" ~ "))," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
 	else
-		enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? fromJSON!(Parameters!(" ~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]" ~ ") : ParameterDefaults!(" ~ fn ~ ")[" ~ i
-				.to!string ~ "]," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
+		enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? fromJSON!(Parameters!(" ~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]"
+				~ ") : ParameterDefaults!(" ~ fn ~ ")[" ~ i.to!string ~ "]," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
 }
 
 template JSONCallNoRet(alias T, string fn, string jsonvar, bool async)
@@ -196,13 +98,18 @@ template compatibleGetUDAs(alias symbol, alias attribute)
 {
 	import std.typetuple : Filter;
 
-	template isDesiredUDA(alias S) {
-		static if(__traits(compiles, is(typeof(S) == attribute))) {
+	template isDesiredUDA(alias S)
+	{
+		static if (__traits(compiles, is(typeof(S) == attribute)))
+		{
 			enum isDesiredUDA = is(typeof(S) == attribute);
-		} else {
+		}
+		else
+		{
 			enum isDesiredUDA = isInstanceOf!(attribute, typeof(S));
 		}
 	}
+
 	alias compatibleGetUDAs = Filter!(isDesiredUDA, __traits(getAttributes, symbol));
 }
 
@@ -235,12 +142,12 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 					matches = true;
 				static if (hasUDA!(symbol, component))
 				{
-					if (("cmd" in request) !is null && request["cmd"].type == JSON_TYPE.STRING && compatibleGetUDAs!(symbol, component)[0].name != request["cmd"].str)
+					if (("cmd" in request)!is null && request["cmd"].type == JSON_TYPE.STRING && compatibleGetUDAs!(symbol, component)[0].name != request["cmd"].str)
 						matches = false;
 				}
 				static if (hasUDA!(symbol, load) && hasUDA!(symbol, component))
 				{
-					if (("components" in request) !is null && ("cmd" in request) !is null && request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "load")
+					if (("components" in request)!is null && ("cmd" in request)!is null && request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "load")
 					{
 						if (request["components"].type == JSON_TYPE.ARRAY)
 						{
@@ -254,7 +161,7 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 				}
 				static if (hasUDA!(symbol, unload) && hasUDA!(symbol, component))
 				{
-					if (("components" in request) !is null && ("cmd" in request) !is null && request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "unload")
+					if (("components" in request)!is null && ("cmd" in request)!is null && request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "unload")
 					{
 						if (request["components"].type == JSON_TYPE.ARRAY)
 						{
@@ -330,6 +237,7 @@ void handleRequest(int id, JSONValue request)
 	handleRequestMod!(workspaced.com.dcd)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.dfmt)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.dscanner)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dlangui)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 
 	if (isAsync)
 	{
@@ -375,57 +283,63 @@ int main(string[] args)
 	import std.file;
 	import etc.linux.memoryerror;
 
-	static if (is(typeof(registerMemoryErrorHandler)))
-		registerMemoryErrorHandler();
-
-	writeMutex = new Mutex;
-
-	int length = 0;
-	int id = 0;
-	ubyte[4] intBuffer;
-	ubyte[] dataBuffer;
-	JSONValue data;
-	while (stdin.isOpen && stdout.isOpen && !stdin.eof)
+	version (unittest)
 	{
-		dataBuffer = stdin.rawRead(intBuffer);
-		assert(dataBuffer.length == 4, "Unexpected buffer data");
-		length = bigEndianToNative!int(dataBuffer[0 .. 4]);
+	}
+	else
+	{
+		static if (is(typeof(registerMemoryErrorHandler)))
+			registerMemoryErrorHandler();
 
-		assert(length >= 4, "Invalid request");
+		writeMutex = new Mutex;
 
-		dataBuffer = stdin.rawRead(intBuffer);
-		assert(dataBuffer.length == 4, "Unexpected buffer data");
-		id = bigEndianToNative!int(dataBuffer[0 .. 4]);
+		int length = 0;
+		int id = 0;
+		ubyte[4] intBuffer;
+		ubyte[] dataBuffer;
+		JSONValue data;
+		while (stdin.isOpen && stdout.isOpen && !stdin.eof)
+		{
+			dataBuffer = stdin.rawRead(intBuffer);
+			assert(dataBuffer.length == 4, "Unexpected buffer data");
+			length = bigEndianToNative!int(dataBuffer[0 .. 4]);
 
-		dataBuffer.length = length - 4;
-		dataBuffer = stdin.rawRead(dataBuffer);
+			assert(length >= 4, "Invalid request");
 
-		try
-		{
-			data = parseJSON(cast(string) dataBuffer);
-		}
-		catch (Exception e)
-		{
-			processException(id, e);
-		}
-		catch (AssertError e)
-		{
-			processException(id, e);
-		}
+			dataBuffer = stdin.rawRead(intBuffer);
+			assert(dataBuffer.length == 4, "Unexpected buffer data");
+			id = bigEndianToNative!int(dataBuffer[0 .. 4]);
 
-		try
-		{
-			handleRequest(id, data);
+			dataBuffer.length = length - 4;
+			dataBuffer = stdin.rawRead(dataBuffer);
+
+			try
+			{
+				data = parseJSON(cast(string) dataBuffer);
+			}
+			catch (Exception e)
+			{
+				processException(id, e);
+			}
+			catch (AssertError e)
+			{
+				processException(id, e);
+			}
+
+			try
+			{
+				handleRequest(id, data);
+			}
+			catch (Exception e)
+			{
+				processException(id, data, e);
+			}
+			catch (AssertError e)
+			{
+				processException(id, data, e);
+			}
+			stdout.flush();
 		}
-		catch (Exception e)
-		{
-			processException(id, data, e);
-		}
-		catch (AssertError e)
-		{
-			processException(id, data, e);
-		}
-		stdout.flush();
 	}
 	return 0;
 }
