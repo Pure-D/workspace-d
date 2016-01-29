@@ -33,12 +33,20 @@ import workspaced.api;
 /// Returns: `[{file: string, line: int, column: int, type: string, description: string}]`
 /// Call_With: `{"subcmd": "lint"}`
 @arguments("subcmd", "lint")
-@async void lint(AsyncCallback cb, string file)
+@async void lint(AsyncCallback cb, string file, string ini = "dscanner.ini")
 {
 	new Thread({
 		try
 		{
-			ProcessPipes pipes = raw([execPath, "-S", file, "--config", buildPath(cwd, "dscanner.ini")]);
+			auto args = [execPath, "-S", file];
+			if(ini && ini.length)
+			{
+				if(ini.isAbsolute)
+					args ~= ["--config", ini];
+				else
+					args ~= ["--config", buildPath(cwd, ini)];
+			}
+			ProcessPipes pipes = raw(args);
 			scope (exit)
 				pipes.pid.wait();
 			string[] res;
