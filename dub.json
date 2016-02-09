@@ -7,7 +7,7 @@
 	],
 	"dependencies": {
 		"dub": "~>0.9.24",
-		"painlessjson": "~>1.3.5"
+		"painlessjson": "~>1.3.6"
 	},
 	"configurations": [
 		{
