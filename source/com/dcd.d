@@ -5,6 +5,7 @@ import std.conv;
 import std.stdio;
 import std.string;
 import std.process;
+import std.algorithm;
 import core.thread;
 
 import painlessjson;
@@ -35,21 +36,30 @@ import workspaced.api;
 /// This will start the dcd-server and load import paths from the current provider
 /// Call_With: `{"subcmd": "setup-server"}`
 @arguments("subcmd", "setup-server")
-void setupServer()
+void setupServer(string[] additionalImports = [])
 {
-	startServer();
-	refreshImports();
+	startServer(importPathProvider() ~ additionalImports);
 }
 
 /// This will start the dcd-server
 /// Call_With: `{"subcmd": "start-server"}`
 @arguments("subcmd", "start-server")
-void startServer()
+void startServer(string[] additionalImports = [])
 {
 	if (isPortRunning(port))
 		throw new Exception("Already running dcd on port " ~ port.to!string);
 	runningPort = port;
-	serverPipes = raw([serverPath, "--port", runningPort.to!string], Redirect.stdin | Redirect.stdoutToStderr);
+	string[] imports;
+	foreach (i; additionalImports)
+		imports ~= "-I" ~ i;
+	serverPipes = raw([serverPath, "--port", runningPort.to!string] ~ imports, Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
+	while (!serverPipes.stderr.eof)
+	{
+		string line = serverPipes.stderr.readln();
+		stderr.writeln("Server: ", line);
+		if (line.canFind(" Startup completed in "))
+			break;
+	}
 	new Thread({
 		while (!serverPipes.stderr.eof)
 		{
@@ -299,8 +309,7 @@ void addImports(string[] imports)
 			else if (data[0] == "identifiers")
 			{
 				DCDIdentifier[] identifiers;
-				foreach (line;
-				data[1 .. $])
+				foreach (line; data[1 .. $])
 				{
 					string[] splits = line.split('\t');
 					identifiers ~= DCDIdentifier(splits[0], splits[1]);
