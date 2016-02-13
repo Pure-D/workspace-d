@@ -8,12 +8,18 @@ import std.process;
 import std.algorithm;
 import core.thread;
 
+import dub.semver;
+
 import painlessjson;
 
 import workspaced.api;
 
-@component("dcd") :
+version (OSX) version = haveUnixSockets;
+version (linux) version = haveUnixSockets;
+version (BSD) version = haveUnixSockets;
+version (FreeBSD) version = haveUnixSockets;
 
+@component("dcd") :
 /// Load function for dcd. Call with `{"cmd": "load", "components": ["dcd"]}`
 /// This will start dcd-server and load all import paths specified by previously loaded modules such as dub if autoStart is true. All dcd methods are used with `"cmd": "dcd"`
 /// Note: This will block any incoming requests while loading.
@@ -23,6 +29,9 @@ import workspaced.api;
 	.serverPath = serverPath;
 	.clientPath = clientPath;
 	.port = port;
+	installedVersion = execute([clientPath, "--version"]).output.strip.replace(" ", "+");
+	version (haveUnixSockets)
+		hasUnixDomainSockets = compareVersions(installedVersion, "0.8.0") >= 0;
 	if (autoStart)
 		startServer();
 }
@@ -57,6 +66,7 @@ void startServer(string[] additionalImports = [])
 	{
 		string line = serverPipes.stderr.readln();
 		stderr.writeln("Server: ", line);
+		stderr.flush();
 		if (line.canFind(" Startup completed in "))
 			break;
 	}
@@ -131,8 +141,10 @@ auto serverStatus() @property
 	DCDServerStatus status;
 	if (serverPipes.pid.tryWait().terminated)
 		status.isRunning = false;
+	else if (hasUnixDomainSockets)
+		status.isRunning = true;
 	else
-		status.isRunning = isPortRunning(runningPort) == 0;
+		status.isRunning = isPortRunning(runningPort);
 	return status;
 }
 
@@ -341,6 +353,8 @@ void updateImports()
 private __gshared:
 
 string clientPath, serverPath, cwd;
+string installedVersion;
+bool hasUnixDomainSockets = false;
 ProcessPipes serverPipes;
 ushort port, runningPort;
 string[] knownImports;
@@ -358,6 +372,8 @@ auto raw(string[] args, Redirect redirect = Redirect.all)
 
 bool isPortRunning(ushort port)
 {
+	if (hasUnixDomainSockets)
+		return false;
 	auto pipes = raw([clientPath, "-q", "--port", port.to!string]);
 	return wait(pipes.pid) == 0;
 }
