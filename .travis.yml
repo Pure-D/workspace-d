@@ -2,4 +2,7 @@ language: d
 d:
  - dmd
  - ldc
+os:
+ - linux
+ - osx
 script: dub run --build=fix-unittest --compiler=${DC}
