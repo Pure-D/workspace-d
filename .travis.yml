@@ -1,0 +1,5 @@
+language: d
+d:
+ - dmd
+ - ldc
+script: dub run --build=fix-unittest --compiler=${DC}

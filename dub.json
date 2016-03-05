@@ -21,7 +21,6 @@
 	"buildTypes": {
 		"fix-unittest": {
 			"dflags": [
-				"-wi",
 				"-unittest"
 			],
 			"buildOptions": [
