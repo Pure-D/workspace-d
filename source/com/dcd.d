@@ -4,7 +4,9 @@ import std.json;
 import std.conv;
 import std.stdio;
 import std.string;
+import std.random;
 import std.process;
+import std.datetime;
 import std.algorithm;
 import core.thread;
 
@@ -61,7 +63,8 @@ void startServer(string[] additionalImports = [])
 	string[] imports;
 	foreach (i; additionalImports)
 		imports ~= "-I" ~ i;
-	serverPipes = raw([serverPath, "--port", runningPort.to!string] ~ imports, Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
+	socketFile = "workspace-d-sock_" ~ uniform(ulong.min, ulong.max).to!string ~ "-" ~ Clock.currStdTime().to!string;
+	serverPipes = raw([serverPath] ~ clientArgs ~ imports, Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
 	while (!serverPipes.stderr.eof)
 	{
 		string line = serverPipes.stderr.readln();
@@ -197,11 +200,16 @@ void addImports(string[] imports)
 }
 
 /// Searches for an open port to spawn dcd-server in asynchronously starting with `port`, always increasing by one.
-/// Returns: null
+/// Returns: null if not available, otherwise the port as number
 /// Call_With: `{"subcmd": "find-and-select-port"}`
 @arguments("subcmd", "find-and-select-port")
 @async void findAndSelectPort(AsyncCallback cb, ushort port = 9166)
 {
+	if (hasUnixDomainSockets)
+	{
+		cb(null, JSONValue(null));
+		return;
+	}
 	new Thread({ /**/
 		try
 		{
@@ -281,6 +289,25 @@ void addImports(string[] imports)
 	}).start();
 }
 
+/// Returns the used socket file. Only available on OSX, linux and BSD with DCD >= 0.8.0
+/// Throws an error if not available.
+@arguments("subcmd", "get-socketfile")
+string getSocketFile()
+{
+	if (!hasUnixDomainSockets)
+		throw new Exception("Unix domain sockets not supported");
+	return socketFile;
+}
+
+/// Returns the used running port. Throws an error if using unix sockets instead
+@arguments("subcmd", "get-port")
+ushort getRunningPort()
+{
+	if (hasUnixDomainSockets)
+		throw new Exception("Using unix domain sockets instead of a port");
+	return runningPort;
+}
+
 /// Queries for code completion at position `pos` in code
 /// Returns: `{type:string}` where type is either identifiers, calltips or raw.
 /// When identifiers: `{type:"identifiers", identifiers:[{identifier:string, type:string}]}`
@@ -357,11 +384,20 @@ string installedVersion;
 bool hasUnixDomainSockets = false;
 ProcessPipes serverPipes;
 ushort port, runningPort;
+string socketFile;
 string[] knownImports;
+
+string[] clientArgs()
+{
+	if (hasUnixDomainSockets)
+		return ["--socketFile", socketFile];
+	else
+		return ["--port", runningPort.to!string];
+}
 
 auto doClient(string[] args)
 {
-	return raw([clientPath, "--port", runningPort.to!string] ~ args);
+	return raw([clientPath] ~ clientArgs ~ args);
 }
 
 auto raw(string[] args, Redirect redirect = Redirect.all)
@@ -374,7 +410,7 @@ bool isPortRunning(ushort port)
 {
 	if (hasUnixDomainSockets)
 		return false;
-	auto pipes = raw([clientPath, "-q", "--port", port.to!string]);
+	auto pipes = raw([clientPath, "-q"] ~ clientArgs);
 	return wait(pipes.pid) == 0;
 }
 

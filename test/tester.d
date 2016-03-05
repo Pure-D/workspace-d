@@ -36,6 +36,8 @@ void main(string[] args)
 		/* 7  */`{"cmd":"dcd","subcmd":"search-symbol","query":"toImpl"}`,
 		/* 8  */`{"cmd":"dcd","subcmd":"find-declaration","pos":14,"code":"void main() {foo();} void foo() {}"}`,
 		/* 9  */`{"cmd":"dcd","subcmd":"list-completion","pos":21,"code":"int integer; integer."}`,
+		/* 10 */`{"cmd":"dcd","subcmd":"get-socketfile"}`,
+		/* 11 */`{"cmd":"dcd","subcmd":"get-port"}`,
 	];
 	//dfmt on
 
@@ -43,8 +45,10 @@ void main(string[] args)
 	int requestID = 0;
 	ubyte[4] intBuffer;
 	ubyte[] dataBuffer;
-	new Thread({ while (!pipes.stderr.eof)
-		write("Error: ", pipes.stderr.readln()); }).start();
+	new Thread({
+		while (!pipes.stderr.eof)
+			write("Error: ", pipes.stderr.readln());
+	}).start();
 	while (true)
 	{
 		write("Enter JSON: ");
