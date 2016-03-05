@@ -1,5 +1,8 @@
 module workspaced.com.dcd;
 
+import std.file : tempDir;
+
+import std.path;
 import std.json;
 import std.conv;
 import std.stdio;
@@ -63,7 +66,7 @@ void startServer(string[] additionalImports = [])
 	string[] imports;
 	foreach (i; additionalImports)
 		imports ~= "-I" ~ i;
-	socketFile = "workspace-d-sock_" ~ uniform(ulong.min, ulong.max).to!string ~ "-" ~ Clock.currStdTime().to!string;
+	socketFile = buildPath(tempDir, "workspace-d-sock_" ~ uniform(ulong.min, ulong.max).to!string ~ "-" ~ Clock.currStdTime().to!string);
 	serverPipes = raw([serverPath] ~ clientArgs ~ imports, Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
 	while (!serverPipes.stderr.eof)
 	{
