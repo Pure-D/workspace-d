@@ -17,7 +17,7 @@ import std.meta;
 import std.conv;
 
 static immutable Version = [2, 4, 0];
-__gshared Mutex writeMutex;
+__gshared Mutex writeMutex, commandMutex;
 
 void sendFinal(int id, JSONValue value)
 {
@@ -113,7 +113,7 @@ template compatibleGetUDAs(alias symbol, alias attribute)
 	alias compatibleGetUDAs = Filter!(isDesiredUDA, __traits(getAttributes, symbol));
 }
 
-void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values, ref int asyncWaiting, ref bool isAsync, ref bool hasArgs, ref AsyncCallback asyncCallback)
+void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values, ref int asyncWaiting, ref bool isAsync, ref bool hasArgs, in AsyncCallback asyncCallback)
 {
 	foreach (name; __traits(allMembers, T))
 	{
@@ -207,10 +207,9 @@ void handleRequest(int id, JSONValue request)
 	int asyncWaiting = 0;
 	bool isAsync = false;
 	bool hasArgs = false;
-	Mutex asyncMutex = new Mutex;
 
-	AsyncCallback asyncCallback = (err, value) {
-		synchronized (asyncMutex)
+	const AsyncCallback asyncCallback = (err, value) {
+		synchronized (commandMutex)
 		{
 			try
 			{
@@ -219,7 +218,7 @@ void handleRequest(int id, JSONValue request)
 					throw err;
 				values ~= value;
 				asyncWaiting--;
-				if (asyncWaiting == 0)
+				if (asyncWaiting <= 0)
 					send(id, values);
 			}
 			catch (Exception e)
@@ -292,6 +291,7 @@ int main(string[] args)
 			registerMemoryErrorHandler();
 
 		writeMutex = new Mutex;
+		commandMutex = new Mutex;
 
 		int length = 0;
 		int id = 0;
