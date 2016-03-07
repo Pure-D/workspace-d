@@ -83,7 +83,10 @@ template JSONCallNoRet(alias T, string fn, string jsonvar, bool async)
 template JSONCall(alias T, string fn, string jsonvar, bool async)
 {
 	static if (async)
+	{
+		static assert(is(ReturnType!T == void), "Async functions cant have an return type! For function " ~ fn);
 		enum JSONCall = JSONCallNoRet!(T, fn, jsonvar, async) ~ ";";
+	}
 	else
 	{
 		alias Ret = ReturnType!T;
@@ -241,7 +244,7 @@ void handleRequest(int id, JSONValue request)
 	if (isAsync)
 	{
 		if (values.length > 0)
-			throw new Exception("Cannot mix sync and async functions!");
+			throw new Exception("Cannot mix sync and async functions! In request " ~ request.toString);
 	}
 	else
 	{
