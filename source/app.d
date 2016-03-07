@@ -207,6 +207,7 @@ void handleRequest(int id, JSONValue request)
 	}
 
 	JSONValue[] values;
+	JSONValue[] asyncValues;
 	int asyncWaiting = 0;
 	bool isAsync = false;
 	bool hasArgs = false;
@@ -219,10 +220,10 @@ void handleRequest(int id, JSONValue request)
 				assert(isAsync);
 				if (err)
 					throw err;
-				values ~= value;
+				asyncValues ~= value;
 				asyncWaiting--;
 				if (asyncWaiting <= 0)
-					send(id, values);
+					send(id, asyncValues);
 			}
 			catch (Exception e)
 			{
