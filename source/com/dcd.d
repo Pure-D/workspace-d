@@ -6,14 +6,13 @@ import std.path;
 import std.json;
 import std.conv;
 import std.stdio;
+import std.regex;
 import std.string;
 import std.random;
 import std.process;
 import std.datetime;
 import std.algorithm;
 import core.thread;
-
-import dub.semver;
 
 import painlessjson;
 
@@ -34,11 +33,33 @@ version (FreeBSD) version = haveUnixSockets;
 	.serverPath = serverPath;
 	.clientPath = clientPath;
 	.port = port;
-	installedVersion = execute([clientPath, "--version"]).output.strip.replace(" ", "+");
+	installedVersion = execute([clientPath, "--version"]).output;
 	version (haveUnixSockets)
-		hasUnixDomainSockets = compareVersions(installedVersion, "0.8.0") >= 0;
+		hasUnixDomainSockets = supportsUnixDomainSockets(installedVersion);
 	if (autoStart)
 		startServer();
+}
+
+enum verRegex = ctRegex!`(\d+)\.(\d+)\.\d+`;
+bool supportsUnixDomainSockets(string ver)
+{
+	auto match = ver.matchFirst(verRegex);
+	assert(match);
+	int major = match[1].to!int;
+	int minor = match[2].to!int;
+	if (major > 0)
+		return true;
+	if (major == 0 && minor >= 8)
+		return true;
+	return false;
+}
+
+unittest
+{
+	assert(supportsUnixDomainSockets("0.8.0-beta2+9ec55f40a26f6bb3ca95dc9232a239df6ed25c37"));
+	assert(!supportsUnixDomainSockets("0.7.9-beta3"));
+	assert(!supportsUnixDomainSockets("0.7.0"));
+	assert(supportsUnixDomainSockets("1.0.0"));
 }
 
 /// This stops the dcd-server instance safely and waits for it to exit
