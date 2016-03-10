@@ -10,6 +10,7 @@ import core.thread;
 import painlessjson;
 
 import workspaced.api;
+import workspaced.completion.dml;
 
 @component("dlangui") :
 
@@ -22,7 +23,7 @@ import workspaced.api;
 }
 
 /// Queries for code completion at position `pos` in DML code
-/// Returns: `[{type: CompletionType, value: string}]`
+/// Returns: `[{type: CompletionType, value: string, documentation: string, enumName: string}]`
 /// Where type is an integer
 /// Call_With: `{"subcmd": "list-completion"}`
 @arguments("subcmd", "list-completion")
@@ -33,62 +34,84 @@ import workspaced.api;
 		{
 			LocationInfo info = getLocationInfo(code, pos);
 			CompletionItem[] suggestions;
-			final switch (info.type) with (LocationType)
+			string name = info.itemScope[$ - 1];
+			string[] stack;
+			if (info.itemScope.length > 1)
+				stack = info.itemScope[0 .. $ - 1];
+			string[][] curScope = stack.getProvidedScope();
+			if (info.type == LocationType.RootMember)
 			{
-			case RootMember:
-				if (info.name.length == 0)
+				foreach (CompletionLookup item; dmlCompletions)
 				{
-					foreach (widget; widgets)
+					if (item.item.type == CompletionType.Class)
 					{
-						suggestions ~= CompletionItem(CompletionType.Class, widget);
-					}
-				}
-				else
-				{
-					foreach (widget; widgets)
-					{
-						if (widget.toUpper.canFind(info.name.toUpper))
+						if (name.length == 0 || item.item.value.canFind(name))
 						{
-							suggestions ~= CompletionItem(CompletionType.Class, widget);
+							suggestions ~= item.item;
 						}
 					}
 				}
-				break;
-			case Member:
-				if (info.name.length == 0)
+			}
+			else if (info.type == LocationType.Member)
+			{
+				foreach (CompletionLookup item; dmlCompletions)
 				{
-					foreach (prop; baseProperties)
+					if (item.item.type == CompletionType.Class)
 					{
-						suggestions ~= CompletionItem(CompletionType.Property, prop);
-					}
-					foreach (widget; widgets)
-					{
-						suggestions ~= CompletionItem(CompletionType.Class, widget);
-					}
-				}
-				else
-				{
-					foreach (property; baseProperties)
-					{
-						if (property.toUpper.canFind(info.name.toUpper))
+						if (name.length == 0 || item.item.value.canFind(name))
 						{
-							suggestions ~= CompletionItem(CompletionType.Property, property);
+							suggestions ~= item.item;
 						}
 					}
-					foreach (widget; widgets)
+					else if (item.item.type != CompletionType.EnumDefinition)
 					{
-						if (widget.toUpper.canFind(info.name.toUpper))
+						std.stdio.stderr.writeln("Cur Scope: ", curScope);
+						std.stdio.stderr.writeln("Item Scope: ", item.requiredScope);
+						if (curScope.canFind(item.requiredScope))
 						{
-							suggestions ~= CompletionItem(CompletionType.Class, widget);
+							if (name.length == 0 || item.item.value.canFind(name))
+							{
+								suggestions ~= item.item;
+							}
 						}
 					}
 				}
-				break;
-			case PropertyValue:
-				// TODO: Add possible enums/values
-				break;
-			case None:
-				break;
+			}
+			else if (info.type == LocationType.PropertyValue)
+			{
+				foreach (CompletionLookup item; dmlCompletions)
+				{
+					if (item.item.type == CompletionType.EnumValue)
+					{
+						if (curScope.canFind(item.requiredScope))
+						{
+							if (item.item.value == name)
+							{
+								foreach (CompletionLookup enumdef; dmlCompletions)
+								{
+									if (enumdef.item.type == CompletionType.EnumDefinition)
+									{
+										if (enumdef.item.enumName == item.item.enumName)
+											suggestions ~= enumdef.item;
+									}
+								}
+								break;
+							}
+						}
+					}
+					else if (item.item.type == CompletionType.Boolean)
+					{
+						if (curScope.canFind(item.requiredScope))
+						{
+							if (item.item.value == name)
+							{
+								suggestions ~= CompletionItem(CompletionType.Keyword, "true");
+								suggestions ~= CompletionItem(CompletionType.Keyword, "false");
+								break;
+							}
+						}
+					}
+				}
 			}
 			cb(null, suggestions.toJSON);
 		}
@@ -99,24 +122,68 @@ import workspaced.api;
 	}).start();
 }
 
-///
-enum CompletionType
+string[][] getProvidedScope(string[] stack)
 {
+	if (stack.length == 0)
+		return [];
+	string[][] providedScope;
+	foreach (CompletionLookup item; dmlCompletions)
+	{
+		if (item.item.type == CompletionType.Class)
+		{
+			if (item.item.value == stack[$ - 1])
+			{
+				providedScope ~= item.providedScope;
+				break;
+			}
+		}
+	}
+	return providedScope;
+}
+
+///
+enum CompletionType : ubyte
+{
+	///
+	Undefined = 0,
 	///
 	Class = 1,
 	///
-	Property = 2
+	String = 2,
+	///
+	Number = 3,
+	///
+	Color = 4,
+	///
+	EnumDefinition = 5,
+	///
+	EnumValue = 6,
+	///
+	Rectangle = 7,
+	///
+	Boolean = 8,
+	///
+	Keyword = 9,
 }
-
-__gshared private:
 
 struct CompletionItem
 {
 	CompletionType type;
 	string value;
+	string documentation = "";
+	string enumName = "";
 }
 
-enum LocationType
+struct CompletionLookup
+{
+	CompletionItem item;
+	string[][] providedScope = [];
+	string[] requiredScope = [];
+}
+
+__gshared private:
+
+enum LocationType : ubyte
 {
 	RootMember,
 	Member,
@@ -127,20 +194,23 @@ enum LocationType
 struct LocationInfo
 {
 	LocationType type;
-	string name;
+	string[] itemScope;
+	string propertyName;
 }
 
 LocationInfo getLocationInfo(in string code, int pos)
 {
 	LocationInfo current;
 	current.type = LocationType.RootMember;
-	current.name = "";
+	current.itemScope = [];
+	current.propertyName = "";
+	string member = "";
 	bool inString = false;
 	bool escapeChar = false;
 	foreach (i, c; code)
 	{
 		if (i == pos)
-			return current;
+			break;
 		if (inString)
 		{
 			if (escapeChar)
@@ -154,8 +224,8 @@ LocationInfo getLocationInfo(in string code, int pos)
 				else if (c == '"')
 				{
 					inString = false;
-					current.name = "";
 					current.type = LocationType.None;
+					member = "";
 					escapeChar = false;
 				}
 			}
@@ -163,14 +233,23 @@ LocationInfo getLocationInfo(in string code, int pos)
 		}
 		else
 		{
-			if (c == '{' || c == '\n' || c == '\r' || c == ';')
+			if (c == '{')
 			{
-				current.name = "";
+				current.itemScope ~= member;
+				current.propertyName = "";
+				member = "";
+				current.type = LocationType.Member;
+			}
+			else if (c == '\n' || c == '\r' || c == ';')
+			{
+				current.propertyName = "";
+				member = "";
 				current.type = LocationType.Member;
 			}
 			else if (c == ':')
 			{
-				current.name = "";
+				current.propertyName = member;
+				member = "";
 				current.type = LocationType.PropertyValue;
 			}
 			else if (c == '"')
@@ -179,172 +258,65 @@ LocationInfo getLocationInfo(in string code, int pos)
 			}
 			else if (c == '}')
 			{
-				if (current.type == LocationType.PropertyValue)
-					current.type = LocationType.None;
+				if (current.itemScope.length > 0)
+					current.itemScope.length--;
+				current.type = LocationType.None;
+				current.propertyName = "";
+				member = "";
 			}
 			else if (c.isWhite)
 			{
-				current.name = "";
+				if (current.type == LocationType.None)
+					current.type = LocationType.Member;
+				if (current.itemScope.length == 0)
+					current.type = LocationType.RootMember;
 			}
 			else
 			{
 				if (current.type == LocationType.Member || current.type == LocationType.RootMember)
-					current.name ~= c;
+					member ~= c;
 			}
 		}
 	}
+	if (member.length)
+		current.propertyName = member;
+	current.itemScope ~= current.propertyName;
 	return current;
 }
 
 unittest
 {
-	auto info = getLocationInfo("", 0);
-	assert(info.type == LocationType.RootMember);
+	import dunit.toolkit;
+
+	auto info = getLocationInfo(" ", 0);
+	assertEqual(info.type, LocationType.RootMember);
 	info = getLocationInfo(`TableLayout { mar }`, 17);
-	assert(info.type == LocationType.Member);
-	assert(info.name == "mar");
+	assertEqual(info.itemScope, ["TableLayout", "mar"]);
+	assertEqual(info.type, LocationType.Member);
 	info = getLocationInfo(`TableLayout { margins: 20; paddin }`, 33);
-	assert(info.type == LocationType.Member);
-	assert(info.name == "paddin");
+	assertEqual(info.itemScope, ["TableLayout", "paddin"]);
+	assertEqual(info.type, LocationType.Member);
 	info = getLocationInfo("TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foo } }", 70);
-	assert(info.type == LocationType.PropertyValue);
+	assertEqual(info.itemScope, ["TableLayout", "TextWidget", "text"]);
+	assertEqual(info.type, LocationType.PropertyValue);
 	info = getLocationInfo(`TableLayout { margins: 2 }`, 24);
-	assert(info.type == LocationType.PropertyValue);
-	info = getLocationInfo("TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\" } }", 74);
-	assert(info.type == LocationType.None);
-	info = getLocationInfo("TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\"; } }", 75);
-	assert(info.type == LocationType.Member);
-	info = getLocationInfo("TableLayout {\n\t", 17);
-	assert(info.type == LocationType.Member);
-	assert(info.name == "", info.name);
+	assertEqual(info.itemScope, ["TableLayout", "margins"]);
+	assertEqual(info.type, LocationType.PropertyValue);
+	info = getLocationInfo("TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\" } } ", int.max);
+	assertEqual(info.itemScope, [""]);
+	assertEqual(info.type, LocationType.RootMember);
+	info = getLocationInfo("TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\"; } }", 69);
+	assertEqual(info.itemScope, ["TableLayout", "TextWidget", "text"]);
+	assertEqual(info.type, LocationType.PropertyValue);
+	info = getLocationInfo("TableLayout {\n\t", int.max);
+	assertEqual(info.itemScope, ["TableLayout", ""]);
+	assertEqual(info.type, LocationType.Member);
 	info = getLocationInfo(`TableLayout {
 	colCount: 2
 	margins: 20; padding: 10
 	backgroundColor: "#FFFFE0"
 	TextWidget {
 		t`, int.max);
-	assert(info.type == LocationType.Member);
-	assert(info.name == "t");
+	assertEqual(info.itemScope, ["TableLayout", "TextWidget", "t"]);
+	assertEqual(info.type, LocationType.Member);
 }
-
-//dfmt off
-static immutable string[] widgets = [
-	// appframe
-	"AppFrame",
-	// combobox
-	"ComboBox",
-	"ComboBoxBase",
-	"ComboEdit",
-	// controls
-	"AbstractSlider",
-	"Button",
-	"CheckBox",
-	"HSpacer",
-	"ImageButton",
-	"ImageTextButton",
-	"ImageWidget",
-	"RadioButton",
-	"ScrollBar",
-	"TextWidget",
-	"VSpacer",
-	// docks
-	"DockHost",
-	"DockWindow",
-	// editors
-	"EditBox",
-	"EditLine",
-	"EditOperation",
-	"EditWidgetBase",
-	"UndoBuffer",
-	// grid
-	"GridWidgetBase",
-	"StringGridAdapter",
-	"StringGridWidget",
-	"StringGridWidgetBase",
-	// layouts
-	"FrameLayout",
-	"HorizontalLayout",
-	"LinearLayout",
-	"ResizerWidget",
-	"TableLayout",
-	"VerticalLayout",
-	// lists
-	"ListWidget",
-	"StringListAdapter",
-	"WidgetListAdapter",
-	// menu
-	"MainMenu",
-	"MenuItemWidget",
-	"MenuWidgetBase",
-	"PopupMenu",
-	// popup
-	"PopupWidget",
-	// scroll
-	"ScrollWidget",
-	"ScrollWidgetBase",
-	// srcedit
-	"SourceEdit",
-	// statusline
-	"StatusLine",
-	// styles
-	// tabs
-	"TabControl",
-	"TabHost",
-	"TabItemWidget",
-	"TabWidget",
-	// toolbars
-	"ToolBar",
-	"ToolBarHost",
-	"ToolBarImageButton",
-	"ToolBarSeparator",
-	// tree
-	"TreeItemWidget",
-	"TreeWidget",
-	"TreeWidgetBase",
-	// widget
-	"Widget",
-	"WidgetGroup",
-	"WidgetGroupDefaultDrawing",
-];
-
-static immutable string[] baseProperties = [
-	"action",
-	"alignment",
-	"alpha",
-	"backgroundColor",
-	"backgroundImageId",
-	"checkable",
-	"checked",
-	"clickable",
-	"enabled",
-	"focusable",
-	"focusGroup",
-	"fontFace",
-	"fontFamily",
-	"fontItalic",
-	"fontSize",
-	"fontWeight",
-	"id",
-	"layoutHeight",
-	"layoutWeight",
-	"layoutWidth",
-	"margins",
-	"maxHeight",
-	"maxWidth",
-	"minHeight",
-	"minWidth",
-	"padding",
-	"parent",
-	"resetState",
-	"setState",
-	"state",
-	"styleId",
-	"tabOrder",
-	"text",
-	"textColor",
-	"textFlags",
-	"trackHover",
-	"visibility",
-	"window"
-];
-//dfmt on
