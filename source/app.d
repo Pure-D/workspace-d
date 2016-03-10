@@ -16,7 +16,7 @@ import std.json;
 import std.meta;
 import std.conv;
 
-static immutable Version = [2, 4, 0];
+static immutable Version = [2, 5, 0];
 __gshared Mutex writeMutex, commandMutex;
 
 void sendFinal(int id, JSONValue value)
