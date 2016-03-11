@@ -66,6 +66,8 @@ unittest
 @unload void stop()
 {
 	stopServerSync();
+	Thread.sleep(100.msecs);
+	killServer();
 }
 
 /// This will start the dcd-server and load import paths from the current provider

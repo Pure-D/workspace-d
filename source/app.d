@@ -302,6 +302,10 @@ int main(string[] args)
 		ubyte[4] intBuffer;
 		ubyte[] dataBuffer;
 		JSONValue data;
+
+		scope (exit)
+			handleRequest(int.min, JSONValue(["cmd" : "unload", "components" : "*"]));
+
 		while (stdin.isOpen && stdout.isOpen && !stdin.eof)
 		{
 			dataBuffer = stdin.rawRead(intBuffer);
