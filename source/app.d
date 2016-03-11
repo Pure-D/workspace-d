@@ -16,7 +16,7 @@ import std.json;
 import std.meta;
 import std.conv;
 
-static immutable Version = [2, 5, 0];
+static immutable Version = [2, 6, 0];
 __gshared Mutex writeMutex, commandMutex;
 
 void sendFinal(int id, JSONValue value)
@@ -241,6 +241,7 @@ void handleRequest(int id, JSONValue request)
 	handleRequestMod!(workspaced.com.dfmt)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.dscanner)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.dlangui)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.fsworkspace)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
 
 	if (isAsync)
 	{
