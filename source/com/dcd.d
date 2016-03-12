@@ -110,7 +110,8 @@ void startServer(string[] additionalImports = [])
 
 void stopServerSync()
 {
-	doClient(["--shutdown"]).pid.wait;
+	if (!serverPipes.pid.tryWait().terminated)
+		doClient(["--shutdown"]).pid.wait;
 }
 
 /// This stops the dcd-server asynchronously
