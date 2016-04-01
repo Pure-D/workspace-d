@@ -89,7 +89,7 @@ void startServer(string[] additionalImports = [])
 	string[] imports;
 	foreach (i; additionalImports)
 		imports ~= "-I" ~ i;
-	socketFile = buildPath(tempDir, "workspace-d-sock_" ~ uniform(ulong.min, ulong.max).to!string ~ "-" ~ Clock.currStdTime().to!string);
+	socketFile = buildPath(tempDir, "workspace-d-sock" ~ thisProcessID.to!string(36));
 	serverPipes = raw([serverPath] ~ clientArgs ~ imports, Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
 	while (!serverPipes.stderr.eof)
 	{
