@@ -6,9 +6,9 @@
 		"webfreak"
 	],
 	"dependencies": {
-		"dub": "~>0.9.24",
+		"dub": "~>0.9.25-beta.3",
 		"dunit": "~>1.0.12",
-		"painlessjson": "~>1.3.6"
+		"painlessjson": "~>1.3.7"
 	},
 	"configurations": [
 		{

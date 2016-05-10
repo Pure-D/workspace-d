@@ -48,7 +48,7 @@ import dub.internal.vibecompat.core.log;
 	start();
 	upgrade();
 
-	string compilerName = defaultCompiler;
+	string compilerName = _dub.defaultCompiler;
 	_compiler = getCompiler(compilerName);
 	BuildSettings settings;
 	_platform = _compiler.determinePlatform(settings, compilerName);
@@ -62,14 +62,14 @@ import dub.internal.vibecompat.core.log;
 /// Stops dub when called.
 @unload void stop()
 {
-	_dub.shutdown();
+	_dub.destroy();
 }
 
 private void start()
 {
-	_dub = new Dub(null, _cwdStr, SkipRegistry.none);
+	_dub = new Dub(_cwdStr, null, SkipPackageSuppliers.none);
 	_dub.packageManager.getOrLoadPackage(_cwd);
-	_dub.loadPackageFromCwd();
+	_dub.loadPackage();
 	_dub.project.validate();
 }
 
@@ -104,13 +104,26 @@ bool updateImportPaths(bool restartDub = true)
 	if (restartDub)
 		restart();
 
-	ProjectDescription desc = _dub.project.describe(_platform, _configuration, _buildType);
+	auto compiler = getCompiler(.compiler);
+	auto buildPlatform = compiler.determinePlatform(_settings, .compiler);
+	
+	GeneratorSettings settings;
+	settings.platform = buildPlatform;
+	settings.config = _configuration;
+	settings.buildType = _buildType;
+	settings.compiler = compiler;
+	settings.buildSettings = _settings;
+	settings.buildSettings.options |= BuildOption.syntaxOnly;
+	settings.combined = true;
+	settings.run = false;
+	ProjectDescription desc = _dub.project.describe(settings);
 
 	// target-type: none (no import paths)
 	if (desc.targets.length > 0 && desc.targetLookup.length > 0 && (desc.rootPackage in desc.targetLookup) !is null)
 	{
-		_importPaths = _dub.project.listImportPaths(_platform, _configuration, _buildType, false);
-		_stringImportPaths = _dub.project.listStringImportPaths(_platform, _configuration, _buildType, false);
+		auto paths = _dub.project.listBuildSettings(settings, ["import-paths", "string-import-paths"], ListBuildSettingsFormat.listNul);
+		_importPaths = paths[0].split('\0');
+		_stringImportPaths = paths[1].split('\0');
 		return _importPaths.length > 0;
 	}
 	else
@@ -126,7 +139,7 @@ bool updateImportPaths(bool restartDub = true)
 @arguments("subcmd", "upgrade")
 void upgrade()
 {
-	_dub.upgrade(UpgradeOptions.upgrade);
+	_dub.upgrade(UpgradeOptions.select | UpgradeOptions.upgrade);
 }
 
 /// Lists all dependencies
@@ -168,7 +181,7 @@ string[] configurations() @property
 string[] buildTypes() @property
 {
 	string[] types = ["plain", "debug", "release", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov"];
-	foreach (type, info; _dub.project.rootPackage.info.buildTypes)
+	foreach (type, info; _dub.project.rootPackage.recipe.buildTypes)
 		types ~= type;
 	return types;
 }
@@ -372,10 +385,10 @@ DubPackageInfo getInfo(in Package dep)
 {
 	DubPackageInfo info;
 	info.name = dep.name;
-	info.ver = dep.vers;
-	foreach (name, subDep; dep.dependencies)
+	info.ver = dep.version_.toString;
+	foreach (subDep; dep.getAllDependencies())
 	{
-		info.dependencies[name] = subDep.toString();
+		info.dependencies[subDep.name] = subDep.spec.toString;
 	}
 	return info;
 }

@@ -16,6 +16,13 @@ import std.json;
 import std.meta;
 import std.conv;
 
+static import workspaced.com.dcd;
+static import workspaced.com.dfmt;
+static import workspaced.com.dlangui;
+static import workspaced.com.dscanner;
+static import workspaced.com.dub;
+static import workspaced.com.fsworkspace;
+
 static immutable Version = [2, 6, 0];
 __gshared Mutex writeMutex, commandMutex;
 
@@ -118,7 +125,7 @@ template compatibleGetUDAs(alias symbol, alias attribute)
 
 void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values, ref int asyncWaiting, ref bool isAsync, ref bool hasArgs, in AsyncCallback asyncCallback)
 {
-	foreach (name; __traits(allMembers, T))
+	foreach (name; __traits(derivedMembers, T))
 	{
 		static if (__traits(compiles, __traits(getMember, T, name)))
 		{

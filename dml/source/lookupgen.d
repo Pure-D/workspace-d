@@ -1,6 +1,7 @@
 import std.conv;
 import std.algorithm;
 import pegged.grammar;
+static import pegged.peg;
 
 ///
 enum CompletionType : ubyte

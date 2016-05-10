@@ -65,8 +65,6 @@ import workspaced.completion.dml;
 					}
 					else if (item.item.type != CompletionType.EnumDefinition)
 					{
-						std.stdio.stderr.writeln("Cur Scope: ", curScope);
-						std.stdio.stderr.writeln("Item Scope: ", item.requiredScope);
 						if (curScope.canFind(item.requiredScope))
 						{
 							if (name.length == 0 || item.item.value.canFind(name))
