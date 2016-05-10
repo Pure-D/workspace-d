@@ -17,10 +17,15 @@ import std.meta;
 import std.conv;
 
 static import workspaced.com.dcd;
+
 static import workspaced.com.dfmt;
+
 static import workspaced.com.dlangui;
+
 static import workspaced.com.dscanner;
+
 static import workspaced.com.dub;
+
 static import workspaced.com.fsworkspace;
 
 static immutable Version = [2, 6, 0];
@@ -71,18 +76,23 @@ template JSONCallBody(alias T, string fn, string jsonvar, size_t i, Args...)
 	else static if (Args.length == i)
 		enum JSONCallBody = "";
 	else static if (is(ParameterDefaults!T[i] == void))
-		enum JSONCallBody = "(assert(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `" ~ Args[i] ~ " has no default value and is not in the JSON request`), fromJSON!(Parameters!(" ~ fn ~ ")[" ~ i
-				.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]" ~ "))," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
+		enum JSONCallBody = "(assert(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `" ~ Args[i]
+				~ " has no default value and is not in the JSON request`), fromJSON!(Parameters!("
+				~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]"
+				~ "))," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
 	else
-		enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? fromJSON!(Parameters!(" ~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]"
-				~ ") : ParameterDefaults!(" ~ fn ~ ")[" ~ i.to!string ~ "]," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
+					enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? fromJSON!(Parameters!("
+							~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i]
+							~ "`]" ~ ") : ParameterDefaults!(" ~ fn ~ ")[" ~ i.to!string
+							~ "]," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
 }
 
 template JSONCallNoRet(alias T, string fn, string jsonvar, bool async)
 {
 	alias Args = ParameterIdentifierTuple!T;
 	static if (Args.length > 0)
-		enum JSONCallNoRet = fn ~ "(" ~ (async ? "asyncCallback," : "") ~ JSONCallBody!(T, fn, jsonvar, async ? 1 : 0, Args) ~ ")";
+		enum JSONCallNoRet = fn ~ "(" ~ (async ? "asyncCallback,"
+					: "") ~ JSONCallBody!(T, fn, jsonvar, async ? 1 : 0, Args) ~ ")";
 	else
 		enum JSONCallNoRet = fn ~ "(" ~ (async ? "asyncCallback" : "") ~ ")";
 }
@@ -91,7 +101,8 @@ template JSONCall(alias T, string fn, string jsonvar, bool async)
 {
 	static if (async)
 	{
-		static assert(is(ReturnType!T == void), "Async functions cant have an return type! For function " ~ fn);
+		static assert(is(ReturnType!T == void),
+				"Async functions cant have an return type! For function " ~ fn);
 		enum JSONCall = JSONCallNoRet!(T, fn, jsonvar, async) ~ ";";
 	}
 	else
@@ -123,7 +134,8 @@ template compatibleGetUDAs(alias symbol, alias attribute)
 	alias compatibleGetUDAs = Filter!(isDesiredUDA, __traits(getAttributes, symbol));
 }
 
-void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values, ref int asyncWaiting, ref bool isAsync, ref bool hasArgs, in AsyncCallback asyncCallback)
+void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values,
+		ref int asyncWaiting, ref bool isAsync, ref bool hasArgs, in AsyncCallback asyncCallback)
 {
 	foreach (name; __traits(derivedMembers, T))
 	{
@@ -152,35 +164,45 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 					matches = true;
 				static if (hasUDA!(symbol, component))
 				{
-					if (("cmd" in request)!is null && request["cmd"].type == JSON_TYPE.STRING && compatibleGetUDAs!(symbol, component)[0].name != request["cmd"].str)
+					if (("cmd" in request) !is null && request["cmd"].type == JSON_TYPE.STRING
+							&& compatibleGetUDAs!(symbol, component)[0].name != request["cmd"].str)
 						matches = false;
 				}
 				static if (hasUDA!(symbol, load) && hasUDA!(symbol, component))
 				{
-					if (("components" in request)!is null && ("cmd" in request)!is null && request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "load")
+					if (("components" in request) !is null && ("cmd" in request) !is null
+							&& request["cmd"].type == JSON_TYPE.STRING
+							&& request["cmd"].str == "load")
 					{
 						if (request["components"].type == JSON_TYPE.ARRAY)
 						{
 							foreach (com; request["components"].array)
-								if (com.type == JSON_TYPE.STRING && com.str == compatibleGetUDAs!(symbol, component)[0].name)
+								if (com.type == JSON_TYPE.STRING
+										&& com.str == compatibleGetUDAs!(symbol, component)[0].name)
 									matches = true;
 						}
-						else if (request["components"].type == JSON_TYPE.STRING && request["components"].str == compatibleGetUDAs!(symbol, component)[0].name)
+						else if (request["components"].type == JSON_TYPE.STRING
+								&& request["components"].str == compatibleGetUDAs!(symbol,
+								component)[0].name)
 							matches = true;
 					}
 				}
 				static if (hasUDA!(symbol, unload) && hasUDA!(symbol, component))
 				{
-					if (("components" in request)!is null && ("cmd" in request)!is null && request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "unload")
+					if (("components" in request) !is null && ("cmd" in request) !is null
+							&& request["cmd"].type == JSON_TYPE.STRING
+							&& request["cmd"].str == "unload")
 					{
 						if (request["components"].type == JSON_TYPE.ARRAY)
 						{
 							foreach (com; request["components"].array)
-								if (com.type == JSON_TYPE.STRING && (com.str == compatibleGetUDAs!(symbol, component)[0].name || com.str == "*"))
+								if (com.type == JSON_TYPE.STRING && (com.str == compatibleGetUDAs!(symbol,
+										component)[0].name || com.str == "*"))
 									matches = true;
 						}
-						else if (request["components"].type == JSON_TYPE.STRING && (request["components"].str == compatibleGetUDAs!(symbol, component)[0].name
-								|| request["components"].str == "*"))
+						else if (request["components"].type == JSON_TYPE.STRING
+								&& (request["components"].str == compatibleGetUDAs!(symbol,
+									component)[0].name || request["components"].str == "*"))
 							matches = true;
 					}
 				}
@@ -207,9 +229,11 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 
 void handleRequest(int id, JSONValue request)
 {
-	if (("cmd" in request) && request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "version")
+	if (("cmd" in request) && request["cmd"].type == JSON_TYPE.STRING
+			&& request["cmd"].str == "version")
 	{
-		sendFinal(id, JSONValue(["major" : JSONValue(Version[0]), "minor" : JSONValue(Version[1]), "patch" : JSONValue(Version[2])]));
+		sendFinal(id, JSONValue(["major" : JSONValue(Version[0]), "minor"
+				: JSONValue(Version[1]), "patch" : JSONValue(Version[2])]));
 		return;
 	}
 
@@ -243,17 +267,24 @@ void handleRequest(int id, JSONValue request)
 		}
 	};
 
-	handleRequestMod!(workspaced.com.dub)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dcd)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dfmt)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dscanner)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dlangui)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.fsworkspace)(id, request, values, asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dub)(id, request, values, asyncWaiting,
+			isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dcd)(id, request, values, asyncWaiting,
+			isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dfmt)(id, request, values, asyncWaiting,
+			isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dscanner)(id, request, values,
+			asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dlangui)(id, request, values,
+			asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.fsworkspace)(id, request, values,
+			asyncWaiting, isAsync, hasArgs, asyncCallback);
 
 	if (isAsync)
 	{
 		if (values.length > 0)
-			throw new Exception("Cannot mix sync and async functions! In request " ~ request.toString);
+			throw new Exception(
+					"Cannot mix sync and async functions! In request " ~ request.toString);
 	}
 	else
 	{

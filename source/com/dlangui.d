@@ -294,16 +294,20 @@ unittest
 	info = getLocationInfo(`TableLayout { margins: 20; paddin }`, 33);
 	assertEqual(info.itemScope, ["TableLayout", "paddin"]);
 	assertEqual(info.type, LocationType.Member);
-	info = getLocationInfo("TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foo } }", 70);
+	info = getLocationInfo(
+			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foo } }", 70);
 	assertEqual(info.itemScope, ["TableLayout", "TextWidget", "text"]);
 	assertEqual(info.type, LocationType.PropertyValue);
 	info = getLocationInfo(`TableLayout { margins: 2 }`, 24);
 	assertEqual(info.itemScope, ["TableLayout", "margins"]);
 	assertEqual(info.type, LocationType.PropertyValue);
-	info = getLocationInfo("TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\" } } ", int.max);
+	info = getLocationInfo(
+			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\" } } ",
+			int.max);
 	assertEqual(info.itemScope, [""]);
 	assertEqual(info.type, LocationType.RootMember);
-	info = getLocationInfo("TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\"; } }", 69);
+	info = getLocationInfo(
+			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\"; } }", 69);
 	assertEqual(info.itemScope, ["TableLayout", "TextWidget", "text"]);
 	assertEqual(info.type, LocationType.PropertyValue);
 	info = getLocationInfo("TableLayout {\n\t", int.max);

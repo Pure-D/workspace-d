@@ -27,7 +27,8 @@ version (FreeBSD) version = haveUnixSockets;
 /// Load function for dcd. Call with `{"cmd": "load", "components": ["dcd"]}`
 /// This will start dcd-server and load all import paths specified by previously loaded modules such as dub if autoStart is true. All dcd methods are used with `"cmd": "dcd"`
 /// Note: This will block any incoming requests while loading.
-@load void start(string dir, string clientPath = "dcd-client", string serverPath = "dcd-server", ushort port = 9166, bool autoStart = true)
+@load void start(string dir, string clientPath = "dcd-client",
+		string serverPath = "dcd-server", ushort port = 9166, bool autoStart = true)
 {
 	.cwd = dir;
 	.serverPath = serverPath;
@@ -90,7 +91,8 @@ void startServer(string[] additionalImports = [])
 	foreach (i; additionalImports)
 		imports ~= "-I" ~ i;
 	socketFile = buildPath(tempDir, "workspace-d-sock" ~ thisProcessID.to!string(36));
-	serverPipes = raw([serverPath] ~ clientArgs ~ imports, Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
+	serverPipes = raw([serverPath] ~ clientArgs ~ imports,
+			Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
 	while (!serverPipes.stderr.eof)
 	{
 		string line = serverPipes.stderr.readln();
@@ -364,12 +366,14 @@ ushort getRunningPort()
 			int[] emptyArr;
 			if (data.length == 0)
 			{
-				cb(null, JSONValue(["type" : JSONValue("identifiers"), "identifiers" : emptyArr.toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("identifiers"),
+					"identifiers" : emptyArr.toJSON()]));
 				return;
 			}
 			if (data[0] == "calltips")
 			{
-				cb(null, JSONValue(["type" : JSONValue("calltips"), "calltips" : data[1 .. $].toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("calltips"), "calltips"
+					: data[1 .. $].toJSON()]));
 				return;
 			}
 			else if (data[0] == "identifiers")
@@ -380,7 +384,8 @@ ushort getRunningPort()
 					string[] splits = line.split('\t');
 					identifiers ~= DCDIdentifier(splits[0], splits[1]);
 				}
-				cb(null, JSONValue(["type" : JSONValue("identifiers"), "identifiers" : identifiers.toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("identifiers"),
+					"identifiers" : identifiers.toJSON()]));
 				return;
 			}
 			else

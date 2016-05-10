@@ -1,6 +1,7 @@
 import std.conv;
 import std.algorithm;
 import pegged.grammar;
+
 static import pegged.peg;
 
 ///
@@ -56,7 +57,8 @@ struct CompletionItem
 
 	string toString()
 	{
-		return "CompletionItem(CompletionType." ~ type.to!string ~ ", " ~ value.quote ~ ", " ~ documentation.quote ~ ", " ~ enumName.quote ~ ")";
+		return "CompletionItem(CompletionType." ~ type.to!string ~ ", "
+			~ value.quote ~ ", " ~ documentation.quote ~ ", " ~ enumName.quote ~ ")";
 	}
 }
 
@@ -111,7 +113,8 @@ CompletionLookup[] generateCompletions(string completionLookup)
 					string documentation = "";
 					if (val.children.length > 0 && val.children[0].name == "DML.Documentation")
 						documentation = val.children[0].matches[0];
-					enumCompletions ~= CompletionLookup(CompletionItem(CompletionType.EnumDefinition, val.matches[0], documentation, child.matches[1]), [], []);
+					enumCompletions ~= CompletionLookup(CompletionItem(CompletionType.EnumDefinition,
+							val.matches[0], documentation, child.matches[1]), [], []);
 				}
 			}
 		}
@@ -139,20 +142,26 @@ CompletionLookup[] generateCompletions(string completionLookup)
 					if (type == "include")
 						dependencies ~= name;
 					else if (type == "bool")
-						members ~= CompletionLookup(CompletionItem(CompletionType.Boolean, name, documentation), [], [child.matches[1]]);
+						members ~= CompletionLookup(CompletionItem(CompletionType.Boolean,
+								name, documentation), [], [child.matches[1]]);
 					else if (type == "color")
-						members ~= CompletionLookup(CompletionItem(CompletionType.Color, name, documentation), [], [child.matches[1]]);
+						members ~= CompletionLookup(CompletionItem(CompletionType.Color,
+								name, documentation), [], [child.matches[1]]);
 					else if (type == "number")
-						members ~= CompletionLookup(CompletionItem(CompletionType.Number, name, documentation), [], [child.matches[1]]);
+						members ~= CompletionLookup(CompletionItem(CompletionType.Number,
+								name, documentation), [], [child.matches[1]]);
 					else if (type == "rect")
-						members ~= CompletionLookup(CompletionItem(CompletionType.Rectangle, name, documentation), [], [child.matches[1]]);
+						members ~= CompletionLookup(CompletionItem(CompletionType.Rectangle,
+								name, documentation), [], [child.matches[1]]);
 					else if (type == "string")
-						members ~= CompletionLookup(CompletionItem(CompletionType.String, name, documentation), [], [child.matches[1]]);
+						members ~= CompletionLookup(CompletionItem(CompletionType.String,
+								name, documentation), [], [child.matches[1]]);
 					else
 					{
 						assert(!classes.canFind(type), "Member values can not be of type class!");
 						assert(enums.canFind(type), "Undefined value type '" ~ type ~ "'");
-						members ~= CompletionLookup(CompletionItem(CompletionType.EnumValue, name, documentation, type), [], [child.matches[1]]);
+						members ~= CompletionLookup(CompletionItem(CompletionType.EnumValue,
+								name, documentation, type), [], [child.matches[1]]);
 					}
 				}
 			}
@@ -167,7 +176,8 @@ CompletionLookup[] generateCompletions(string completionLookup)
 			string documentation = "";
 			if (child.children.length > 0 && child.children[0].name == "DML.Documentation")
 				documentation = child.children[0].matches[0];
-			CompletionLookup type = CompletionLookup(CompletionItem(CompletionType.Class, child.matches[1], documentation), scopes, []);
+			CompletionLookup type = CompletionLookup(CompletionItem(CompletionType.Class,
+					child.matches[1], documentation), scopes, []);
 			dependTree ~= ClassDependency(type, members, dependencies);
 		}
 	}
@@ -185,7 +195,8 @@ CompletionLookup[] generateCompletions(string completionLookup)
 				done = false;
 				foreach (loaded; dependTree)
 				{
-					if (loaded.type.item.value == remaining && loaded.remainingDependencies.length == 0)
+					if (loaded.type.item.value == remaining
+							&& loaded.remainingDependencies.length == 0)
 					{
 						dep.type.providedScope ~= loaded.type.providedScope;
 						string[][] newProvidedScope;

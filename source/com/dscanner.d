@@ -39,9 +39,9 @@ import workspaced.api;
 		try
 		{
 			auto args = [execPath, "-S", file];
-			if(ini && ini.length)
+			if (ini && ini.length)
 			{
-				if(ini.isAbsolute)
+				if (ini.isAbsolute)
 					args ~= ["--config", ini];
 				else
 					args ~= ["--config", buildPath(cwd, ini)];
@@ -53,8 +53,7 @@ import workspaced.api;
 			while (pipes.stdout.isOpen && !pipes.stdout.eof)
 				res ~= pipes.stdout.readln();
 			DScannerIssue[] issues;
-			foreach (line;
-			res)
+			foreach (line; res)
 			{
 				if (!line.length)
 					continue;
@@ -94,8 +93,7 @@ import workspaced.api;
 			while (pipes.stdout.isOpen && !pipes.stdout.eof)
 				res ~= pipes.stdout.readln();
 			DefinitionElement[] definitions;
-			foreach (line;
-			res)
+			foreach (line; res)
 			{
 				if (!line.length || line[0] == '!')
 					continue;
@@ -106,12 +104,11 @@ import workspaced.api;
 				definition.type = splits[3];
 				definition.line = toImpl!int(splits[4][5 .. $]);
 				if (splits.length > 5)
-					foreach (attribute;
-				splits[5 .. $])
-				{
-					string[] sides = attribute.split(':');
-					definition.attributes[sides[0]] = sides[1 .. $].join(':');
-				}
+					foreach (attribute; splits[5 .. $])
+					{
+						string[] sides = attribute.split(':');
+						definition.attributes[sides[0]] = sides[1 .. $].join(':');
+					}
 				definitions ~= definition;
 			}
 			cb(null, definitions.toJSON);

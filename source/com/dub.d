@@ -33,7 +33,8 @@ import dub.internal.vibecompat.core.log;
 /// Load function for dub. Call with `{"cmd": "load", "components": ["dub"]}`
 /// This will start dub and load all import paths. All dub methods are used with `"cmd": "dub"`
 /// Note: This will block any incoming requests while loading.
-@load void startup(string dir, bool registerImportProvider = true, bool registerStringImportProvider = true)
+@load void startup(string dir, bool registerImportProvider = true,
+		bool registerStringImportProvider = true)
 {
 	setLogLevel(LogLevel.none);
 
@@ -55,7 +56,7 @@ import dub.internal.vibecompat.core.log;
 	_settings = settings;
 
 	_configuration = _dub.project.getDefaultConfiguration(_platform);
-	assert (_dub.project.configurations.canFind(_configuration), "No configuration available");
+	assert(_dub.project.configurations.canFind(_configuration), "No configuration available");
 	updateImportPaths(false);
 }
 
@@ -106,7 +107,7 @@ bool updateImportPaths(bool restartDub = true)
 
 	auto compiler = getCompiler(.compiler);
 	auto buildPlatform = compiler.determinePlatform(_settings, .compiler);
-	
+
 	GeneratorSettings settings;
 	settings.platform = buildPlatform;
 	settings.config = _configuration;
@@ -119,9 +120,11 @@ bool updateImportPaths(bool restartDub = true)
 	ProjectDescription desc = _dub.project.describe(settings);
 
 	// target-type: none (no import paths)
-	if (desc.targets.length > 0 && desc.targetLookup.length > 0 && (desc.rootPackage in desc.targetLookup) !is null)
+	if (desc.targets.length > 0 && desc.targetLookup.length > 0
+			&& (desc.rootPackage in desc.targetLookup) !is null)
 	{
-		auto paths = _dub.project.listBuildSettings(settings, ["import-paths", "string-import-paths"], ListBuildSettingsFormat.listNul);
+		auto paths = _dub.project.listBuildSettings(settings, ["import-paths",
+				"string-import-paths"], ListBuildSettingsFormat.listNul);
 		_importPaths = paths[0].split('\0');
 		_stringImportPaths = paths[1].split('\0');
 		return _importPaths.length > 0;
@@ -180,7 +183,10 @@ string[] configurations() @property
 @arguments("subcmd", "list:build-types")
 string[] buildTypes() @property
 {
-	string[] types = ["plain", "debug", "release", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov"];
+	string[] types = [
+		"plain", "debug", "release", "release-nobounds", "unittest", "docs",
+		"ddox", "profile", "profile-gc", "cov", "unittest-cov"
+	];
 	foreach (type, info; _dub.project.rootPackage.recipe.buildTypes)
 		types ~= type;
 	return types;
@@ -213,7 +219,6 @@ string buildType() @property
 {
 	return _buildType;
 }
-
 
 /// Selects a new build type and updates the import paths accordingly
 /// Returns: `false` if there are no import paths in the new build type
@@ -302,13 +307,13 @@ auto path() @property
 
 			settings.compileCallback = (status, output) {
 				string[] lines = output.splitLines;
-				foreach (line;
-				lines)
+				foreach (line; lines)
 				{
 					auto match = line.matchFirst(errorFormat);
 					if (match)
 					{
-						issues ~= BuildIssue(match[2].to!int, match[3].to!int, match[1], match[4].to!ErrorType, match[5]);
+						issues ~= BuildIssue(match[2].to!int,
+							match[3].to!int, match[1], match[4].to!ErrorType, match[5]);
 					}
 					else
 					{
@@ -317,7 +322,8 @@ auto path() @property
 							auto contMatch = line.matchFirst(errorFormatCont);
 							if (contMatch)
 							{
-								issues ~= BuildIssue(contMatch[2].to!int, contMatch[3].to!int, contMatch[1], ErrorType.Error, contMatch[4]);
+								issues ~= BuildIssue(contMatch[2].to!int, contMatch[3].to!int,
+									contMatch[1], ErrorType.Error, contMatch[4]);
 							}
 						}
 					}

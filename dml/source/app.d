@@ -20,7 +20,8 @@ module workspaced.completion.dml;
 import workspaced.com.dlangui;
 
 };
-	string compStr = "[" ~ generateCompletions(readText("views/dml-completion.txt")).to!(string[]).join(",\n\t") ~ "]";
+	string compStr = "[" ~ generateCompletions(readText("views/dml-completion.txt"))
+		.to!(string[]).join(",\n\t") ~ "]";
 	string completions = "enum dmlCompletions = " ~ compStr ~ ";";
 
 	write("source/completion/dml.d", prefix ~ completions);

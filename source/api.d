@@ -44,10 +44,11 @@ private struct Argument
 private template ArgumentPair(size_t i)
 {
 	static if (i > 0)
-		enum ArgumentPair = "ret.arguments[" ~ (i / 2 - 1).to!string ~ "] = Argument(args[" ~ (i - 2).to!string ~ "], args[" ~ (i - 1).to!string ~ "].toJSON);" ~ ArgumentPair!(
-				i - 2);
+		enum ArgumentPair = "ret.arguments[" ~ (i / 2 - 1)
+				.to!string ~ "] = Argument(args[" ~ (i - 2).to!string ~ "], args[" ~ (i - 1)
+				.to!string ~ "].toJSON);" ~ ArgumentPair!(i - 2);
 	else
-		enum ArgumentPair = "";
+					enum ArgumentPair = "";
 }
 
 Arguments arguments(T...)(T args)
