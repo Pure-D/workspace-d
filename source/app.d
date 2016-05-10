@@ -28,7 +28,7 @@ static import workspaced.com.dub;
 
 static import workspaced.com.fsworkspace;
 
-static immutable Version = [2, 6, 0];
+static immutable Version = [2, 7, 0];
 __gshared Mutex writeMutex, commandMutex;
 
 void sendFinal(int id, JSONValue value)
