@@ -117,11 +117,8 @@ bool updateImportPaths(bool restartDub = true)
 	settings.buildSettings.options |= BuildOption.syntaxOnly;
 	settings.combined = true;
 	settings.run = false;
-	ProjectDescription desc = _dub.project.describe(settings);
 
-	// target-type: none (no import paths)
-	if (desc.targets.length > 0 && desc.targetLookup.length > 0
-			&& (desc.rootPackage in desc.targetLookup) !is null)
+	try
 	{
 		auto paths = _dub.project.listBuildSettings(settings, ["import-paths",
 				"string-import-paths"], ListBuildSettingsFormat.listNul);
@@ -129,8 +126,9 @@ bool updateImportPaths(bool restartDub = true)
 		_stringImportPaths = paths[1].split('\0');
 		return _importPaths.length > 0;
 	}
-	else
+	catch (Exception e)
 	{
+		stderr.writeln("Exception while listing import paths: ", e);
 		_importPaths = [];
 		_stringImportPaths = [];
 		return false;
