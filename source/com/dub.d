@@ -298,8 +298,12 @@ auto path() @property
 			settings.compiler = compiler;
 			settings.buildSettings = _settings;
 			settings.buildSettings.options |= BuildOption.syntaxOnly;
-			settings.combined = true;
+			settings.buildSettings.addDFlags("-o-");
+			settings.direct = true;
+			settings.combined = false;
+			settings.tempBuild = true;
 			settings.run = false;
+			settings.rdmd = false;
 
 			BuildIssue[] issues;
 
