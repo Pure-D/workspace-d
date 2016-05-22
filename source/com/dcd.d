@@ -86,11 +86,11 @@ void startServer(string[] additionalImports = [])
 {
 	if (isPortRunning(port))
 		throw new Exception("Already running dcd on port " ~ port.to!string);
-	runningPort = port;
 	string[] imports;
 	foreach (i; additionalImports)
 		imports ~= "-I" ~ i;
-	socketFile = buildPath(tempDir, "workspace-d-sock" ~ thisProcessID.to!string(36));
+	.runningPort = port;
+	.socketFile = buildPath(tempDir, "workspace-d-sock" ~ thisProcessID.to!string(36));
 	serverPipes = raw([serverPath] ~ clientArgs ~ imports,
 			Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
 	while (!serverPipes.stderr.eof)
@@ -171,7 +171,7 @@ void restartServer(AsyncCallback cb)
 auto serverStatus() @property
 {
 	DCDServerStatus status;
-	if (serverPipes.pid.tryWait().terminated)
+	if (serverPipes.pid && serverPipes.pid.tryWait().terminated)
 		status.isRunning = false;
 	else if (hasUnixDomainSockets)
 		status.isRunning = true;
@@ -442,8 +442,8 @@ bool isPortRunning(ushort port)
 {
 	if (hasUnixDomainSockets)
 		return false;
-	auto pipes = raw([clientPath, "-q"] ~ clientArgs);
-	return wait(pipes.pid) == 0;
+	auto ret = execute([clientPath, "-q"] ~ clientArgs);
+	return ret.status == 0;
 }
 
 ushort findOpen(ushort port)
