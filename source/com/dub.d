@@ -359,20 +359,23 @@ enum ErrorType : ubyte
 	Deprecation = 2
 }
 
-private __gshared:
+private:
 
-Dub _dub;
-Path _cwd;
-string _configuration;
-string _buildType = "debug";
-string _cwdStr;
-BuildSettings _settings;
-Compiler _compiler;
-BuildPlatform _platform;
-string[] _importPaths, _stringImportPaths;
+__gshared
+{
+	Dub _dub;
+	Path _cwd;
+	string _configuration;
+	string _buildType = "debug";
+	string _cwdStr;
+	BuildSettings _settings;
+	Compiler _compiler;
+	BuildPlatform _platform;
+	string[] _importPaths, _stringImportPaths;
+}
 
-auto errorFormat = ctRegex!(`(.*?)\((\d+),(\d+)\): (Deprecation|Warning|Error): (.*)`, "gi"); // `
-auto errorFormatCont = ctRegex!(`(.*?)\((\d+),(\d+)\): (.*)`, "g"); // `
+enum errorFormat = ctRegex!(`(.*?)\((\d+),(\d+)\): (Deprecation|Warning|Error): (.*)`, "gi"); // `
+enum errorFormatCont = ctRegex!(`(.*?)\((\d+),(\d+)\): (.*)`, "g"); // `
 
 struct BuildIssue
 {

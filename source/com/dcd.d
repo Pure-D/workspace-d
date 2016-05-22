@@ -191,7 +191,10 @@ auto serverStatus() @property
 		{
 			auto pipes = doClient(["--search", query]);
 			scope (exit)
+			{
 				pipes.pid.wait();
+				pipes.destroy();
+			}
 			pipes.stdin.close();
 			DCDSearchResult[] results;
 			while (pipes.stdout.isOpen && !pipes.stdout.eof)
@@ -264,7 +267,10 @@ void addImports(string[] imports)
 		{
 			auto pipes = doClient(["-c", pos.to!string, "--symbolLocation"]);
 			scope (exit)
+			{
 				pipes.pid.wait();
+				pipes.destroy();
+			}
 			pipes.stdin.write(code);
 			pipes.stdin.close();
 			string line = pipes.stdout.readln();
@@ -299,7 +305,10 @@ void addImports(string[] imports)
 		{
 			auto pipes = doClient(["--doc", "-c", pos.to!string]);
 			scope (exit)
+			{
 				pipes.pid.wait();
+				pipes.destroy();
+			}
 			pipes.stdin.write(code);
 			pipes.stdin.close();
 			string data;
@@ -352,7 +361,10 @@ ushort getRunningPort()
 		{
 			auto pipes = doClient(["-c", pos.to!string]);
 			scope (exit)
+			{
 				pipes.pid.wait();
+				pipes.destroy();
+			}
 			pipes.stdin.write(code);
 			pipes.stdin.close();
 			string[] data;
@@ -409,15 +421,18 @@ void updateImports()
 	doClient(args).pid.wait();
 }
 
-private __gshared:
+private:
 
-string clientPath, serverPath, cwd;
-string installedVersion;
-bool hasUnixDomainSockets = false;
-ProcessPipes serverPipes;
-ushort port, runningPort;
-string socketFile;
-string[] knownImports;
+__gshared
+{
+	string clientPath, serverPath, cwd;
+	string installedVersion;
+	bool hasUnixDomainSockets = false;
+	ProcessPipes serverPipes;
+	ushort port, runningPort;
+	string socketFile;
+	string[] knownImports;
+}
 
 string[] clientArgs()
 {
@@ -434,8 +449,7 @@ auto doClient(string[] args)
 
 auto raw(string[] args, Redirect redirect = Redirect.all)
 {
-	auto pipes = pipeProcess(args, redirect, null, Config.none, cwd);
-	return pipes;
+	return pipeProcess(args, redirect, null, Config.none, cwd);
 }
 
 bool isPortRunning(ushort port)

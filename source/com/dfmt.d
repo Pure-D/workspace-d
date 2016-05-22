@@ -76,6 +76,6 @@ bool hasConfigFolder(string ver)
 	}).start();
 }
 
-__gshared:
+private __gshared:
 string cwd, execPath;
 bool needsConfigFolder = false;

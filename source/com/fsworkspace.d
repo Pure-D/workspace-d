@@ -36,5 +36,5 @@ string[] imports()
 	return paths;
 }
 
-__gshared:
+private __gshared:
 string[] paths;

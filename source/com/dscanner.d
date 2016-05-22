@@ -120,9 +120,12 @@ import workspaced.api;
 	}).start();
 }
 
-private __gshared:
+private:
 
-string cwd, execPath;
+__gshared
+{
+	string cwd, execPath;
+}
 
 auto raw(string[] args, Redirect redirect = Redirect.all)
 {

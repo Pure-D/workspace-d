@@ -179,7 +179,7 @@ struct CompletionLookup
 	string[] requiredScope = [];
 }
 
-__gshared private:
+private:
 
 enum LocationType : ubyte
 {

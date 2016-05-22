@@ -33,9 +33,9 @@ __gshared Mutex writeMutex, commandMutex;
 
 void sendFinal(int id, JSONValue value)
 {
-	ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
 	synchronized (writeMutex)
 	{
+		ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
 		stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
 		stdout.flush();
 	}
