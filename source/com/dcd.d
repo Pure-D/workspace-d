@@ -112,8 +112,8 @@ void startServer(string[] additionalImports = [])
 
 void stopServerSync()
 {
-	if (!serverPipes.pid.tryWait().terminated)
-		doClient(["--shutdown"]).pid.wait;
+	while (!serverPipes.pid.tryWait().terminated)
+		execClient(["--shutdown"]);
 }
 
 /// This stops the dcd-server asynchronously
@@ -418,7 +418,7 @@ void updateImports()
 	string[] args;
 	foreach (path; knownImports)
 		args ~= "-I" ~ path;
-	doClient(args).pid.wait();
+	execClient(args);
 }
 
 private:
@@ -450,6 +450,16 @@ auto doClient(string[] args)
 auto raw(string[] args, Redirect redirect = Redirect.all)
 {
 	return pipeProcess(args, redirect, null, Config.none, cwd);
+}
+
+auto execClient(string[] args)
+{
+	return rawExec([clientPath] ~ clientArgs ~ args);
+}
+
+auto rawExec(string[] args)
+{
+	return execute(args, null, Config.none, size_t.max, cwd);
 }
 
 bool isPortRunning(ushort port)
