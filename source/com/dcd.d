@@ -466,18 +466,16 @@ bool isPortRunning(ushort port)
 {
 	if (hasUnixDomainSockets)
 		return false;
-	auto ret = execute([clientPath, "-q"] ~ clientArgs);
+	auto ret = execute([clientPath, "-q", "--port", port.to!string]);
 	return ret.status == 0;
 }
 
 ushort findOpen(ushort port)
 {
-	port--;
 	bool isRunning;
 	do
 	{
-		port++;
-		isRunning = isPortRunning(port);
+		isRunning = isPortRunning(port++);
 	}
 	while (isRunning);
 	return port;
