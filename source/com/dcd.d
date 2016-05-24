@@ -472,10 +472,11 @@ bool isPortRunning(ushort port)
 
 ushort findOpen(ushort port)
 {
+	--port;
 	bool isRunning;
 	do
 	{
-		isRunning = isPortRunning(port++);
+		isRunning = isPortRunning(++port);
 	}
 	while (isRunning);
 	return port;
