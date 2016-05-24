@@ -6,23 +6,39 @@ It uses process pipes and json for communication.
 
 ## Installation
 
-Install the desired extra programs (dcd, dfmt, dscanner) if using them.
+**Automatic Installation**
+
+via **[workspace-d-installer](https://github.com/Pure-D/workspace-d-installer)**
+
+```sh
+git clone https://github.com/Pure-D/workspace-d-installer.git
+cd workspace-d-installer
+dub
+```
+
+**Manual Installation**
+
+First, install the dependencies:
+ 
+* [dcd](https://github.com/Hackerpilot/DCD) - Used for auto completion
+* [dfmt](https://github.com/Hackerpilot/dfmt) - Used for code formatting
+* [dscanner](https://github.com/Hackerpilot/Dscanner) - Used for static code linting
+
+Then, run:
 
 ```sh
 git clone https://github.com/Pure-D/workspace-d.git
 cd workspace-d
 dub build --build=release
-# or with debug information:
-dub build
 ```
 
 ## Usage
 
-For users:
+**For users**
 
 * Visual Studio Code: [code-d](https://github.com/Pure-D/code-d)
 
-For plugin developers:
+**For plugin developers**
 
 First you need to start the process. It receives commands via stdin and strictly outputs via stdout. Debug information and errors go through stderr.
 
