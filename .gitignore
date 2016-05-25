@@ -9,4 +9,6 @@ dub.selections.json
 *.a
 /workspace-d
 docs/
+bin/
+iworkspaced
 workspace-d_dml

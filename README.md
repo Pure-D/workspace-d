@@ -8,12 +8,10 @@ It uses process pipes and json for communication.
 
 **Automatic Installation**
 
-via **[workspace-d-installer](https://github.com/Pure-D/workspace-d-installer)**
+Just run install.sh or install.bat (Windows/WIP)
 
 ```sh
-git clone https://github.com/Pure-D/workspace-d-installer.git
-cd workspace-d-installer
-dub
+sh install.sh
 ```
 
 **Manual Installation**
