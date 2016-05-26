@@ -53,19 +53,19 @@ bool dubInstall(bool isClonedAlready = false)(string folder, string git, string[
 			return false;
 		}
 		string cwd = buildNormalizedPath(tmp, folder);
-	}
-	string tag = execute(["git", "describe", "--abbrev=0", "--tags"], null,
-			Config.none, size_t.max, cwd).output.strip();
-	if (tag.canFind(" "))
-	{
-		writeln("Invalid tag in git repository.");
-		return false;
-	}
-	writeln("Checking out ", tag);
-	if (proc(["git", "checkout", "-q", tag], cwd) != 0)
-	{
-		writeln("Error while checking out " ~ folder ~ ".");
-		return false;
+		string tag = execute(["git", "describe", "--abbrev=0", "--tags"], null,
+				Config.none, size_t.max, cwd).output.strip();
+		if (tag.canFind(" "))
+		{
+			writeln("Invalid tag in git repository.");
+			return false;
+		}
+		writeln("Checking out ", tag);
+		if (proc(["git", "checkout", "-q", tag], cwd) != 0)
+		{
+			writeln("Error while checking out " ~ folder ~ ".");
+			return false;
+		}
 	}
 	writeln("Compiling...");
 	foreach (args; compilation)
