@@ -103,7 +103,10 @@ int main(string[] args)
 		writeln("LDC is required on your platform!");
 		winCompiler = getLDC();
 		if (!winCompiler.length)
+		{
 			writeln("WARNING: LDC could was not detected. Before submitting an issue, make sure `dub build --compiler=ldc` works!");
+			winCompiler = "ldc";
+		}
 	}
 	writeln();
 	string workspacedPath = "";
