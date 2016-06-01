@@ -57,7 +57,7 @@ import workspaced.api;
 			{
 				if (!line.length)
 					continue;
-				auto match = line[0 .. $ - 1].matchFirst(dscannerIssueRegex);
+				auto match = line.chomp.matchFirst(dscannerIssueRegex);
 				if (!match)
 					continue;
 				DScannerIssue issue;
@@ -97,7 +97,7 @@ import workspaced.api;
 			{
 				if (!line.length || line[0] == '!')
 					continue;
-				line = line[0 .. $ - 1];
+				line = line.chomp;
 				string[] splits = line.split('\t');
 				DefinitionElement definition;
 				definition.name = splits[0];

@@ -202,7 +202,7 @@ auto serverStatus() @property
 				string line = pipes.stdout.readln();
 				if (line.length == 0)
 					continue;
-				string[] splits = line[0 .. $ - 1].split('\t');
+				string[] splits = line.chomp.split('\t');
 				results ~= DCDSearchResult(splits[0], toImpl!(int)(splits[2]), splits[1]);
 			}
 			cb(null, results.toJSON);
@@ -279,7 +279,7 @@ void addImports(string[] imports)
 				cb(null, JSONValue(null));
 				return;
 			}
-			string[] splits = line[0 .. $ - 1].split('\t');
+			string[] splits = line.chomp.split('\t');
 			if (splits.length != 2)
 			{
 				cb(null, JSONValue(null));
@@ -316,7 +316,7 @@ void addImports(string[] imports)
 			{
 				string line = pipes.stdout.readln();
 				if (line.length)
-					data ~= line[0 .. $ - 1];
+					data ~= line.chomp;
 			}
 			cb(null, JSONValue(data.replace("\\n", "\n")));
 		}
@@ -373,7 +373,7 @@ ushort getRunningPort()
 				string line = pipes.stdout.readln();
 				if (line.length == 0)
 					continue;
-				data ~= line[0 .. $ - 1];
+				data ~= line.chomp;
 			}
 			int[] emptyArr;
 			if (data.length == 0)
