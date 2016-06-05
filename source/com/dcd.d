@@ -76,7 +76,7 @@ unittest
 @arguments("subcmd", "setup-server")
 void setupServer(string[] additionalImports = [])
 {
-	startServer(importPathProvider() ~ additionalImports);
+	startServer(importPathProvider() ~ importFilesProvider() ~ additionalImports);
 }
 
 /// This will start the dcd-server
@@ -219,7 +219,7 @@ auto serverStatus() @property
 @arguments("subcmd", "refresh-imports")
 void refreshImports()
 {
-	addImports(importPathProvider());
+	addImports(importPathProvider() ~ importFilesProvider());
 }
 
 /// Manually adds import paths as string array

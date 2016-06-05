@@ -72,4 +72,6 @@ unittest
 
 alias ImportPathProvider = string[]function();
 
-ImportPathProvider importPathProvider, stringImportPathProvider;
+ImportPathProvider importPathProvider = () => cast(string[]) [];
+ImportPathProvider stringImportPathProvider = () => cast(string[]) [];
+ImportPathProvider importFilesProvider = () => cast(string[]) [];
