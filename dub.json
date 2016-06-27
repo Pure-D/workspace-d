@@ -6,7 +6,7 @@
 		"webfreak"
 	],
 	"dependencies": {
-		"dub": "~>0.9.25-beta.3",
+		"dub": "~>1.0.0",
 		"dunit": "~>1.0.12",
 		"painlessjson": "~>1.3.7"
 	},
@@ -19,20 +19,6 @@
 			"targetType": "executable"
 		}
 	],
-	"buildTypes": {
-		"fix-unittest": {
-			"dflags": [
-				"-unittest"
-			],
-			"buildOptions": [
-				"warnings"
-			],
-			"buildRequirements": [
-				"allowWarnings",
-				"silenceWarnings"
-			]
-		}
-	},
 	"subPackages": [
 		"./test",
 		"./installer",
