@@ -11,7 +11,7 @@ import std.string;
 import std.parallelism;
 import std.algorithm;
 
-import painlessjson;
+import painlessjson : toJSON, fromJSON;
 
 import workspaced.api;
 
