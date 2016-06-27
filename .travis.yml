@@ -5,4 +5,4 @@ d:
 os:
  - linux
  - osx
-script: dub run --build=fix-unittest --compiler=${DC}
+script: dub test --compiler=${DC}
