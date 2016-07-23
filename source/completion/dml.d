@@ -115,7 +115,7 @@ enum dmlCompletions = [CompletionLookup(CompletionItem(CompletionType.EnumDefini
 	CompletionLookup(CompletionItem(CompletionType.Class, "DockHost", "Layout for docking support - contains body widget and optional docked windows", ""), [["WidgetGroupDefaultDrawing"], ["DockHost"], ["Widget"]], []),
 	CompletionLookup(CompletionItem(CompletionType.Class, "DockWindow", "docked window", ""), [["VerticalLayout"], ["DockWindow"], ["LinearLayout"], ["Widget"]], []),
 	CompletionLookup(CompletionItem(CompletionType.EnumValue, "dockAlignment", "", "DockAlignment"), [], ["DockWindow"]),
-	CompletionLookup(CompletionItem(CompletionType.Class, "EditBox", "single line editor", ""), [["EditWidgetBase"], ["EditBox"], ["ScrollWidgetBase"], ["WidgetGroup"], ["Widget"]], []),
+	CompletionLookup(CompletionItem(CompletionType.Class, "EditBox", "multiline editor", ""), [["EditWidgetBase"], ["EditBox"], ["ScrollWidgetBase"], ["WidgetGroup"], ["Widget"]], []),
 	CompletionLookup(CompletionItem(CompletionType.Number, "maxFontSize", "", ""), [], ["EditBox"]),
 	CompletionLookup(CompletionItem(CompletionType.Number, "minFontSize", "", ""), [], ["EditBox"]),
 	CompletionLookup(CompletionItem(CompletionType.Class, "EditLine", "single line editor", ""), [["EditWidgetBase"], ["EditLine"], ["ScrollWidgetBase"], ["WidgetGroup"], ["Widget"]], []),

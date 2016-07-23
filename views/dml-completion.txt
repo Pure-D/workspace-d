@@ -194,7 +194,7 @@ class DockWindow --- docked window
 	include VerticalLayout;
 }
 // editors
-class EditBox --- single line editor
+class EditBox --- multiline editor
 {
 	number maxFontSize;
 	number minFontSize;
