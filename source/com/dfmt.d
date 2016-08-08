@@ -67,7 +67,10 @@ bool hasConfigFolder(string ver)
 				data ~= appended;
 			}
 			while (len == 4096);
-			cb(null, JSONValue(cast(string) data));
+			if (data.length)
+				cb(null, JSONValue(cast(string) data));
+			else
+				cb(null, JSONValue(code));
 		}
 		catch (Throwable e)
 		{
