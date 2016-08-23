@@ -210,12 +210,19 @@ bool setConfiguration(string configuration)
 	return updateImportPaths(false);
 }
 
-/// List all possible arch types, even one's not possible for every compiler (eg ARM for dmd).
+/// List all possible arch types for current set compiler
 /// Call_With: `{"subcmd": "list:arch-types"}`
 @arguments("subcmd", "list:arch-types")
 string[] archTypes() @property
 {
-	return [ "x86", "x86_64" ]; // todo update this list to include all other archs
+	string[] types = [ "x86_64", "x86" ];
+
+	if(_compiler.name == "gdc")
+	{
+		types ~= [ "arm", "arm_thumb" ];
+	}
+
+	return types;
 }
 
 /// Returns the current selected arch type
