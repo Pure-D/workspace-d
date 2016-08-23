@@ -49,10 +49,10 @@ import dub.internal.vibecompat.core.log;
 	start();
 	upgrade();
 
-	string compilerName = _dub.defaultCompiler;
-	_compiler = getCompiler(compilerName);
+	_compilerBinaryName = _dub.defaultCompiler;
+	_compiler = getCompiler(_compilerBinaryName);
 	BuildSettings settings;
-	_platform = _compiler.determinePlatform(settings, compilerName);
+	_platform = _compiler.determinePlatform(settings, _compilerBinaryName);
 
 	_configuration = _dub.project.getDefaultConfiguration(_platform);
 	assert(_dub.project.configurations.canFind(_configuration), "No configuration available");
@@ -104,9 +104,9 @@ bool updateImportPaths(bool restartDub = true)
 	if (restartDub)
 		restart();
 
-	auto compiler = getCompiler(.compiler);
+	auto compiler = getCompiler(_compilerBinaryName);
 	BuildSettings buildSettings;
-	auto buildPlatform = compiler.determinePlatform(buildSettings, .compiler, _archType);
+	auto buildPlatform = compiler.determinePlatform(buildSettings, _compilerBinaryName, _archType);
 
 	GeneratorSettings settings;
 	settings.platform = buildPlatform;
@@ -284,7 +284,7 @@ bool setBuildType(JSONValue request)
 @arguments("subcmd", "get:compiler")
 string compiler() @property
 {
-	return _compiler.name;
+	return _compilerBinaryName;
 }
 
 /// Selects a new compiler for building
@@ -295,6 +295,7 @@ bool setCompiler(string compiler)
 {
 	try
 	{
+		_compilerBinaryName = compiler;
 		_compiler = getCompiler(compiler);
 		return true;
 	}
@@ -329,10 +330,9 @@ auto path() @property
 	new Thread({
 		try
 		{
-			string compilerName = .compiler;
-			auto compiler = getCompiler(compilerName);
+			auto compiler = getCompiler(_compilerBinaryName);
 			BuildSettings buildSettings;
-			auto buildPlatform = compiler.determinePlatform(buildSettings, compilerName, _archType);
+			auto buildPlatform = compiler.determinePlatform(buildSettings, _compilerBinaryName, _archType);
 
 			GeneratorSettings settings;
 			settings.platform = buildPlatform;
@@ -412,6 +412,7 @@ __gshared
 	string _archType = "x86_64";
 	string _buildType = "debug";
 	string _cwdStr;
+	string _compilerBinaryName;
 	Compiler _compiler;
 	BuildPlatform _platform;
 	string[] _importPaths, _stringImportPaths;
