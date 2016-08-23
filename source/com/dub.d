@@ -53,7 +53,6 @@ import dub.internal.vibecompat.core.log;
 	_compiler = getCompiler(compilerName);
 	BuildSettings settings;
 	_platform = _compiler.determinePlatform(settings, compilerName);
-	_settings = settings;
 
 	_configuration = _dub.project.getDefaultConfiguration(_platform);
 	assert(_dub.project.configurations.canFind(_configuration), "No configuration available");
@@ -106,14 +105,15 @@ bool updateImportPaths(bool restartDub = true)
 		restart();
 
 	auto compiler = getCompiler(.compiler);
-	auto buildPlatform = compiler.determinePlatform(_settings, .compiler);
+	BuildSettings buildSettings;
+	auto buildPlatform = compiler.determinePlatform(buildSettings, .compiler, _archType);
 
 	GeneratorSettings settings;
 	settings.platform = buildPlatform;
 	settings.config = _configuration;
 	settings.buildType = _buildType;
 	settings.compiler = compiler;
-	settings.buildSettings = _settings;
+	settings.buildSettings = buildSettings;
 	settings.buildSettings.options |= BuildOption.syntaxOnly;
 	settings.combined = true;
 	settings.run = false;
@@ -210,6 +210,41 @@ bool setConfiguration(string configuration)
 	return updateImportPaths(false);
 }
 
+/// List all possible arch types, even one's not possible for every compiler (eg ARM for dmd).
+/// Call_With: `{"subcmd": "list:arch-types"}`
+@arguments("subcmd", "list:arch-types")
+string[] archTypes() @property
+{
+	return [ "x86", "x86_64" ]; // todo update this list to include all other archs
+}
+
+/// Returns the current selected arch type
+/// Call_With: `{"subcmd": "get:arch-type"}`
+@arguments("subcmd", "get:arch-type")
+string archType() @property
+{
+	return _archType;
+}
+
+/// Selects a new arch type and updates the import paths accordingly
+/// Returns: `false` if there are no import paths in the new arch type
+/// Call_With: `{"subcmd": "set:arch-type"}`
+@arguments("subcmd", "set:arch-type")
+bool setArchType(JSONValue request)
+{
+	assert("arch-type" in request, "arch-type not in request");
+	auto type = request["arch-type"].fromJSON!string;
+	if(archTypes.canFind(type))
+	{
+		_archType = type;
+		return updateImportPaths(false);
+	}
+	else
+	{
+		return false;
+	}
+}
+
 /// Returns the current selected build type
 /// Call_With: `{"subcmd": "get:build-type"}`
 @arguments("subcmd", "get:build-type")
@@ -289,14 +324,15 @@ auto path() @property
 		{
 			string compilerName = .compiler;
 			auto compiler = getCompiler(compilerName);
-			auto buildPlatform = compiler.determinePlatform(_settings, compilerName);
+			BuildSettings buildSettings;
+			auto buildPlatform = compiler.determinePlatform(buildSettings, compilerName, _archType);
 
 			GeneratorSettings settings;
 			settings.platform = buildPlatform;
 			settings.config = _configuration;
 			settings.buildType = _buildType;
 			settings.compiler = compiler;
-			settings.buildSettings = _settings;
+			settings.buildSettings = buildSettings;
 			settings.buildSettings.options |= BuildOption.syntaxOnly;
 			settings.buildSettings.addDFlags("-o-");
 			settings.direct = true;
@@ -366,9 +402,9 @@ __gshared
 	Dub _dub;
 	Path _cwd;
 	string _configuration;
+	string _archType = "x86_64";
 	string _buildType = "debug";
 	string _cwdStr;
-	BuildSettings _settings;
 	Compiler _compiler;
 	BuildPlatform _platform;
 	string[] _importPaths, _stringImportPaths;
