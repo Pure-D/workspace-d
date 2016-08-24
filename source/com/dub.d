@@ -50,11 +50,11 @@ import dub.internal.vibecompat.core.log;
 	upgrade();
 
 	_compilerBinaryName = _dub.defaultCompiler;
-	_compiler = getCompiler(_compilerBinaryName);
+	Compiler compiler = getCompiler(_compilerBinaryName);
 	BuildSettings settings;
-	_platform = _compiler.determinePlatform(settings, _compilerBinaryName);
+	auto platform = compiler.determinePlatform(settings, _compilerBinaryName);
 
-	_configuration = _dub.project.getDefaultConfiguration(_platform);
+	_configuration = _dub.project.getDefaultConfiguration(platform);
 	assert(_dub.project.configurations.canFind(_configuration), "No configuration available");
 	updateImportPaths(false);
 }
@@ -217,7 +217,7 @@ string[] archTypes() @property
 {
 	string[] types = [ "x86_64", "x86" ];
 
-	if(_compiler.name == "gdc")
+	if(getCompiler(_compilerBinaryName).name == "gdc")
 	{
 		types ~= [ "arm", "arm_thumb" ];
 	}
@@ -296,7 +296,7 @@ bool setCompiler(string compiler)
 	try
 	{
 		_compilerBinaryName = compiler;
-		_compiler = getCompiler(compiler);
+		Compiler comp = getCompiler(compiler); // make sure it gets a valid compiler
 		return true;
 	}
 	catch (Exception e)
@@ -413,8 +413,6 @@ __gshared
 	string _buildType = "debug";
 	string _cwdStr;
 	string _compilerBinaryName;
-	Compiler _compiler;
-	BuildPlatform _platform;
 	string[] _importPaths, _stringImportPaths;
 }
 
