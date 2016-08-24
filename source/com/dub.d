@@ -49,13 +49,12 @@ import dub.internal.vibecompat.core.log;
 	start();
 	upgrade();
 
-	string compilerName = _dub.defaultCompiler;
-	_compiler = getCompiler(compilerName);
+	_compilerBinaryName = _dub.defaultCompiler;
+	Compiler compiler = getCompiler(_compilerBinaryName);
 	BuildSettings settings;
-	_platform = _compiler.determinePlatform(settings, compilerName);
-	_settings = settings;
+	auto platform = compiler.determinePlatform(settings, _compilerBinaryName);
 
-	_configuration = _dub.project.getDefaultConfiguration(_platform);
+	_configuration = _dub.project.getDefaultConfiguration(platform);
 	assert(_dub.project.configurations.canFind(_configuration), "No configuration available");
 	updateImportPaths(false);
 }
@@ -105,15 +104,16 @@ bool updateImportPaths(bool restartDub = true)
 	if (restartDub)
 		restart();
 
-	auto compiler = getCompiler(.compiler);
-	auto buildPlatform = compiler.determinePlatform(_settings, .compiler);
+	auto compiler = getCompiler(_compilerBinaryName);
+	BuildSettings buildSettings;
+	auto buildPlatform = compiler.determinePlatform(buildSettings, _compilerBinaryName, _archType);
 
 	GeneratorSettings settings;
 	settings.platform = buildPlatform;
 	settings.config = _configuration;
 	settings.buildType = _buildType;
 	settings.compiler = compiler;
-	settings.buildSettings = _settings;
+	settings.buildSettings = buildSettings;
 	settings.buildSettings.options |= BuildOption.syntaxOnly;
 	settings.combined = true;
 	settings.run = false;
@@ -210,6 +210,48 @@ bool setConfiguration(string configuration)
 	return updateImportPaths(false);
 }
 
+/// List all possible arch types for current set compiler
+/// Call_With: `{"subcmd": "list:arch-types"}`
+@arguments("subcmd", "list:arch-types")
+string[] archTypes() @property
+{
+	string[] types = [ "x86_64", "x86" ];
+
+	if(getCompiler(_compilerBinaryName).name == "gdc")
+	{
+		types ~= [ "arm", "arm_thumb" ];
+	}
+
+	return types;
+}
+
+/// Returns the current selected arch type
+/// Call_With: `{"subcmd": "get:arch-type"}`
+@arguments("subcmd", "get:arch-type")
+string archType() @property
+{
+	return _archType;
+}
+
+/// Selects a new arch type and updates the import paths accordingly
+/// Returns: `false` if there are no import paths in the new arch type
+/// Call_With: `{"subcmd": "set:arch-type"}`
+@arguments("subcmd", "set:arch-type")
+bool setArchType(JSONValue request)
+{
+	assert("arch-type" in request, "arch-type not in request");
+	auto type = request["arch-type"].fromJSON!string;
+	if(archTypes.canFind(type))
+	{
+		_archType = type;
+		return updateImportPaths(false);
+	}
+	else
+	{
+		return false;
+	}
+}
+
 /// Returns the current selected build type
 /// Call_With: `{"subcmd": "get:build-type"}`
 @arguments("subcmd", "get:build-type")
@@ -242,7 +284,7 @@ bool setBuildType(JSONValue request)
 @arguments("subcmd", "get:compiler")
 string compiler() @property
 {
-	return _compiler.name;
+	return _compilerBinaryName;
 }
 
 /// Selects a new compiler for building
@@ -253,7 +295,8 @@ bool setCompiler(string compiler)
 {
 	try
 	{
-		_compiler = getCompiler(compiler);
+		_compilerBinaryName = compiler;
+		Compiler comp = getCompiler(compiler); // make sure it gets a valid compiler
 		return true;
 	}
 	catch (Exception e)
@@ -287,16 +330,16 @@ auto path() @property
 	new Thread({
 		try
 		{
-			string compilerName = .compiler;
-			auto compiler = getCompiler(compilerName);
-			auto buildPlatform = compiler.determinePlatform(_settings, compilerName);
+			auto compiler = getCompiler(_compilerBinaryName);
+			BuildSettings buildSettings;
+			auto buildPlatform = compiler.determinePlatform(buildSettings, _compilerBinaryName, _archType);
 
 			GeneratorSettings settings;
 			settings.platform = buildPlatform;
 			settings.config = _configuration;
 			settings.buildType = _buildType;
 			settings.compiler = compiler;
-			settings.buildSettings = _settings;
+			settings.buildSettings = buildSettings;
 			settings.buildSettings.options |= BuildOption.syntaxOnly;
 			settings.buildSettings.addDFlags("-o-");
 			settings.direct = true;
@@ -366,11 +409,10 @@ __gshared
 	Dub _dub;
 	Path _cwd;
 	string _configuration;
+	string _archType = "x86_64";
 	string _buildType = "debug";
 	string _cwdStr;
-	BuildSettings _settings;
-	Compiler _compiler;
-	BuildPlatform _platform;
+	string _compilerBinaryName;
 	string[] _importPaths, _stringImportPaths;
 }
 
