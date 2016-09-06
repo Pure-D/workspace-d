@@ -16,6 +16,8 @@ import std.json;
 import std.meta;
 import std.conv;
 
+import source.info;
+
 static import workspaced.com.dcd;
 
 static import workspaced.com.dfmt;
@@ -28,7 +30,6 @@ static import workspaced.com.dub;
 
 static import workspaced.com.fsworkspace;
 
-static immutable Version = [2, 7, 2];
 __gshared Mutex writeMutex, commandMutex;
 
 void sendFinal(int id, JSONValue value)
