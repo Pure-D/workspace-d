@@ -215,11 +215,11 @@ bool setConfiguration(string configuration)
 @arguments("subcmd", "list:arch-types")
 string[] archTypes() @property
 {
-	string[] types = [ "x86_64", "x86" ];
+	string[] types = ["x86_64", "x86"];
 
-	if(getCompiler(_compilerBinaryName).name == "gdc")
+	if (getCompiler(_compilerBinaryName).name == "gdc")
 	{
-		types ~= [ "arm", "arm_thumb" ];
+		types ~= ["arm", "arm_thumb"];
 	}
 
 	return types;
@@ -241,7 +241,7 @@ bool setArchType(JSONValue request)
 {
 	assert("arch-type" in request, "arch-type not in request");
 	auto type = request["arch-type"].fromJSON!string;
-	if(archTypes.canFind(type))
+	if (archTypes.canFind(type))
 	{
 		_archType = type;
 		return updateImportPaths(false);
@@ -332,7 +332,8 @@ auto path() @property
 		{
 			auto compiler = getCompiler(_compilerBinaryName);
 			BuildSettings buildSettings;
-			auto buildPlatform = compiler.determinePlatform(buildSettings, _compilerBinaryName, _archType);
+			auto buildPlatform = compiler.determinePlatform(buildSettings,
+				_compilerBinaryName, _archType);
 
 			GeneratorSettings settings;
 			settings.platform = buildPlatform;
