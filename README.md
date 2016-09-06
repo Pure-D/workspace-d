@@ -27,8 +27,14 @@ Then, run:
 ```sh
 git clone https://github.com/Pure-D/workspace-d.git
 cd workspace-d
+# Linux:
 dub build --build=release
+# Windows:
+dub build --build=release --compiler=ldc
 ```
+
+Either move all the executable binaries to one path and add that path to the Windows PATH
+variable or $PATH on Posix, or change the binary path configuration in your editor.
 
 ## Usage
 
