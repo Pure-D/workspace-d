@@ -143,7 +143,7 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 		static if (__traits(compiles, __traits(getMember, T, name)))
 		{
 			alias symbol = Identity!(__traits(getMember, T, name));
-			static if (isSomeFunction!symbol)
+			static if (isSomeFunction!symbol && __traits(getProtection, symbol[0]) == "public")
 			{
 				bool matches = false;
 				foreach (Arguments args; compatibleGetUDAs!(symbol, Arguments))
