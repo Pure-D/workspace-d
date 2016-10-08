@@ -342,12 +342,6 @@ auto path() @property
 			settings.compiler = compiler;
 			settings.buildSettings = buildSettings;
 			settings.buildSettings.options |= BuildOption.syntaxOnly;
-			settings.buildSettings.addDFlags("-o-");
-			settings.direct = true;
-			settings.combined = false;
-			settings.tempBuild = true;
-			settings.run = false;
-			settings.rdmd = false;
 
 			BuildIssue[] issues;
 
@@ -359,7 +353,7 @@ auto path() @property
 					if (match)
 					{
 						issues ~= BuildIssue(match[2].to!int,
-							match[3].to!int, match[1], match[4].to!ErrorType, match[5]);
+							match[3].toOr!int(0), match[1], match[4].to!ErrorType, match[5]);
 					}
 					else
 					{
@@ -368,8 +362,18 @@ auto path() @property
 							auto contMatch = line.matchFirst(errorFormatCont);
 							if (contMatch)
 							{
-								issues ~= BuildIssue(contMatch[2].to!int, contMatch[3].to!int,
+								issues ~= BuildIssue(contMatch[2].to!int, contMatch[3].toOr!int(1),
 									contMatch[1], ErrorType.Error, contMatch[4]);
+							}
+						}
+						if (line.canFind("is deprecated"))
+						{
+							auto deprMatch = line.matchFirst(deprecationFormat);
+							if (deprMatch)
+							{
+								issues ~= BuildIssue(deprMatch[2].to!int, deprMatch[3].toOr!int(1),
+									deprMatch[1], ErrorType.Deprecation, deprMatch[4] ~ " is deprecated, use " ~ deprMatch[5] ~ " instead.");
+								// TODO: maybe add special type or output
 							}
 						}
 					}
@@ -381,6 +385,8 @@ auto path() @property
 			}
 			catch (Exception e)
 			{
+				if (!e.msg.matchFirst(harmlessExceptionFormat))
+					throw e;
 			}
 			cb(null, issues.toJSON);
 		}
@@ -417,8 +423,17 @@ __gshared
 	string[] _importPaths, _stringImportPaths;
 }
 
-enum errorFormat = ctRegex!(`(.*?)\((\d+),(\d+)\): (Deprecation|Warning|Error): (.*)`, "gi"); // `
-enum errorFormatCont = ctRegex!(`(.*?)\((\d+),(\d+)\): (.*)`, "g"); // `
+T toOr(T)(string s, T defaultValue)
+{
+	if (!s || !s.length)
+		return defaultValue;
+	return s.to!T;
+}
+
+enum harmlessExceptionFormat = ctRegex!(`failed with exit code`, "g");
+enum errorFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (Deprecation|Warning|Error): (.*)`, "gi"); // `
+enum errorFormatCont = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*)`, "g"); // `
+enum deprecationFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*?) is deprecated, use (.*?) instead.$`, "g"); // `
 
 struct BuildIssue
 {
