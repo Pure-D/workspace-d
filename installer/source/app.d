@@ -36,7 +36,7 @@ version (Windows) string getLDC()
 	}
 }
 
-bool dubInstall(bool isClonedAlready = false)(string folder, string git, string[] output,
+bool dubInstall(bool isClonedAlready = false, bool fetchMaster = false)(string folder, string git, string[] output,
 		string[][] compilation = [["dub", "upgrade"], ["dub", "build", "--build=release"]])
 {
 	static if (isClonedAlready)
@@ -53,18 +53,25 @@ bool dubInstall(bool isClonedAlready = false)(string folder, string git, string[
 			return false;
 		}
 		string cwd = buildNormalizedPath(tmp, folder);
-		string tag = execute(["git", "describe", "--abbrev=0", "--tags"], null,
-				Config.none, size_t.max, cwd).output.strip();
-		if (tag.canFind(" "))
+		static if (fetchMaster)
 		{
-			writeln("Invalid tag in git repository.");
-			return false;
+			writeln("Using ~master for building.");
 		}
-		writeln("Checking out ", tag);
-		if (proc(["git", "checkout", "-q", tag], cwd) != 0)
+		else
 		{
-			writeln("Error while checking out " ~ folder ~ ".");
-			return false;
+			string tag = execute(["git", "describe", "--abbrev=0", "--tags"], null,
+					Config.none, size_t.max, cwd).output.strip();
+			if (tag.canFind(" "))
+			{
+				writeln("Invalid tag in git repository.");
+				return false;
+			}
+			writeln("Checking out ", tag);
+			if (proc(["git", "checkout", "-q", tag], cwd) != 0)
+			{
+				writeln("Error while checking out " ~ folder ~ ".");
+				return false;
+			}
 		}
 	}
 	writeln("Compiling...");
@@ -174,7 +181,7 @@ int main(string[] args)
 				".\\libeay32.dll", "ssleay32.dll"], [["dub", "upgrade"], ["dub", "build",
 				"--compiler=" ~ winCompiler, "--combined", "--build=release"]]))
 			return 1;
-		if (dcd && !dubInstall("DCD", "https://github.com/Hackerpilot/DCD.git",
+		if (dcd && !dubInstall!(false, true)("DCD", "https://github.com/Hackerpilot/DCD.git",
 				[".\\dcd-client.exe", ".\\dcd-server.exe"],
 				[["dub", "upgrade"], ["dub", "build", "--build=release", "--config=client"],
 				["dub", "build", "--build=release", "--config=server"]]))
@@ -196,7 +203,7 @@ int main(string[] args)
 		else if (!dubInstall("workspace-d",
 				"https://github.com/Pure-D/workspace-d.git", ["./workspace-d"]))
 			return 1;
-		if (dcd && !dubInstall("DCD", "https://github.com/Hackerpilot/DCD.git", ["./dcd-client", "./dcd-server"],
+		if (dcd && !dubInstall!(false, true)("DCD", "https://github.com/Hackerpilot/DCD.git", ["./dcd-client", "./dcd-server"],
 				[["dub", "upgrade"], ["dub", "build", "--build=release", "--config=client"],
 				["dub", "build", "--build=release", "--config=server"]]))
 			return 1;
