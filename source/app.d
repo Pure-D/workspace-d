@@ -77,10 +77,10 @@ template JSONCallBody(alias T, string fn, string jsonvar, size_t i, Args...)
 	else static if (Args.length == i)
 		enum JSONCallBody = "";
 	else static if (is(ParameterDefaults!T[i] == void))
-		enum JSONCallBody = "(assert(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `" ~ Args[i]
-				~ " has no default value and is not in the JSON request`), fromJSON!(Parameters!("
-				~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]"
-				~ "))," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
+		enum JSONCallBody = "(fromJSON!(Parameters!(" ~ fn ~ ")[" ~ i.to!string
+				~ "])(*enforce(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `"
+				~ Args[i] ~ " has no default value and is not in the JSON request`))),"
+				~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
 	else
 					enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? fromJSON!(Parameters!("
 							~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i]
