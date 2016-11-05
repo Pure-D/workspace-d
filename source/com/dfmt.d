@@ -14,11 +14,10 @@ import workspaced.api;
 
 /// Load function for dfmt. Call with `{"cmd": "load", "components": ["dfmt"]}`
 /// This will store the working directory and executable name for future use. All dub methods are used with `"cmd": "dfmt"`
-@load void start(string dir, string dfmtPath = "dfmt", string[] arguments = [])
+@load void start(string dir, string dfmtPath = "dfmt")
 {
 	cwd = dir;
 	execPath = dfmtPath;
-	customArgs = arguments;
 	auto features = execute([execPath, "--version"]).output;
 	needsConfigFolder = features.hasConfigFolder;
 }
@@ -45,14 +44,14 @@ bool hasConfigFolder(string ver)
 /// Will format the code passed in asynchronously.
 /// Returns: the formatted code as string
 /// Call_With: `{"cmd": "dfmt"}`
-@any @async void format(AsyncCallback cb, string code)
+@any @async void format(AsyncCallback cb, string code, string[] arguments = [])
 {
 	new Thread({
 		try
 		{
 			auto args = [execPath];
-			if (customArgs.length)
-				args ~= customArgs;
+			if (arguments.length)
+				args ~= arguments;
 			else if (needsConfigFolder)
 				args ~= ["-c", cwd];
 			auto pipes = pipeProcess(args, Redirect.all, null, Config.none, cwd);
@@ -85,4 +84,3 @@ bool hasConfigFolder(string ver)
 private __gshared:
 string cwd, execPath;
 bool needsConfigFolder = false;
-string[] customArgs;
