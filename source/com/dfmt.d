@@ -51,7 +51,7 @@ bool hasConfigFolder(string ver)
 		{
 			auto args = [execPath];
 			if (needsConfigFolder)
-				args ~= ["--config", cwd];
+				args ~= ["-c", cwd];
 			auto pipes = pipeProcess(args, Redirect.all, null, Config.none, cwd);
 			scope (exit)
 				pipes.pid.wait();
