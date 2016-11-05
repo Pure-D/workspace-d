@@ -203,7 +203,7 @@ auto serverStatus() @property
 				if (line.length == 0)
 					continue;
 				string[] splits = line.chomp.split('\t');
-				results ~= DCDSearchResult(splits[0], toImpl!(int)(splits[2]), splits[1]);
+				results ~= DCDSearchResult(splits[0], splits[2].to!int, splits[1]);
 			}
 			cb(null, results.toJSON);
 		}

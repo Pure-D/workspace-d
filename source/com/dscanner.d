@@ -62,8 +62,8 @@ import workspaced.api;
 					continue;
 				DScannerIssue issue;
 				issue.file = match[1];
-				issue.line = toImpl!int(match[2]);
-				issue.column = toImpl!int(match[3]);
+				issue.line = match[2].to!int;
+				issue.column = match[3].to!int;
 				issue.type = match[4];
 				issue.description = match[5];
 				issues ~= issue;
@@ -102,7 +102,7 @@ import workspaced.api;
 				DefinitionElement definition;
 				definition.name = splits[0];
 				definition.type = splits[3];
-				definition.line = toImpl!int(splits[4][5 .. $]);
+				definition.line = splits[4][5 .. $].to!int;
 				if (splits.length > 5)
 					foreach (attribute; splits[5 .. $])
 					{
