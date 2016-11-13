@@ -2,8 +2,8 @@
 	"name": "dml",
 	"targetType": "executable",
 	"dependencies": {
-		"pegged": "~>0.3.1",
-		"dunit": "~>1.0.12"
+		"pegged": "~>0.3.3",
+		"dunit": "~>1.0.14"
 	},
 	"buildRequirements": [
 		"allowWarnings",
