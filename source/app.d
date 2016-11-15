@@ -11,7 +11,17 @@ import std.exception;
 import std.bitmanip;
 import std.process;
 import std.traits;
-import std.stdio;
+version (OSX) {
+	import std.stdio : stdout, stderr, File;
+	static import std.stdio;
+	File stdin;
+	static this() {
+		stdin = std.stdio.stdin;
+		std.stdio.stdin = File("/dev/null", "r");
+	}
+} else {
+	import std.stdio;
+}
 import std.json;
 import std.meta;
 import std.conv;
