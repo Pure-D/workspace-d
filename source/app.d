@@ -11,22 +11,21 @@ import std.exception;
 import std.bitmanip;
 import std.process;
 import std.traits;
-version (OSX) {
-	import std.stdio : stdout, stderr, File;
-	static import std.stdio;
-	File stdin;
-	static this() {
-		stdin = std.stdio.stdin;
-		std.stdio.stdin = File("/dev/null", "r");
-	}
-} else {
-	import std.stdio;
-}
+import std.stdio : stderr, File;
+static import std.stdio;
 import std.json;
 import std.meta;
 import std.conv;
 
 import source.info;
+
+__gshared File stdin, stdout;
+shared static this() {
+	stdin = std.stdio.stdin;
+	stdout = std.stdio.stdout;
+	std.stdio.stdin = File("/dev/null", "r");
+	std.stdio.stdout = stderr;
+}
 
 static import workspaced.com.dcd;
 
