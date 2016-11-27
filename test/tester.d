@@ -1,3 +1,4 @@
+import std.exception;
 import std.bitmanip;
 import std.process;
 import std.string;
@@ -15,6 +16,15 @@ bool isNumeric(in string s)
 		if (!c.isNumber)
 			return false;
 	return true;
+}
+
+string readAll(File file)
+{
+	ubyte[1024] buf;
+	string data;
+	while (!file.eof)
+		data ~= cast(string) file.rawRead(buf);
+	return data;
 }
 
 void main(string[] args)
@@ -41,7 +51,8 @@ void main(string[] args)
 	];
 	//dfmt on
 
-	auto pipes = pipeProcess(["./workspace-d"] ~ args, Redirect.stdin | Redirect.stdout | Redirect.stderr);
+	auto pipes = pipeProcess(["./workspace-d"] ~ args,
+			Redirect.stdin | Redirect.stdout | Redirect.stderr);
 	int requestID = 0;
 	ubyte[4] intBuffer;
 	ubyte[] dataBuffer;
@@ -72,7 +83,9 @@ void main(string[] args)
 		assert(dataBuffer.length == 4, "Invalid buffer data");
 		int receivedID = bigEndianToNative!int(dataBuffer[0 .. 4]);
 
-		assert(requestID == receivedID, "Processed invalid id! Got those bytes instead: " ~ cast(string) dataBuffer);
+		enforce(requestID == receivedID,
+				"Processed invalid id! Got those bytes instead: " ~ cast(
+					string) dataBuffer ~ pipes.stdout.readAll);
 
 		dataBuffer.length = length - 4;
 		dataBuffer = pipes.stdout.rawRead(dataBuffer);
