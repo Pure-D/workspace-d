@@ -12,6 +12,7 @@ import std.bitmanip;
 import std.process;
 import std.traits;
 import std.stdio : stderr, File;
+
 static import std.stdio;
 import std.json;
 import std.meta;
@@ -20,7 +21,8 @@ import std.conv;
 import source.info;
 
 __gshared File stdin, stdout;
-shared static this() {
+shared static this()
+{
 	stdin = std.stdio.stdin;
 	stdout = std.stdio.stdout;
 	std.stdio.stdin = File("/dev/null", "r");
@@ -38,6 +40,8 @@ static import workspaced.com.dscanner;
 static import workspaced.com.dub;
 
 static import workspaced.com.fsworkspace;
+
+static import workspaced.com.importer;
 
 __gshared Mutex writeMutex, commandMutex;
 
@@ -92,9 +96,9 @@ template JSONCallBody(alias T, string fn, string jsonvar, size_t i, Args...)
 				~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
 	else
 					enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? fromJSON!(Parameters!("
-							~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i]
-							~ "`]" ~ ") : ParameterDefaults!(" ~ fn ~ ")[" ~ i.to!string
-							~ "]," ~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
+							~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]"
+							~ ") : ParameterDefaults!(" ~ fn ~ ")[" ~ i.to!string ~ "]," ~ JSONCallBody!(T,
+									fn, jsonvar, i + 1, Args);
 }
 
 template JSONCallNoRet(alias T, string fn, string jsonvar, bool async)
@@ -181,8 +185,7 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 				static if (hasUDA!(symbol, load) && hasUDA!(symbol, component))
 				{
 					if (("components" in request) !is null && ("cmd" in request) !is null
-							&& request["cmd"].type == JSON_TYPE.STRING
-							&& request["cmd"].str == "load")
+							&& request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "load")
 					{
 						if (request["components"].type == JSON_TYPE.ARRAY)
 						{
@@ -192,16 +195,14 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 									matches = true;
 						}
 						else if (request["components"].type == JSON_TYPE.STRING
-								&& request["components"].str == compatibleGetUDAs!(symbol,
-								component)[0].name)
+								&& request["components"].str == compatibleGetUDAs!(symbol, component)[0].name)
 							matches = true;
 					}
 				}
 				static if (hasUDA!(symbol, unload) && hasUDA!(symbol, component))
 				{
 					if (("components" in request) !is null && ("cmd" in request) !is null
-							&& request["cmd"].type == JSON_TYPE.STRING
-							&& request["cmd"].str == "unload")
+							&& request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "unload")
 					{
 						if (request["components"].type == JSON_TYPE.ARRAY)
 						{
@@ -283,18 +284,19 @@ void handleRequest(int id, JSONValue request)
 			isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.dfmt)(id, request, values, asyncWaiting,
 			isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dscanner)(id, request, values,
-			asyncWaiting, isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dlangui)(id, request, values,
-			asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dscanner)(id, request, values, asyncWaiting,
+			isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dlangui)(id, request, values, asyncWaiting,
+			isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.fsworkspace)(id, request, values,
 			asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.importer)(id, request, values, asyncWaiting,
+			isAsync, hasArgs, asyncCallback);
 
 	if (isAsync)
 	{
 		if (values.length > 0)
-			throw new Exception(
-					"Cannot mix sync and async functions! In request " ~ request.toString);
+			throw new Exception("Cannot mix sync and async functions! In request " ~ request.toString);
 	}
 	else
 	{

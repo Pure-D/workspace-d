@@ -1,0 +1,3 @@
+[submodule "libdparse"]
+	path = libdparse
+	url = git@github.com:WebFreak001/libdparse.git
