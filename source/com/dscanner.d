@@ -122,6 +122,42 @@ import workspaced.api;
 	}).start();
 }
 
+/// Asynchronously finds all definitions of a symbol in the import paths.
+/// Returns: `[{name: string, line: int, column: int}]`
+/// Call_With: `{"subcmd": "find-symbol"}`
+@arguments("subcmd", "find-symbol")
+@async void findSymbol(AsyncCallback cb, string symbol)
+{
+	new Thread({
+		try
+		{
+			ProcessPipes pipes = raw([execPath, "-d", symbol] ~ importPathProvider());
+			scope (exit)
+				pipes.pid.wait();
+			string[] res;
+			while (pipes.stdout.isOpen && !pipes.stdout.eof)
+				res ~= pipes.stdout.readln();
+			FileLocation[] files;
+			foreach (line; res)
+			{
+				auto match = line.chomp.matchFirst(dscannerFileRegex);
+				if (!match)
+					continue;
+				FileLocation file;
+				file.file = match[1];
+				file.line = match[2].to!int;
+				file.column = match[3].to!int;
+				files ~= file;
+			}
+			cb(null, files.toJSON);
+		}
+		catch (Throwable e)
+		{
+			cb(e, JSONValue(null));
+		}
+	}).start();
+}
+
 private:
 
 __gshared
@@ -136,12 +172,19 @@ auto raw(string[] args, Redirect redirect = Redirect.all)
 }
 
 auto dscannerIssueRegex = ctRegex!`^(.+?)\((\d+)\:(\d+)\)\[(.*?)\]: (.*)`;
+auto dscannerFileRegex = ctRegex!`^(.*?)\((\d+):(\d+)\)`;
 struct DScannerIssue
 {
 	string file;
 	int line, column;
 	string type;
 	string description;
+}
+
+struct FileLocation
+{
+	string file;
+	int line, column;
 }
 
 struct OutlineTreeNode
