@@ -4,6 +4,7 @@ import core.sync.mutex;
 import core.exception;
 
 import painlessjson;
+import standardpaths;
 
 import workspaced.api;
 
@@ -356,6 +357,8 @@ int main(string[] args)
 
 		scope (exit)
 			handleRequest(int.min, JSONValue(["cmd" : "unload", "components" : "*"]));
+
+		stderr.writeln("Config files stored in ", standardPaths(StandardPath.config, "workspace-d"));
 
 		while (stdin.isOpen && stdout.isOpen && !stdin.eof)
 		{

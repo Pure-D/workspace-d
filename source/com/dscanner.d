@@ -39,7 +39,9 @@ import workspaced.api;
 		try
 		{
 			auto args = [execPath, "-S", file];
-			if (ini && ini.length)
+			if (getConfigPath("dscanner.ini", ini))
+				stderr.writeln("Overriding Dscanner ini with workspace-d dscanner.ini config file");
+			else if (ini && ini.length)
 			{
 				if (ini.isAbsolute)
 					args ~= ["--config", ini];

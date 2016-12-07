@@ -2,7 +2,10 @@ module workspaced.api;
 
 import std.conv;
 import std.json;
+import std.file;
+import std.path;
 import painlessjson;
+import standardpaths;
 
 ///
 alias AsyncCallback = void delegate(Throwable, JSONValue);
@@ -68,6 +71,20 @@ unittest
 	assert(args.arguments[0].value.integer == 5);
 	assert(args.arguments[1].key == "bar");
 	assert(args.arguments[1].value.str == "str");
+}
+
+bool getConfigPath(string file, ref string retPath)
+{
+	foreach (dir; standardPaths(StandardPath.config, "workspace-d"))
+	{
+		auto path = buildPath(dir, file);
+		if (path.exists)
+		{
+			retPath = path;
+			return true;
+		}
+	}
+	return false;
 }
 
 alias ImportPathProvider = string[]function();

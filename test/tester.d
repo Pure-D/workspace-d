@@ -7,6 +7,7 @@ import std.conv;
 import std.json;
 import std.uni;
 import core.thread;
+static import std.file;
 
 bool isNumeric(in string s)
 {
@@ -65,7 +66,7 @@ void main(string[] args)
 		write("Enter JSON: ");
 		string instr = readln().strip();
 		if (instr.isNumeric)
-			instr = preprogrammed[toImpl!int(instr)];
+			instr = preprogrammed[instr.to!int];
 		ubyte[] input = cast(ubyte[]) instr;
 		if (input.length == 0)
 			continue;

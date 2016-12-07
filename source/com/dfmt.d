@@ -3,6 +3,8 @@ module workspaced.com.dfmt;
 import std.json;
 import std.conv;
 import std.regex;
+import fs = std.file;
+import std.stdio : stderr;
 import std.process;
 import core.thread;
 
@@ -50,7 +52,35 @@ bool hasConfigFolder(string ver)
 		try
 		{
 			auto args = [execPath];
-			if (arguments.length)
+			string configPath;
+			if (getConfigPath("dfmt.json", configPath))
+			{
+				stderr.writeln("Overriding dfmt arguments with workspace-d dfmt.json config file");
+				try
+				{
+					auto json = parseJSON(fs.readText(configPath));
+					json.tryFetchProperty(arguments, "align_switch_statements");
+					json.tryFetchProperty(arguments, "brace_style");
+					json.tryFetchProperty(arguments, "end_of_line");
+					json.tryFetchProperty(arguments, "indent_size");
+					json.tryFetchProperty(arguments, "indent_style");
+					json.tryFetchProperty(arguments, "max_line_length");
+					json.tryFetchProperty(arguments, "soft_max_line_length");
+					json.tryFetchProperty(arguments, "outdent_attributes");
+					json.tryFetchProperty(arguments, "space_after_cast");
+					json.tryFetchProperty(arguments, "split_operator_at_line_end");
+					json.tryFetchProperty(arguments, "tab_width");
+					json.tryFetchProperty(arguments, "selective_import_space");
+					json.tryFetchProperty(arguments, "compact_labeled_statements");
+					json.tryFetchProperty(arguments, "template_constraint_style");
+				}
+				catch (Exception e)
+				{
+					stderr.writeln("dfmt.json in workspace-d config folder is malformed");
+					stderr.writeln(e);
+				}
+			}
+			else if (arguments.length)
 				args ~= arguments;
 			else if (needsConfigFolder)
 				args ~= ["-c", cwd];
@@ -84,3 +114,15 @@ bool hasConfigFolder(string ver)
 private __gshared:
 string cwd, execPath;
 bool needsConfigFolder = false;
+
+void tryFetchProperty(ref JSONValue json, ref string[] args, string name)
+{
+	auto ptr = name in json;
+	if (ptr)
+	{
+		auto val = *ptr;
+		if (val.type != JSON_TYPE.STRING)
+			throw new Exception("dfmt config value must be a string");
+		args ~= ["--" ~ name, val.str];
+	}
+}
