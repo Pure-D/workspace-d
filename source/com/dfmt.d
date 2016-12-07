@@ -59,20 +59,20 @@ bool hasConfigFolder(string ver)
 				try
 				{
 					auto json = parseJSON(fs.readText(configPath));
-					json.tryFetchProperty!bool(arguments, "align_switch_statements");
-					json.tryFetchProperty(arguments, "brace_style");
-					json.tryFetchProperty(arguments, "end_of_line");
-					json.tryFetchProperty!uint(arguments, "indent_size");
-					json.tryFetchProperty(arguments, "indent_style");
-					json.tryFetchProperty!uint(arguments, "max_line_length");
-					json.tryFetchProperty!uint(arguments, "soft_max_line_length");
-					json.tryFetchProperty!bool(arguments, "outdent_attributes");
-					json.tryFetchProperty!bool(arguments, "space_after_cast");
-					json.tryFetchProperty!bool(arguments, "split_operator_at_line_end");
-					json.tryFetchProperty!uint(arguments, "tab_width");
-					json.tryFetchProperty!bool(arguments, "selective_import_space");
-					json.tryFetchProperty!bool(arguments, "compact_labeled_statements");
-					json.tryFetchProperty(arguments, "template_constraint_style");
+					json.tryFetchProperty!bool(args, "align_switch_statements");
+					json.tryFetchProperty(args, "brace_style");
+					json.tryFetchProperty(args, "end_of_line");
+					json.tryFetchProperty!uint(args, "indent_size");
+					json.tryFetchProperty(args, "indent_style");
+					json.tryFetchProperty!uint(args, "max_line_length");
+					json.tryFetchProperty!uint(args, "soft_max_line_length");
+					json.tryFetchProperty!bool(args, "outdent_attributes");
+					json.tryFetchProperty!bool(args, "space_after_cast");
+					json.tryFetchProperty!bool(args, "split_operator_at_line_end");
+					json.tryFetchProperty!uint(args, "tab_width");
+					json.tryFetchProperty!bool(args, "selective_import_space");
+					json.tryFetchProperty!bool(args, "compact_labeled_statements");
+					json.tryFetchProperty(args, "template_constraint_style");
 				}
 				catch (Exception e)
 				{
@@ -147,6 +147,7 @@ void tryFetchProperty(T = string)(ref JSONValue json, ref string[] args, string 
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a boolean");
 			args ~= ["--" ~ name, val.type == JSON_TYPE.TRUE ? "true" : "false"];
 		}
-		else static assert(false);
+		else
+			static assert(false);
 	}
 }
