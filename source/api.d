@@ -89,4 +89,9 @@ bool getConfigPath(string file, ref string retPath)
 
 alias ImportPathProvider = string[]function();
 
-ImportPathProvider importPathProvider, stringImportPathProvider;
+private string[] noImports()
+{
+	return [];
+}
+
+ImportPathProvider importPathProvider = &noImports, stringImportPathProvider = &noImports;
