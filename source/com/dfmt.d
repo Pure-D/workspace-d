@@ -59,19 +59,19 @@ bool hasConfigFolder(string ver)
 				try
 				{
 					auto json = parseJSON(fs.readText(configPath));
-					json.tryFetchProperty(arguments, "align_switch_statements");
+					json.tryFetchProperty!bool(arguments, "align_switch_statements");
 					json.tryFetchProperty(arguments, "brace_style");
 					json.tryFetchProperty(arguments, "end_of_line");
-					json.tryFetchProperty(arguments, "indent_size");
+					json.tryFetchProperty!uint(arguments, "indent_size");
 					json.tryFetchProperty(arguments, "indent_style");
-					json.tryFetchProperty(arguments, "max_line_length");
-					json.tryFetchProperty(arguments, "soft_max_line_length");
-					json.tryFetchProperty(arguments, "outdent_attributes");
-					json.tryFetchProperty(arguments, "space_after_cast");
-					json.tryFetchProperty(arguments, "split_operator_at_line_end");
-					json.tryFetchProperty(arguments, "tab_width");
-					json.tryFetchProperty(arguments, "selective_import_space");
-					json.tryFetchProperty(arguments, "compact_labeled_statements");
+					json.tryFetchProperty!uint(arguments, "max_line_length");
+					json.tryFetchProperty!uint(arguments, "soft_max_line_length");
+					json.tryFetchProperty!bool(arguments, "outdent_attributes");
+					json.tryFetchProperty!bool(arguments, "space_after_cast");
+					json.tryFetchProperty!bool(arguments, "split_operator_at_line_end");
+					json.tryFetchProperty!uint(arguments, "tab_width");
+					json.tryFetchProperty!bool(arguments, "selective_import_space");
+					json.tryFetchProperty!bool(arguments, "compact_labeled_statements");
 					json.tryFetchProperty(arguments, "template_constraint_style");
 				}
 				catch (Exception e)
@@ -115,14 +115,38 @@ private __gshared:
 string cwd, execPath;
 bool needsConfigFolder = false;
 
-void tryFetchProperty(ref JSONValue json, ref string[] args, string name)
+void tryFetchProperty(T = string)(ref JSONValue json, ref string[] args, string name)
 {
 	auto ptr = name in json;
 	if (ptr)
 	{
 		auto val = *ptr;
-		if (val.type != JSON_TYPE.STRING)
-			throw new Exception("dfmt config value must be a string");
-		args ~= ["--" ~ name, val.str];
+		static if (is(T == string))
+		{
+			if (val.type != JSON_TYPE.STRING)
+				throw new Exception("dfmt config value '" ~ name ~ "' must be a string");
+			args ~= ["--" ~ name, val.str];
+		}
+		else static if (is(T == uint))
+		{
+			if (val.type != JSON_TYPE.INTEGER)
+				throw new Exception("dfmt config value '" ~ name ~ "' must be a number");
+			if (val.integer < 0)
+				throw new Exception("dfmt config value '" ~ name ~ "' must be a positive number");
+			args ~= ["--" ~ name, val.integer.to!string];
+		}
+		else static if (is(T == int))
+		{
+			if (val.type != JSON_TYPE.INTEGER)
+				throw new Exception("dfmt config value '" ~ name ~ "' must be a number");
+			args ~= ["--" ~ name, val.integer.to!string];
+		}
+		else static if (is(T == bool))
+		{
+			if (val.type != JSON_TYPE.TRUE && val.type != JSON_TYPE.FALSE)
+				throw new Exception("dfmt config value '" ~ name ~ "' must be a boolean");
+			args ~= ["--" ~ name, val.type == JSON_TYPE.TRUE ? "true" : "false"];
+		}
+		else static assert(false);
 	}
 }
