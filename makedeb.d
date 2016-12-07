@@ -35,6 +35,10 @@ Description: Wraps dcd, dfmt and dscanner to one unified environment managed by 
 	mkdir("debs/" ~ pkgPath ~ "/usr/local/bin");
 	writeln("Building workspace-d");
 	spawnProcess(["dub", "build", "--build=release"]).wait;
+	writeln("Compressing regular linux package");
+	spawnProcess(["tar", "cfJ", "workspace-d_" ~ source.info.Version[0].to!string ~ "."
+		~ source.info.Version[1].to!string ~ "." ~ source.info.Version[2].to!string ~ "-linux-x86_64.tar.xz",
+		"workspace-d"]).wait;
 	rename("workspace-d", "debs/" ~ pkgPath ~ "/usr/local/bin/workspace-d");
 	writeln("Generating package in debs/ folder");
 	spawnProcess(["dpkg-deb", "--build", pkgPath], std.stdio.stdin,
