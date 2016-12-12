@@ -26,7 +26,12 @@ shared static this()
 {
 	stdin = std.stdio.stdin;
 	stdout = std.stdio.stdout;
-	std.stdio.stdin = File("/dev/null", "r");
+	version (Windows)
+		std.stdio.stdin = File("NUL", "r");
+	else version (Posix)
+		std.stdio.stdin = File("/dev/null", "r");
+	else
+		stderr.writeln("warning: no /dev/null implementation on this OS");
 	std.stdio.stdout = stderr;
 }
 
