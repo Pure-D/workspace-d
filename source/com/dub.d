@@ -176,13 +176,13 @@ string[] configurations() @property
 	return _dub.project.configurations;
 }
 
-/// Lists all build types defined in the package description AND the predefined ones from dub ("plain", "debug", "release", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov")
+/// Lists all build types defined in the package description AND the predefined ones from dub ("plain", "debug", "release", "release-debug", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov")
 /// Call_With: `{"subcmd": "list:build-types"}`
 @arguments("subcmd", "list:build-types")
 string[] buildTypes() @property
 {
 	string[] types = [
-		"plain", "debug", "release", "release-nobounds", "unittest", "docs",
+		"plain", "debug", "release", "release-debug", "release-nobounds", "unittest", "docs",
 		"ddox", "profile", "profile-gc", "cov", "unittest-cov"
 	];
 	foreach (type, info; _dub.project.rootPackage.recipe.buildTypes)
