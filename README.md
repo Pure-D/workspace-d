@@ -27,6 +27,8 @@ Then, run:
 ```sh
 git clone https://github.com/Pure-D/workspace-d.git
 cd workspace-d
+git submodule init
+git submodule update
 # Linux:
 dub build --build=release
 # Windows:
