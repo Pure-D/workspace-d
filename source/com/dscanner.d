@@ -17,11 +17,17 @@ import workspaced.api;
 @component("dscanner") :
 
 /// Load function for dscanner. Call with `{"cmd": "load", "components": ["dscanner"]}`
-/// This will store the working directory and executable name for future use. All dub methods are used with `"cmd": "dscanner"`
+/// This will store the working directory and executable name for future use.
+/// It also checks for the version. All dub methods are used with `"cmd": "dscanner"`
 @load void start(string dir, string dscannerPath = "dscanner")
 {
 	cwd = dir;
 	execPath = dscannerPath;
+	if (!checkVersion(execPath.getVersionAndFixPath, [0, 4, 0]))
+		broadcast(JSONValue([
+			"type": JSONValue("outdated"),
+			"component": JSONValue("dscanner")
+		]));
 }
 
 /// Unloads dscanner. Has no purpose right now.

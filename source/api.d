@@ -4,8 +4,10 @@ import std.conv;
 import std.json;
 import std.file;
 import std.path;
+import std.regex;
 import painlessjson;
 import standardpaths;
+import workspaced.app;
 
 ///
 alias AsyncCallback = void delegate(Throwable, JSONValue);
@@ -95,3 +97,45 @@ private string[] noImports()
 }
 
 ImportPathProvider importPathProvider = &noImports, stringImportPathProvider = &noImports;
+
+enum verRegex = ctRegex!`(\d+)\.(\d+)\.(\d+)`;
+bool checkVersion(string ver, int[3] target)
+{
+	auto match = ver.matchFirst(verRegex);
+	assert(match);
+	int major = match[1].to!int;
+	int minor = match[2].to!int;
+	int patch = match[3].to!int;
+	if (major > target[0])
+		return true;
+	if (major == target[0] && minor >= target[1])
+		return true;
+	if (major == target[0] && minor == target[1] && patch >= target[2])
+		return true;
+	return false;
+}
+
+void broadcast(JSONValue value)
+{
+	sendFinal(0x7F000000, value);
+}
+
+string getVersionAndFixPath(ref string execPath)
+{
+	import std.process;
+
+	try
+	{
+		return execute([execPath, "--version"]).output;
+	}
+	catch (ProcessException e)
+	{
+		auto newPath = buildPath(thisExePath.dirName, execPath.baseName);
+		if (exists(newPath))
+		{
+			execPath = newPath;
+			return execute([execPath, "--version"]).output;
+		}
+		throw e;
+	}
+}

@@ -6,7 +6,6 @@ import std.path;
 import std.json;
 import std.conv;
 import std.stdio;
-import std.regex;
 import std.string;
 import std.random;
 import std.process;
@@ -25,7 +24,8 @@ version (FreeBSD) version = haveUnixSockets;
 
 @component("dcd") :
 /// Load function for dcd. Call with `{"cmd": "load", "components": ["dcd"]}`
-/// This will start dcd-server and load all import paths specified by previously loaded modules such as dub if autoStart is true. All dcd methods are used with `"cmd": "dcd"`
+/// This will start dcd-server and load all import paths specified by previously loaded modules such as dub if autoStart is true.
+/// It also checks for the version. All dcd methods are used with `"cmd": "dcd"`
 /// Note: This will block any incoming requests while loading.
 @load void start(string dir, string clientPath = "dcd-client",
 		string serverPath = "dcd-server", ushort port = 9166, bool autoStart = true)
@@ -34,25 +34,23 @@ version (FreeBSD) version = haveUnixSockets;
 	.serverPath = serverPath;
 	.clientPath = clientPath;
 	.port = port;
-	installedVersion = execute([clientPath, "--version"]).output;
+	installedVersion = .clientPath.getVersionAndFixPath;
+	if (.serverPath.getVersionAndFixPath != installedVersion)
+		throw new Exception("client & server version mismatch");
 	version (haveUnixSockets)
 		hasUnixDomainSockets = supportsUnixDomainSockets(installedVersion);
 	if (autoStart)
 		startServer();
+	if (!checkVersion(installedVersion, [0, 9, 0]))
+		broadcast(JSONValue([
+			"type": JSONValue("outdated"),
+			"component": JSONValue("dcd")
+		]));
 }
 
-enum verRegex = ctRegex!`(\d+)\.(\d+)\.\d+`;
 bool supportsUnixDomainSockets(string ver)
 {
-	auto match = ver.matchFirst(verRegex);
-	assert(match);
-	int major = match[1].to!int;
-	int minor = match[2].to!int;
-	if (major > 0)
-		return true;
-	if (major == 0 && minor >= 8)
-		return true;
-	return false;
+	return checkVersion(ver, [0, 8, 0]);
 }
 
 unittest
@@ -378,14 +376,12 @@ ushort getRunningPort()
 			int[] emptyArr;
 			if (data.length == 0)
 			{
-				cb(null, JSONValue(["type" : JSONValue("identifiers"),
-					"identifiers" : emptyArr.toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("identifiers"), "identifiers" : emptyArr.toJSON()]));
 				return;
 			}
 			if (data[0] == "calltips")
 			{
-				cb(null, JSONValue(["type" : JSONValue("calltips"), "calltips"
-					: data[1 .. $].toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("calltips"), "calltips" : data[1 .. $].toJSON()]));
 				return;
 			}
 			else if (data[0] == "identifiers")
@@ -396,8 +392,8 @@ ushort getRunningPort()
 					string[] splits = line.split('\t');
 					identifiers ~= DCDIdentifier(splits[0], splits[1]);
 				}
-				cb(null, JSONValue(["type" : JSONValue("identifiers"),
-					"identifiers" : identifiers.toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("identifiers"), "identifiers"
+					: identifiers.toJSON()]));
 				return;
 			}
 			else

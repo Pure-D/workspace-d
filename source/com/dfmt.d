@@ -15,13 +15,19 @@ import workspaced.api;
 @component("dfmt") :
 
 /// Load function for dfmt. Call with `{"cmd": "load", "components": ["dfmt"]}`
-/// This will store the working directory and executable name for future use. All dub methods are used with `"cmd": "dfmt"`
+/// This will store the working directory and executable name for future use.
+/// Also it checks for the version. All dub methods are used with `"cmd": "dfmt"`
 @load void start(string dir, string dfmtPath = "dfmt")
 {
 	cwd = dir;
 	execPath = dfmtPath;
-	auto features = execute([execPath, "--version"]).output;
+	auto features = execPath.getVersionAndFixPath;
 	needsConfigFolder = features.hasConfigFolder;
+	if (!checkVersion(features, [0, 5, 0]))
+		broadcast(JSONValue([
+			"type": JSONValue("outdated"),
+			"component": JSONValue("dfmt")
+		]));
 }
 
 enum verRegex = ctRegex!`(\d+)\.(\d+)\.\d+`;
