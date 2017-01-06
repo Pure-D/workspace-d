@@ -87,7 +87,12 @@ bool dubInstall(bool isClonedAlready = false, bool fetchMaster = false)(string f
 			return false;
 		}
 	foreach (bin; output)
-		copy(buildNormalizedPath(cwd, bin), buildNormalizedPath("bin", bin.baseName));
+	{
+		auto dest = buildNormalizedPath("bin", bin.baseName);
+		copy(buildNormalizedPath(cwd, bin), dest);
+		version (Posix)
+			dest.setAttributes(dest.getAttributes | octal!111);
+	}
 	writeln("Successfully compiled " ~ folder ~ "!");
 	return true;
 }
