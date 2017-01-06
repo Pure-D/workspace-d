@@ -351,6 +351,12 @@ int main(string[] args)
 		static if (is(typeof(registerMemoryErrorHandler)))
 			registerMemoryErrorHandler();
 
+		if (args.length > 1 && (args[1] == "-v" || args[1] == "--version" || args[1] == "-version"))
+		{
+			stdout.writefln("%(%s.%)", Version);
+			return 0;
+		}
+
 		writeMutex = new Mutex;
 		commandMutex = new Mutex;
 
