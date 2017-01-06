@@ -43,11 +43,16 @@ bool dubInstall(bool isClonedAlready = false, bool fetchMaster = false)(string f
 	{
 		writeln("Using existing git repository for " ~ folder);
 		string cwd = git;
+		if (proc(["git", "submodule", "update", "--init", "--recursive"], cwd) != 0)
+		{
+			writeln("Error while cloning subpackages of " ~ folder ~ ".");
+			return false;
+		}
 	}
 	else
 	{
 		writeln("Cloning " ~ folder ~ " into ", tmp);
-		if (proc(["git", "clone", "-q", git, folder], tmp) != 0)
+		if (proc(["git", "clone", "-q", "--recursive", git, folder], tmp) != 0)
 		{
 			writeln("Error while cloning " ~ folder ~ ".");
 			return false;
@@ -111,7 +116,8 @@ int main(string[] args)
 		winCompiler = getLDC();
 		if (!winCompiler.length)
 		{
-			writeln("WARNING: LDC could was not detected. Before submitting an issue, make sure `dub build --compiler=ldc` works!");
+			writeln(
+					"WARNING: LDC could was not detected. Before submitting an issue, make sure `dub build --compiler=ldc` works!");
 			winCompiler = "ldc";
 		}
 	}
@@ -172,23 +178,23 @@ int main(string[] args)
 		if (workspacedPath.length)
 		{
 			if (!dubInstall!true("workspace-d", workspacedPath, [".\\workspace-d.exe", ".\\libcurl.dll",
-					".\\libeay32.dll", "ssleay32.dll"], [["dub", "upgrade"], ["dub", "build",
-					"--compiler=" ~ winCompiler, "--combined", "--build=release"]]))
+					".\\libeay32.dll", "ssleay32.dll"], [["dub", "upgrade"], ["dub",
+					"build", "--compiler=" ~ winCompiler, "--combined", "--build=release"]]))
 				return 1;
 		}
 		else if (!dubInstall("workspace-d", "https://github.com/Pure-D/workspace-d.git",
 				[".\\workspace-d.exe", ".\\libcurl.dll",
-				".\\libeay32.dll", "ssleay32.dll"], [["dub", "upgrade"], ["dub", "build",
-				"--compiler=" ~ winCompiler, "--combined", "--build=release"]]))
+				".\\libeay32.dll", "ssleay32.dll"], [["git", "submodule", "update",
+				"--init", "--recursive"], ["dub", "upgrade"],
+				["dub", "build", "--compiler=" ~ winCompiler, "--combined", "--build=release"]]))
 			return 1;
 		if (dcd && !dubInstall!(false, true)("DCD", "https://github.com/Hackerpilot/DCD.git",
-				[".\\dcd-client.exe", ".\\dcd-server.exe"],
-				[["dub", "upgrade"], ["dub", "build", "--build=release", "--config=client"],
-				["dub", "build", "--build=release", "--config=server"]]))
+				[".\\dcd-client.exe", ".\\dcd-server.exe"], [["dub", "upgrade"], ["dub", "build", "--build=release",
+				"--config=client"], ["dub", "build", "--build=release", "--config=server"]]))
 			return 1;
-		if (dscanner && !dubInstall("Dscanner", "https://github.com/Hackerpilot/Dscanner.git", [".\\dscanner.exe"],
-				[["git", "submodule", "update", "--init", "--recursive"],
-				["cmd", "/c", "build.bat"]]))
+		if (dscanner && !dubInstall("Dscanner", "https://github.com/Hackerpilot/Dscanner.git",
+				[".\\dscanner.exe"], [["git", "submodule", "update", "--init",
+				"--recursive"], ["cmd", "/c", "build.bat"]]))
 			return 1;
 		if (dfmt && !dubInstall("dfmt", "https://github.com/Hackerpilot/dfmt.git", [".\\dfmt.exe"]))
 			return 1;
@@ -203,12 +209,12 @@ int main(string[] args)
 		else if (!dubInstall("workspace-d",
 				"https://github.com/Pure-D/workspace-d.git", ["./workspace-d"]))
 			return 1;
-		if (dcd && !dubInstall!(false, true)("DCD", "https://github.com/Hackerpilot/DCD.git", ["./dcd-client", "./dcd-server"],
-				[["dub", "upgrade"], ["dub", "build", "--build=release", "--config=client"],
-				["dub", "build", "--build=release", "--config=server"]]))
+		if (dcd && !dubInstall!(false, true)("DCD", "https://github.com/Hackerpilot/DCD.git",
+				["./dcd-client", "./dcd-server"], [["dub", "upgrade"], ["dub", "build", "--build=release",
+				"--config=client"], ["dub", "build", "--build=release", "--config=server"]]))
 			return 1;
-		if (dscanner && !dubInstall("Dscanner", "https://github.com/Hackerpilot/Dscanner.git", ["./bin/dscanner"],
-				[["git", "submodule", "update", "--init", "--recursive"], ["make"]]))
+		if (dscanner && !dubInstall("Dscanner", "https://github.com/Hackerpilot/Dscanner.git",
+				["./bin/dscanner"], [["git", "submodule", "update", "--init", "--recursive"], ["make"]]))
 			return 1;
 		if (dfmt && !dubInstall("dfmt", "https://github.com/Hackerpilot/dfmt.git", ["./dfmt"]))
 			return 1;
