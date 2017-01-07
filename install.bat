@@ -1,1 +1,4 @@
-dub run :installer -- .
+cd installer
+dub build
+cd ..
+.\installer\iworkspaced .
