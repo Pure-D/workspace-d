@@ -6,6 +6,8 @@ It uses process pipes and json for communication.
 
 ## Installation
 
+[Precompiled binaries for windows & linux](https://github.com/Pure-D/workspace-d/releases)
+
 **Automatic Installation**
 
 Just run install.sh or install.bat (Windows/WIP)
