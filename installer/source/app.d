@@ -184,14 +184,14 @@ int main(string[] args)
 		{
 			if (!dubInstall!true("workspace-d", workspacedPath, [".\\workspace-d.exe", ".\\libcurl.dll",
 					".\\libeay32.dll", "ssleay32.dll"], [["dub", "upgrade"], ["dub",
-					"build", "--compiler=" ~ winCompiler, "--build=release"]]))
+					"build", "--compiler=" ~ winCompiler, "--combined", "--build=release"]])) // must be --combined to avoid windows issues
 				return 1;
 		}
 		else if (!dubInstall("workspace-d", "https://github.com/Pure-D/workspace-d.git",
 				[".\\workspace-d.exe", ".\\libcurl.dll",
 				".\\libeay32.dll", "ssleay32.dll"], [["git", "submodule", "update",
 				"--init", "--recursive"], ["dub", "upgrade"],
-				["dub", "build", "--compiler=" ~ winCompiler, "--build=release"]]))
+				["dub", "build", "--compiler=" ~ winCompiler, "--combined", "--build=release"]]))
 			return 1;
 		if (dcd && !dubInstall!(false, true)("DCD", "https://github.com/Hackerpilot/DCD.git",
 				[".\\dcd-client.exe", ".\\dcd-server.exe"], [["dub", "upgrade"], ["dub", "build", "--build=release",
