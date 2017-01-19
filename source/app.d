@@ -249,8 +249,7 @@ void handleRequest(int id, JSONValue request)
 	if (("cmd" in request) && request["cmd"].type == JSON_TYPE.STRING
 			&& request["cmd"].str == "version")
 	{
-		sendFinal(id, JSONValue(["major" : JSONValue(Version[0]), "minor"
-				: JSONValue(Version[1]), "patch" : JSONValue(Version[2])]));
+		sendFinal(id, getVersionInfoJson);
 		return;
 	}
 
@@ -353,7 +352,7 @@ int main(string[] args)
 
 		if (args.length > 1 && (args[1] == "-v" || args[1] == "--version" || args[1] == "-version"))
 		{
-			stdout.writefln("%(%s.%)", Version);
+			stdout.writeln(getVersionInfoString);
 			return 0;
 		}
 
