@@ -7,6 +7,9 @@ import std.conv;
 
 static immutable Version = [2, 9, 1];
 
+version (Windows) static assert(Compiler.name != "Digital Mars D",
+		"Use LDC instead of DMD on Windows! See Also: https://github.com/Pure-D/code-d/issues/38");
+
 string getVersionInfoString()
 {
 	return Version[0].to!string ~ '.' ~ Version[1].to!string ~ '.'
