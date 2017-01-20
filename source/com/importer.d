@@ -90,7 +90,7 @@ struct CodeReplacement
 	/// Content to replace it with. Empty means remove.
 	string content;
 
-	package string apply(string code)
+	string apply(string code)
 	{
 		size_t min = range[0];
 		size_t max = range[1];
