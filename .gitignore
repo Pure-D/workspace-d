@@ -13,3 +13,9 @@ bin/
 iworkspaced
 workspace-d_dml
 debs/
+*.exe
+*.dll
+workspace-d*.zip
+workspace-d*.tar.xz
+__test__*__
+.vscode/
