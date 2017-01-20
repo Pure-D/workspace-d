@@ -7,7 +7,6 @@ import std.path;
 import std.regex;
 import painlessjson;
 import standardpaths;
-import workspaced.app;
 
 ///
 alias AsyncCallback = void delegate(Throwable, JSONValue);
@@ -115,9 +114,14 @@ bool checkVersion(string ver, int[3] target)
 	return false;
 }
 
+alias BroadcastCallback = void function(JSONValue);
+BroadcastCallback broadcastCallback;
 void broadcast(JSONValue value)
 {
-	sendFinal(0x7F000000, value);
+	if (broadcastCallback)
+		broadcastCallback(value);
+	else
+		throw new Exception("broadcastCallback not set!");
 }
 
 string getVersionAndFixPath(ref string execPath)

@@ -61,6 +61,11 @@ void sendFinal(int id, JSONValue value)
 	}
 }
 
+void broadcast(JSONValue value)
+{
+	sendFinal(0x7F000000, value);
+}
+
 void send(int id, JSONValue[] values)
 {
 	if (values.length == 0)
@@ -355,6 +360,8 @@ int main(string[] args)
 			stdout.writeln(getVersionInfoString);
 			return 0;
 		}
+
+		broadcastCallback = &broadcast;
 
 		writeMutex = new Mutex;
 		commandMutex = new Mutex;
