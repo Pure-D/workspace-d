@@ -430,10 +430,10 @@ T toOr(T)(string s, T defaultValue)
 	return s.to!T;
 }
 
-enum harmlessExceptionFormat = ctRegex!(`failed with exit code`, "g");
-enum errorFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (Deprecation|Warning|Error): (.*)`, "gi"); // `
-enum errorFormatCont = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*)`, "g"); // `
-enum deprecationFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*?) is deprecated, use (.*?) instead.$`, "g"); // `
+static immutable harmlessExceptionFormat = ctRegex!(`failed with exit code`, "g");
+static immutable errorFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (Deprecation|Warning|Error): (.*)`, "gi"); // `
+static immutable errorFormatCont = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*)`, "g"); // `
+static immutable deprecationFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*?) is deprecated, use (.*?) instead.$`, "g"); // `
 
 struct BuildIssue
 {
