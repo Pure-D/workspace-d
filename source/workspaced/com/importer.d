@@ -136,6 +136,14 @@ string getIndentation(ubyte[] code, size_t index)
 {
 	import std.ascii : isWhite;
 
+	bool atLineEnd = false;
+	if (index < code.length && code[index] == '\n')
+	{
+		for (size_t i = index; i < code.length; i++)
+			if (!code[i].isWhite)
+				break;
+		atLineEnd = true;
+	}
 	while (index > 0)
 	{
 		if (code[index - 1] == cast(ubyte) '\n')
@@ -150,9 +158,9 @@ string getIndentation(ubyte[] code, size_t index)
 		end++;
 	}
 	auto indent = cast(string) code[index .. end];
-	if (!indent.length)
+	if (!indent.length && index == 0 && !atLineEnd)
 		return " ";
-	return "\n" ~ indent;
+	return "\n" ~ indent.stripLeft('\n');
 }
 
 unittest
@@ -160,9 +168,14 @@ unittest
 	auto code = cast(ubyte[]) "void foo() {\n\tfoo();\n}";
 	auto indent = getIndentation(code, 20);
 	assert(indent == "\n\t", '"' ~ indent ~ '"');
+
 	code = cast(ubyte[]) "void foo() { foo(); }";
 	indent = getIndentation(code, 19);
 	assert(indent == " ", '"' ~ indent ~ '"');
+
+	code = cast(ubyte[]) "import a;\n\nvoid foo() {\n\tfoo();\n}";
+	indent = getIndentation(code, 9);
+	assert(indent == "\n", '"' ~ indent ~ '"');
 }
 
 class ImporterReaderVisitor : ASTVisitor
@@ -254,28 +267,46 @@ unittest
 	assertEquals(imports[2].selectives[0].name, "map");
 	assertEquals(imports[2].selectives[1].name, "each");
 	assertEquals(imports[2].selectives[1].rename, "each2");
+
 	string code = "void foo() { import std.stdio : stderr; writeln(\"hi\"); }";
 	auto mod = add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"void foo() { import std.stdio : stderr; import std.stdio; writeln(\"hi\"); }");
+
 	code = "void foo() {\n\timport std.stdio : stderr;\n\twriteln(\"hi\");\n}";
 	mod = add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"void foo() {\n\timport std.stdio : stderr;\n\timport std.stdio;\n\twriteln(\"hi\");\n}");
-	stop();
+
 	code = "void foo() {\n\timport std.file : readText;\n\twriteln(\"hi\");\n}";
 	mod = add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"import std.stdio;\nvoid foo() {\n\timport std.file : readText;\n\twriteln(\"hi\");\n}");
+
 	code = "void foo() { import io = std.stdio; io.writeln(\"hi\"); }";
 	mod = add("std.stdio", code, 45);
 	assertEquals(mod.rename, "io");
 	assertEquals(mod.replacements.length, 0);
+
+	code = "import std.file : readText;\n\nvoid foo() {\n\twriteln(\"hi\");\n}";
+	mod = add("std.stdio", code, 45);
+	assertEquals(mod.rename, "");
+	assertEquals(mod.replacements.length, 1);
+	assertEquals(mod.replacements[0].apply(code),
+			"import std.file : readText;\nimport std.stdio;\n\nvoid foo() {\n\twriteln(\"hi\");\n}");
+
+	code = "import std.file;\nimport std.regex;\n\nvoid foo() {\n\twriteln(\"hi\");\n}";
+	mod = add("std.stdio", code, 54);
+	assertEquals(mod.rename, "");
+	assertEquals(mod.replacements.length, 1);
+	assertEquals(mod.replacements[0].apply(code),
+			"import std.file;\nimport std.regex;\nimport std.stdio;\n\nvoid foo() {\n\twriteln(\"hi\");\n}");
+
 	stop();
 }
