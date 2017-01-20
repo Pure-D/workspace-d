@@ -145,7 +145,7 @@ string getVersionAndFixPath(ref string execPath)
 	}
 }
 
-JSONValue sync(alias fn, alias sleepDur = 1.msecs, Args...)(Args args)
+JSONValue syncBlocking(alias fn, alias sleepDur = 1.msecs, Args...)(Args args)
 {
 	import core.thread;
 
@@ -156,6 +156,22 @@ JSONValue sync(alias fn, alias sleepDur = 1.msecs, Args...)(Args args)
 	fn(cb, args);
 	while (!done)
 		Thread.sleep(sleepDur);
+	if (ex)
+		throw ex;
+	return ret;
+}
+
+JSONValue syncYield(alias fn, Args...)(Args args)
+{
+	import core.thread;
+
+	Throwable ex;
+	JSONValue ret;
+	bool done = false;
+	AsyncCallback cb = (err, data) { ex = err; ret = data; done = true; };
+	fn(cb, args);
+	while (!done)
+		Fiber.yield;
 	if (ex)
 		throw ex;
 	return ret;
