@@ -62,12 +62,16 @@ ImportModification add(string importName, string code, int pos, bool insertOuter
 	{
 		indentation = reader.outerImportLocation == 0 ? "" : (cast(ubyte[]) code)
 			.getIndentation(reader.outerImportLocation);
+		if (reader.isModule)
+			indentation = '\n' ~ indentation;
 		return ImportModification("", [CodeReplacement([reader.outerImportLocation, reader.outerImportLocation],
 				indentation ~ "import " ~ importName ~ ";" ~ (reader.outerImportLocation == 0 ? "\n" : ""))]);
 	}
 	else
 	{
 		indentation = (cast(ubyte[]) code).getIndentation(reader.innermostBlockStart);
+		if (reader.isModule)
+			indentation = '\n' ~ indentation;
 		return ImportModification("", [CodeReplacement([reader.innermostBlockStart,
 				reader.innermostBlockStart], indentation ~ "import " ~ importName ~ ";")]);
 	}
@@ -188,10 +192,19 @@ class ImporterReaderVisitor : ASTVisitor
 
 	alias visit = ASTVisitor.visit;
 
+	override void visit(const ModuleDeclaration decl)
+	{
+		if (decl.endLocation + 1 < outerImportLocation || inBlock)
+			return;
+		isModule = true;
+		outerImportLocation = decl.endLocation + 1;
+	}
+
 	override void visit(const ImportDeclaration decl)
 	{
 		if (decl.startIndex >= pos)
 			return;
+		isModule = false;
 		if (inBlock)
 			innermostBlockStart = decl.endIndex;
 		else
@@ -233,6 +246,7 @@ class ImporterReaderVisitor : ASTVisitor
 	private int pos;
 	private bool inBlock;
 	ImportInfo[] imports;
+	bool isModule;
 	size_t outerImportLocation;
 	size_t innermostBlockStart;
 }
@@ -307,6 +321,13 @@ unittest
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"import std.file;\nimport std.regex;\nimport std.stdio;\n\nvoid foo() {\n\twriteln(\"hi\");\n}");
+
+	code = "module a;\n\nvoid foo() {\n\twriteln(\"hi\");\n}";
+	mod = add("std.stdio", code, 30);
+	assertEquals(mod.rename, "");
+	assertEquals(mod.replacements.length, 1);
+	assertEquals(mod.replacements[0].apply(code),
+			"module a;\n\nimport std.stdio;\n\nvoid foo() {\n\twriteln(\"hi\");\n}");
 
 	stop();
 }
