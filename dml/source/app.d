@@ -24,5 +24,5 @@ import workspaced.com.dlangui;
 		.to!(string[]).join(",\n\t") ~ "]";
 	string completions = "enum dmlCompletions = " ~ compStr ~ ";";
 
-	write("source/completion/dml.d", prefix ~ completions);
+	write("source/workspaced/completion/dml.d", prefix ~ completions);
 }

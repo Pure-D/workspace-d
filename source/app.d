@@ -1,4 +1,4 @@
-module workspaced.app;
+module app;
 
 import core.sync.mutex;
 import core.exception;
