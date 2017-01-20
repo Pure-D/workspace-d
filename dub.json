@@ -17,6 +17,7 @@
 	},
 	"subPackages": [
 		"./test",
+		"./test/library",
 		"./installer",
 		"./dml"
 	]
