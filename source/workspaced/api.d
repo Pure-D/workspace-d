@@ -5,6 +5,7 @@ import std.json;
 import std.file;
 import std.path;
 import std.regex;
+import core.time;
 import painlessjson;
 import standardpaths;
 
@@ -142,4 +143,20 @@ string getVersionAndFixPath(ref string execPath)
 		}
 		throw e;
 	}
+}
+
+JSONValue sync(alias fn, alias sleepDur = 1.msecs, Args...)(Args args)
+{
+	import core.thread;
+
+	Throwable ex;
+	JSONValue ret;
+	bool done = false;
+	AsyncCallback cb = (err, data) { ex = err; ret = data; done = true; };
+	fn(cb, args);
+	while (!done)
+		Thread.sleep(sleepDur);
+	if (ex)
+		throw ex;
+	return ret;
 }
