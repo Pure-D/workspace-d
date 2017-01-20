@@ -56,7 +56,7 @@ private template ArgumentPair(size_t i)
 					enum ArgumentPair = "";
 }
 
-Arguments arguments(T...)(T args)
+package Arguments arguments(T...)(T args)
 {
 	if (args.length < 2)
 		return Arguments.init;
@@ -75,7 +75,7 @@ unittest
 	assert(args.arguments[1].value.str == "str");
 }
 
-bool getConfigPath(string file, ref string retPath)
+package bool getConfigPath(string file, ref string retPath)
 {
 	foreach (dir; standardPaths(StandardPath.config, "workspace-d"))
 	{
@@ -116,8 +116,10 @@ bool checkVersion(string ver, int[3] target)
 }
 
 alias BroadcastCallback = void function(JSONValue);
+/// Broadcast callback which might get called by commands. For example when a component is outdated. Will be called in caller thread of function / while function executes.
 BroadcastCallback broadcastCallback;
-void broadcast(JSONValue value)
+/// Must get called in caller thread
+package void broadcast(JSONValue value)
 {
 	if (broadcastCallback)
 		broadcastCallback(value);
@@ -125,7 +127,7 @@ void broadcast(JSONValue value)
 		throw new Exception("broadcastCallback not set!");
 }
 
-string getVersionAndFixPath(ref string execPath)
+package string getVersionAndFixPath(ref string execPath)
 {
 	import std.process;
 
@@ -145,6 +147,7 @@ string getVersionAndFixPath(ref string execPath)
 	}
 }
 
+/// Calls an asynchronous function and blocks until it returns using Thread.sleep
 JSONValue syncBlocking(alias fn, alias sleepDur = 1.msecs, Args...)(Args args)
 {
 	import core.thread;
@@ -161,6 +164,7 @@ JSONValue syncBlocking(alias fn, alias sleepDur = 1.msecs, Args...)(Args args)
 	return ret;
 }
 
+/// Calls an asynchronous function and blocks until it returns using Fiber.yield
 JSONValue syncYield(alias fn, Args...)(Args args)
 {
 	import core.thread;
