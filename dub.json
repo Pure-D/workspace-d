@@ -1,6 +1,7 @@
 {
 	"name": "workspace-d",
-	"description": "A minimal D application.",
+	"description": "Provides functions for IDEs for managing DCD, Dscanner and Dfmt. Usable as application and library",
+	"license": "MIT",
 	"copyright": "Copyright © 2017, webfreak",
 	"authors": [
 		"webfreak"
@@ -14,15 +15,6 @@
 		},
 		"standardpaths": "~>0.7.1"
 	},
-	"configurations": [
-		{
-			"name": "application",
-			"sourcePaths": [
-				"source"
-			],
-			"targetType": "executable"
-		}
-	],
 	"subPackages": [
 		"./test",
 		"./installer",
