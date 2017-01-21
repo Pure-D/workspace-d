@@ -6,14 +6,13 @@ import std.process;
 
 static import std.stdio;
 
-static import source.info;
+import source.workspaced.info;
 
 void main()
 {
 	if (!exists("debs"))
 		mkdir("debs");
-	auto pkgVersion = source.info.Version[0].to!string ~ "."
-		~ source.info.Version[1].to!string ~ "-" ~ source.info.Version[2].to!string;
+	auto pkgVersion = Version[0].to!string ~ "." ~ Version[1].to!string ~ "-" ~ Version[2].to!string;
 	string pkgPath = "workspace-d_" ~ pkgVersion;
 	if (exists("debs/" ~ pkgPath))
 	{
@@ -36,9 +35,9 @@ Description: Wraps dcd, dfmt and dscanner to one unified environment managed by 
 	writeln("Building workspace-d");
 	spawnProcess(["dub", "build", "--build=release"]).wait;
 	writeln("Compressing regular linux package");
-	spawnProcess(["tar", "cfJ", "workspace-d_" ~ source.info.Version[0].to!string ~ "."
-		~ source.info.Version[1].to!string ~ "." ~ source.info.Version[2].to!string ~ "-linux-x86_64.tar.xz",
-		"workspace-d"]).wait;
+	spawnProcess(["tar", "cfJ",
+			"workspace-d_" ~ Version[0].to!string ~ "." ~ Version[1].to!string ~ "."
+			~ Version[2].to!string ~ "-linux-x86_64.tar.xz", "workspace-d"]).wait;
 	rename("workspace-d", "debs/" ~ pkgPath ~ "/usr/local/bin/workspace-d");
 	writeln("Generating package in debs/ folder");
 	spawnProcess(["dpkg-deb", "--build", pkgPath], std.stdio.stdin,

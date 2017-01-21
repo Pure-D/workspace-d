@@ -19,7 +19,7 @@ import std.json;
 import std.meta;
 import std.conv;
 
-import source.info;
+import source.workspaced.info;
 
 __gshared File stdin, stdout;
 shared static this()
