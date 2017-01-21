@@ -10,9 +10,7 @@
 		"dub": "~>1.2.0-rc.1",
 		"dunit": "~>1.0.14",
 		"painlessjson": "~>1.3.8",
-		"libdparse": {
-			"path": "libdparse"
-		},
+		"libdparse": "~>0.7.0-beta.3",
 		"standardpaths": "~>0.7.1"
 	},
 	"subPackages": [
