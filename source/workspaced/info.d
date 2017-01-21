@@ -5,7 +5,7 @@ import OS = std.system;
 import std.json;
 import std.conv;
 
-static immutable Version = [2, 10, 0];
+static immutable Version = [2, 10, 1];
 
 version (Windows) static assert(Compiler.name != "Digital Mars D",
 		"Use LDC instead of DMD on Windows! See Also: https://github.com/Pure-D/code-d/issues/38");
