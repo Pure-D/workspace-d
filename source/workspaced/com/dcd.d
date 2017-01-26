@@ -86,7 +86,8 @@ void startServer(string[] additionalImports = [])
 		throw new Exception("Already running dcd on port " ~ port.to!string);
 	string[] imports;
 	foreach (i; additionalImports)
-		imports ~= "-I" ~ i;
+		if (i.length)
+			imports ~= "-I" ~ i;
 	.runningPort = port;
 	.socketFile = buildPath(tempDir, "workspace-d-sock" ~ thisProcessID.to!string(36));
 	serverPipes = raw([serverPath] ~ clientArgs ~ imports,
@@ -413,7 +414,8 @@ void updateImports()
 {
 	string[] args;
 	foreach (path; knownImports)
-		args ~= "-I" ~ path;
+		if (path.length)
+			args ~= "-I" ~ path;
 	execClient(args);
 }
 
