@@ -340,8 +340,10 @@ auto path() @property
 			settings.config = _configuration;
 			settings.buildType = _buildType;
 			settings.compiler = compiler;
+			settings.tempBuild = true;
 			settings.buildSettings = buildSettings;
-			settings.buildSettings.options |= BuildOption.syntaxOnly;
+			settings.buildSettings.addOptions(BuildOption.syntaxOnly);
+			settings.buildSettings.addDFlags("-o-");
 
 			BuildIssue[] issues;
 
