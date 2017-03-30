@@ -41,11 +41,14 @@ version (FreeBSD) version = haveUnixSockets;
 		hasUnixDomainSockets = supportsUnixDomainSockets(installedVersion);
 	if (autoStart)
 		startServer();
+	//dfmt off
 	if (!checkVersion(installedVersion, [0, 9, 0]))
 		broadcast(JSONValue([
 			"type": JSONValue("outdated"),
 			"component": JSONValue("dcd")
 		]));
+	//dfmt on
+	running = true;
 }
 
 bool supportsUnixDomainSockets(string ver)
@@ -65,8 +68,6 @@ unittest
 @unload void stop()
 {
 	stopServerSync();
-	Thread.sleep(100.msecs);
-	killServer();
 }
 
 /// This will start the dcd-server and load import paths from the current provider
@@ -111,8 +112,20 @@ void startServer(string[] additionalImports = [])
 
 void stopServerSync()
 {
+	if (serverPipes.pid.tryWait().terminated)
+		return;
+	int i = 0;
+	running = false;
+	doClient(["--shutdown"]).pid.wait;
 	while (!serverPipes.pid.tryWait().terminated)
-		execClient(["--shutdown"]);
+	{
+		Thread.sleep(10.msecs);
+		if (++i > 200) // Kill after 2 seconds
+		{
+			killServer();
+			return;
+		}
+	}
 }
 
 /// This stops the dcd-server asynchronously
@@ -188,6 +201,8 @@ auto serverStatus() @property
 	new Thread({
 		try
 		{
+			if (!running)
+				return;
 			auto pipes = doClient(["--search", query]);
 			scope (exit)
 			{
@@ -264,6 +279,8 @@ void addImports(string[] imports)
 	new Thread({
 		try
 		{
+			if (!running)
+				return;
 			auto pipes = doClient(["-c", pos.to!string, "--symbolLocation"]);
 			scope (exit)
 			{
@@ -302,6 +319,8 @@ void addImports(string[] imports)
 	new Thread({
 		try
 		{
+			if (!running)
+				return;
 			auto pipes = doClient(["--doc", "-c", pos.to!string]);
 			scope (exit)
 			{
@@ -358,6 +377,8 @@ ushort getRunningPort()
 	new Thread({
 		try
 		{
+			if (!running)
+				return;
 			auto pipes = doClient(["-c", pos.to!string]);
 			scope (exit)
 			{
@@ -377,12 +398,14 @@ ushort getRunningPort()
 			int[] emptyArr;
 			if (data.length == 0)
 			{
-				cb(null, JSONValue(["type" : JSONValue("identifiers"), "identifiers" : emptyArr.toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("identifiers"),
+					"identifiers" : emptyArr.toJSON()]));
 				return;
 			}
 			if (data[0] == "calltips")
 			{
-				cb(null, JSONValue(["type" : JSONValue("calltips"), "calltips" : data[1 .. $].toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("calltips"), "calltips"
+					: data[1 .. $].toJSON()]));
 				return;
 			}
 			else if (data[0] == "identifiers")
@@ -393,8 +416,8 @@ ushort getRunningPort()
 					string[] splits = line.split('\t');
 					identifiers ~= DCDIdentifier(splits[0], splits[1]);
 				}
-				cb(null, JSONValue(["type" : JSONValue("identifiers"), "identifiers"
-					: identifiers.toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("identifiers"),
+					"identifiers" : identifiers.toJSON()]));
 				return;
 			}
 			else
@@ -412,6 +435,8 @@ ushort getRunningPort()
 
 void updateImports()
 {
+	if (!running)
+		return;
 	string[] args;
 	foreach (path; knownImports)
 		if (path.length)
@@ -426,6 +451,7 @@ __gshared
 	string clientPath, serverPath, cwd;
 	string installedVersion;
 	bool hasUnixDomainSockets = false;
+	bool running = false;
 	ProcessPipes serverPipes;
 	ushort port, runningPort;
 	string socketFile;
