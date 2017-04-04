@@ -49,6 +49,8 @@ static import workspaced.com.fsworkspace;
 
 static import workspaced.com.importer;
 
+static import workspaced.com.moduleman;
+
 __gshared Mutex writeMutex, commandMutex;
 
 void sendFinal(int id, JSONValue value)
@@ -301,6 +303,8 @@ void handleRequest(int id, JSONValue request)
 	handleRequestMod!(workspaced.com.fsworkspace)(id, request, values,
 			asyncWaiting, isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.importer)(id, request, values, asyncWaiting,
+			isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.moduleman)(id, request, values, asyncWaiting,
 			isAsync, hasArgs, asyncCallback);
 
 	if (isAsync)

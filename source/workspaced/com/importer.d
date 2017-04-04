@@ -86,31 +86,6 @@ struct ImportModification
 	CodeReplacement[] replacements;
 }
 
-/// Describes what to insert/replace/delete to do something
-struct CodeReplacement
-{
-	/// Range what to replace. If both indices are the same its inserting.
-	size_t[2] range;
-	/// Content to replace it with. Empty means remove.
-	string content;
-
-	string apply(string code)
-	{
-		size_t min = range[0];
-		size_t max = range[1];
-		if (min > max)
-		{
-			min = range[1];
-			max = range[0];
-		}
-		if (min >= code.length)
-			return code ~ content;
-		if (max >= code.length)
-			return code[0 .. min] ~ content;
-		return code[0 .. min] ~ content ~ code[max .. $];
-	}
-}
-
 /// Name and (if specified) rename of a symbol
 struct SelectiveImport
 {

@@ -75,6 +75,41 @@ unittest
 	assert(args.arguments[1].value.str == "str");
 }
 
+/// Describes what to insert/replace/delete to do something
+struct CodeReplacement
+{
+	/// Range what to replace. If both indices are the same its inserting.
+	size_t[2] range;
+	/// Content to replace it with. Empty means remove.
+	string content;
+
+	/// Applies this edit to a string.
+	string apply(string code)
+	{
+		size_t min = range[0];
+		size_t max = range[1];
+		if (min > max)
+		{
+			min = range[1];
+			max = range[0];
+		}
+		if (min >= code.length)
+			return code ~ content;
+		if (max >= code.length)
+			return code[0 .. min] ~ content;
+		return code[0 .. min] ~ content ~ code[max .. $];
+	}
+}
+
+/// Code replacements mapped to a file
+struct FileChanges
+{
+	/// File path to change.
+	string file;
+	/// Replacements to apply.
+	CodeReplacement[] replacements;
+}
+
 package bool getConfigPath(string file, ref string retPath)
 {
 	foreach (dir; standardPaths(StandardPath.config, "workspace-d"))
