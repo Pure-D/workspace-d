@@ -217,7 +217,16 @@ string[] archTypes() @property
 {
 	string[] types = ["x86_64", "x86"];
 
-	if (getCompiler(_compilerBinaryName).name == "gdc")
+	string compilerName = getCompiler(_compilerBinaryName).name;
+
+	version (Windows)
+	{
+		if (compilerName == "dmd")
+		{
+			types ~= "x86_mscoff";
+		}
+	}
+	if (compilerName == "gdc")
 	{
 		types ~= ["arm", "arm_thumb"];
 	}
