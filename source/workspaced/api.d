@@ -215,3 +215,46 @@ JSONValue syncYield(alias fn, Args...)(Args args)
 		throw ex;
 	return ret;
 }
+
+version(unittest)
+{
+	struct TestingWorkspace
+	{
+		string directory;
+
+		this(string path)
+		{
+			if (path.exists)
+				throw new Exception("Path already exists");
+			directory = path;
+			mkdir(path);
+		}
+
+		~this()
+		{
+			rmdirRecurse(directory);
+		}
+
+		string getPath(string path)
+		{
+			return buildPath(directory, path);
+		}
+
+		void createDir(string dir)
+		{
+			mkdirRecurse(getPath(dir));
+		}
+
+		void writeFile(string path, string content)
+		{
+			write(getPath(path), content);
+		}
+	}
+
+	TestingWorkspace makeTemporaryTestingWorkspace()
+	{
+		import std.random;
+
+		return TestingWorkspace(buildPath(tempDir, "workspace-d-test-" ~ uniform(0, int.max).to!string(36)));
+	}
+}

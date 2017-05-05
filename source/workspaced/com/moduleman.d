@@ -34,7 +34,7 @@ import workspaced.api;
 /// Returns: all changes that need to happen to rename the module. If no module statement could be found this will return an empty array.
 /// Call_With: `{"subcmd": "rename"}`
 @arguments("subcmd", "rename")
-FileChanges[] rename(string code, string mod, string rename, bool renameSubmodules = true)
+FileChanges[] rename(string mod, string rename, bool renameSubmodules = true)
 {
 	FileChanges[] changes;
 	bool foundModule = false;
@@ -46,13 +46,9 @@ FileChanges[] rename(string code, string mod, string rename, bool renameSubmodul
 			continue;
 		string code = readText(file);
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, cache);
-		auto mod = parseModule(tokens, file, &rba, &doNothing);
-		auto reader = new ModuleChangerVisitor(pos);
-		reader.changes.file = file;
-		reader.from = from;
-		reader.to = to;
-		reader.renameSubmodules = renameSubmodules;
-		reader.visit(mod);
+		auto parsed = parseModule(tokens, file, &rba, &doNothing);
+		auto reader = new ModuleChangerVisitor(file, from, to, renameSubmodules);
+		reader.visit(parsed);
 		if (reader.changes.replacements.length)
 			changes ~= reader.changes;
 		if (reader.foundModule)
@@ -63,25 +59,111 @@ FileChanges[] rename(string code, string mod, string rename, bool renameSubmodul
 	return changes;
 }
 
+/// Renames/adds/removes a module from a file to match the majority of files in the folder.
+/// Params:
+/// 	file: File path to the file to normalize
+/// 	code: Current code inside the text buffer
+CodeReplacement[] normalizeModules(string file, string code)
+{
+	int[string] modulePrefixes;
+	modulePrefixes[""] = 0;
+	foreach (other; file.dirName.dirEntries(SpanMode.shallow))
+	{
+		auto info = fetchModule(other, readText(other));
+		auto ptr = info.moduleName in modulePrefixes;
+		if (!ptr)
+			modulePrefixes[info.moduleName] = 1;
+		else
+			(*ptr)++;
+	}
+	string prefix = modulePrefixes.byKeyValue.maxElement!"a.value".key;
+	string fileName = file.baseName.stripExtension;
+	auto existing = fetchModule(file, code);
+	if (prefix == existing.moduleName && fileName == existing.fileName.text)
+	{
+		return [];
+	}
+	else
+	{
+		if (prefix == "")
+			return [CodeReplacement([existing.outerFrom, existing.outerTo], "")];
+		else if (prefix == "$")
+			return [CodeReplacement([existing.outerFrom, existing.outerTo], "module " ~ fileName ~ ";")];
+		else if (existing.fileName.text.length && existing.fileName.text != fileName)
+			return [CodeReplacement([existing.fileName.index,
+					existing.fileName.index + existing.fileName.text.length], fileName)];
+		else
+			return [CodeReplacement([existing.outerFrom, existing.outerTo],
+					"module " ~ prefix ~ "." ~ fileName ~ ";")];
+	}
+}
+
+/// Returns the module name of a D code
+const(string)[] getModule(string code)
+{
+	return fetchModule("", code).raw;
+}
+
 private __gshared:
 RollbackAllocator rba;
 LexerConfig config;
 StringCache* cache;
 string projectRoot;
 
+ModuleFetchVisitor fetchModule(string file, string code)
+{
+	auto tokens = getTokensForParser(cast(ubyte[]) code, config, cache);
+	auto parsed = parseModule(tokens, file, &rba, &doNothing);
+	auto reader = new ModuleFetchVisitor();
+	reader.visit(parsed);
+	return reader;
+}
+
+class ModuleFetchVisitor : ASTVisitor
+{
+	alias visit = ASTVisitor.visit;
+
+	override void visit(const ModuleDeclaration decl)
+	{
+		outerFrom = decl.startLocation;
+		outerTo = decl.endLocation;
+
+		raw = decl.moduleName.identifiers.map!(a => a.text).array;
+		auto modArray = raw[0 .. $ - 1];
+		if (modArray.length == 0)
+		{
+			moduleName = "$";
+			from = to = decl.moduleName.identifiers[0].index;
+			return;
+		}
+		moduleName = modArray.join(".");
+		fileName = decl.moduleName.identifiers[$ - 1];
+		from = decl.moduleName.identifiers[0].index;
+		to = decl.moduleName.identifiers[$ - 2].index + decl.moduleName.identifiers[$ - 2].text.length;
+	}
+
+	const(string)[] raw;
+	string moduleName = "";
+	Token fileName;
+	size_t from, to;
+	size_t outerFrom, outerTo;
+}
+
 class ModuleChangerVisitor : ASTVisitor
 {
-	this(int pos)
+	this(string file, string[] from, string[] to, bool renameSubmodules)
 	{
-		this.pos = pos;
-		inBlock = false;
+		changes.file = file;
+		this.from = from;
+		this.to = to;
+		this.renameSubmodules = renameSubmodules;
 	}
 
 	alias visit = ASTVisitor.visit;
 
 	override void visit(const ModuleDeclaration decl)
 	{
-		string[] mod = decl.moduleName.identifiers.map!(a => a.text).array;
+		auto mod = decl.moduleName.identifiers.map!(a => a.text).array;
 		auto orig = mod;
 		if (mod.startsWith(from) && renameSubmodules)
 			mod = to ~ mod[from.length .. $];
@@ -90,42 +172,33 @@ class ModuleChangerVisitor : ASTVisitor
 		if (mod != orig)
 		{
 			foundModule = true;
-			changes.replacements ~= CodeReplacement([
-				decl.moduleName.identifiers[0].index,
-				decl.moduleName.identifiers[$ - 1].index + decl.moduleName.identifiers[$ - 1].text.length
-			], mod.join('.'));
+			changes.replacements ~= CodeReplacement([decl.moduleName.identifiers[0].index,
+					decl.moduleName.identifiers[$ - 1].index + decl.moduleName.identifiers[$ - 1].text.length],
+					mod.join('.'));
+		}
+	}
+
+	override void visit(const SingleImport imp)
+	{
+		auto mod = imp.identifierChain.identifiers.map!(a => a.text).array;
+		auto orig = mod;
+		if (mod.startsWith(from) && renameSubmodules)
+			mod = to ~ mod[from.length .. $];
+		else if (mod == from)
+			mod = to;
+		if (mod != orig)
+		{
+			changes.replacements ~= CodeReplacement([imp.identifierChain.identifiers[0].index,
+					imp.identifierChain.identifiers[$ - 1].index
+					+ imp.identifierChain.identifiers[$ - 1].text.length], mod.join('.'));
 		}
 	}
 
 	override void visit(const ImportDeclaration decl)
 	{
-		if (decl.startIndex >= pos)
-			return;
-		isModule = false;
-		if (inBlock)
-			innermostBlockStart = decl.endIndex;
-		else
-			outerImportLocation = decl.endIndex;
-		foreach (i; decl.singleImports)
-			imports ~= ImportInfo(i.identifierChain.identifiers.map!(tok => tok.text.idup)
-					.array, i.rename.text);
-		if (decl.importBindings)
+		if (decl)
 		{
-			ImportInfo info;
-			if (!decl.importBindings.singleImport)
-				return;
-			info.name = decl.importBindings.singleImport.identifierChain.identifiers.map!(
-					tok => tok.text.idup).array;
-			info.rename = decl.importBindings.singleImport.rename.text;
-			foreach (bind; decl.importBindings.importBinds)
-			{
-				if (bind.right.text)
-					info.selectives ~= SelectiveImport(bind.right.text, bind.left.text);
-				else
-					info.selectives ~= SelectiveImport(bind.left.text);
-			}
-			if (info.selectives.length)
-				imports ~= info;
+			return decl.accept(this);
 		}
 	}
 
@@ -148,9 +221,39 @@ void doNothing(string, size_t, size_t, string, bool)
 
 unittest
 {
-	import std.conv;
+	auto workspace = makeTemporaryTestingWorkspace;
+	workspace.createDir("source/newmod");
+	workspace.writeFile("source/newmod/color.d", "module oldmod.color;void foo(){}");
+	workspace.writeFile("source/newmod/render.d", "module oldmod.render;import std.color,oldmod.color;import oldmod.color.oldmod:a=b, c;import a=oldmod.a;void bar(){}");
+	workspace.writeFile("source/newmod/display.d", "module newmod.display;");
+	workspace.writeFile("source/newmod/input.d", "");
 
-	start();
+	start(workspace.directory);
+
+	FileChanges[] changes = rename("oldmod", "newmod").sort!"a.file < b.file".array;
+
+	assert(changes.length == 2);
+	assert(changes[0].file.endsWith("color.d"));
+	assert(changes[1].file.endsWith("render.d"));
+
+	assert(changes[0].replacements == [CodeReplacement([7, 19], "newmod.color")]);
+	assert(changes[1].replacements == [CodeReplacement([7, 20], "newmod.render"),
+			CodeReplacement([38, 50], "newmod.color"), CodeReplacement([58, 77],
+				"newmod.color.oldmod"), CodeReplacement([94, 102], "newmod.a")]);
+
+	auto nrm = normalizeModules(workspace.getPath("source/newmod/input.d"), "");
+	assert(nrm == [CodeReplacement([0, 0], "module oldmod.input;")]);
+
+	foreach (change; changes)
+	{
+		string code = readText(change.file);
+		foreach_reverse (op; change.replacements)
+			code = op.apply(code);
+		std.file.write(change.file, code);
+	}
+
+	nrm = normalizeModules(workspace.getPath("source/newmod/input.d"), "");
+	assert(nrm == [CodeReplacement([0, 0], "module newmod.input;")]);
 
 	stop();
 }
