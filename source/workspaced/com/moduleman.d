@@ -67,34 +67,42 @@ CodeReplacement[] normalizeModules(string file, string code)
 {
 	int[string] modulePrefixes;
 	modulePrefixes[""] = 0;
-	foreach (other; file.dirName.dirEntries(SpanMode.shallow))
+	string modName = file.dirName.replace("\\", "/");
+	if (modName.startsWith(projectRoot.replace("\\", "/")))
+		modName = modName[projectRoot.length .. $];
+	modName = modName.stripLeft('/');
+	foreach (imp; importPathProvider())
 	{
-		auto info = fetchModule(other, readText(other));
-		auto ptr = info.moduleName in modulePrefixes;
-		if (!ptr)
-			modulePrefixes[info.moduleName] = 1;
-		else
-			(*ptr)++;
+		imp = imp.replace("\\", "/");
+		if (imp.startsWith(projectRoot.replace("\\", "/")))
+			imp = imp[projectRoot.length .. $];
+		imp = imp.stripLeft('/');
+		if (modName.startsWith(imp))
+		{
+			modName = modName[imp.length .. $];
+			break;
+		}
 	}
-	string prefix = modulePrefixes.byKeyValue.maxElement!"a.value".key;
+	modName = modName.stripLeft('/').replace("/", ".");
 	string fileName = file.baseName.stripExtension;
 	auto existing = fetchModule(file, code);
-	if (prefix == existing.moduleName && fileName == existing.fileName.text)
+	if (modName == existing.moduleName && fileName == existing.fileName.text)
 	{
 		return [];
 	}
 	else
 	{
-		if (prefix == "")
+		if (modName == "")
 			return [CodeReplacement([existing.outerFrom, existing.outerTo], "")];
-		else if (prefix == "$")
+		else if (modName == "$")
 			return [CodeReplacement([existing.outerFrom, existing.outerTo], "module " ~ fileName ~ ";")];
-		else if (existing.fileName.text.length && existing.fileName.text != fileName)
+		else if (existing.fileName.text.length
+				&& existing.fileName.text != fileName && modName == existing.moduleName)
 			return [CodeReplacement([existing.fileName.index,
 					existing.fileName.index + existing.fileName.text.length], fileName)];
 		else
 			return [CodeReplacement([existing.outerFrom, existing.outerTo],
-					"module " ~ prefix ~ "." ~ fileName ~ ";")];
+					"module " ~ modName ~ "." ~ fileName ~ ";")];
 	}
 }
 
@@ -126,7 +134,7 @@ class ModuleFetchVisitor : ASTVisitor
 	override void visit(const ModuleDeclaration decl)
 	{
 		outerFrom = decl.startLocation;
-		outerTo = decl.endLocation;
+		outerTo = decl.endLocation + 1; // + semicolon
 
 		raw = decl.moduleName.identifiers.map!(a => a.text).array;
 		auto modArray = raw[0 .. $ - 1];
@@ -225,8 +233,10 @@ unittest
 	workspace.createDir("source/newmod");
 	workspace.writeFile("source/newmod/color.d", "module oldmod.color;void foo(){}");
 	workspace.writeFile("source/newmod/render.d", "module oldmod.render;import std.color,oldmod.color;import oldmod.color.oldmod:a=b, c;import a=oldmod.a;void bar(){}");
-	workspace.writeFile("source/newmod/display.d", "module newmod.display;");
+	workspace.writeFile("source/newmod/display.d", "module newmod.displaf;");
 	workspace.writeFile("source/newmod/input.d", "");
+
+	importPathProvider = () => ["source"];
 
 	start(workspace.directory);
 
@@ -241,9 +251,6 @@ unittest
 			CodeReplacement([38, 50], "newmod.color"), CodeReplacement([58, 77],
 				"newmod.color.oldmod"), CodeReplacement([94, 102], "newmod.a")]);
 
-	auto nrm = normalizeModules(workspace.getPath("source/newmod/input.d"), "");
-	assert(nrm == [CodeReplacement([0, 0], "module oldmod.input;")]);
-
 	foreach (change; changes)
 	{
 		string code = readText(change.file);
@@ -252,8 +259,11 @@ unittest
 		std.file.write(change.file, code);
 	}
 
-	nrm = normalizeModules(workspace.getPath("source/newmod/input.d"), "");
+	auto nrm = normalizeModules(workspace.getPath("source/newmod/input.d"), "");
 	assert(nrm == [CodeReplacement([0, 0], "module newmod.input;")]);
+
+	nrm = normalizeModules(workspace.getPath("source/newmod/display.d"), "module oldmod.displaf;");
+	assert(nrm == [CodeReplacement([0, 22], "module newmod.display;")]);
 
 	stop();
 }
