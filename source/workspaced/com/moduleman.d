@@ -7,7 +7,7 @@ import dparse.rollback_allocator;
 
 import std.algorithm;
 import std.array;
-import std.stdio;
+import std.string;
 import std.file;
 import std.path;
 
@@ -85,7 +85,12 @@ CodeReplacement[] normalizeModules(string file, string code)
 			break;
 		}
 	}
+	auto sourcePos = (modName ~ '/').indexOf("/source/");
+	if (sourcePos != -1)
+		modName = modName[sourcePos + "/source".length .. $];
 	modName = modName.stripLeft('/').replace("/", ".");
+	if (!modName.length)
+		return [];
 	auto existing = fetchModule(file, code);
 	if (modName == existing.moduleName)
 	{
@@ -217,11 +222,14 @@ unittest
 {
 	auto workspace = makeTemporaryTestingWorkspace;
 	workspace.createDir("source/newmod");
+	workspace.createDir("unregistered/source");
 	workspace.writeFile("source/newmod/color.d", "module oldmod.color;void foo(){}");
 	workspace.writeFile("source/newmod/render.d", "module oldmod.render;import std.color,oldmod.color;import oldmod.color.oldmod:a=b, c;import a=oldmod.a;void bar(){}");
 	workspace.writeFile("source/newmod/display.d", "module newmod.displaf;");
 	workspace.writeFile("source/newmod/input.d", "");
 	workspace.writeFile("source/newmod/package.d", "");
+	workspace.writeFile("unregistered/source/package.d", "");
+	workspace.writeFile("unregistered/source/app.d", "");
 
 	importPathProvider = () => ["source"];
 
@@ -254,6 +262,12 @@ unittest
 
 	nrm = normalizeModules(workspace.getPath("source/newmod/display.d"), "module oldmod.displaf;");
 	assert(nrm == [CodeReplacement([0, 22], "module newmod.display;")]);
+
+	nrm = normalizeModules(workspace.getPath("unregistered/source/app.d"), "");
+	assert(nrm == [CodeReplacement([0, 0], "module app;")]);
+
+	nrm = normalizeModules(workspace.getPath("unregistered/source/package.d"), "");
+	assert(nrm == []);
 
 	stop();
 }
