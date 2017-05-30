@@ -28,6 +28,8 @@ import workspaced.api;
 			"type": JSONValue("outdated"),
 			"component": JSONValue("dscanner")
 		]));
+	else
+		canStdin = true;
 }
 
 /// Unloads dscanner. Has no purpose right now.
@@ -36,14 +38,17 @@ import workspaced.api;
 }
 
 /// Asynchronously lints the file passed.
+/// If you provide code and DScanner supports reading from stdin (stable 0.4.0 and above) then code will be used.
 /// Returns: `[{file: string, line: int, column: int, type: string, description: string}]`
 /// Call_With: `{"subcmd": "lint"}`
 @arguments("subcmd", "lint")
-@async void lint(AsyncCallback cb, string file, string ini = "dscanner.ini")
+@async void lint(AsyncCallback cb, string file = "", string ini = "dscanner.ini", string code = "")
 {
 	new Thread({
 		try
 		{
+			if (canStdin && code.length)
+				file = "stdin";
 			auto args = [execPath, "-S", file];
 			if (getConfigPath("dscanner.ini", ini))
 				stderr.writeln("Overriding Dscanner ini with workspace-d dscanner.ini config file");
@@ -55,6 +60,12 @@ import workspaced.api;
 					args ~= ["--config", buildPath(cwd, ini)];
 			}
 			ProcessPipes pipes = raw(args);
+			if (canStdin && code.length)
+			{
+				pipes.stdin.write(code);
+				pipes.stdin.flush();
+				pipes.stdin.close();
+			}
 			scope (exit)
 				pipes.pid.wait();
 			string[] res;
@@ -70,6 +81,8 @@ import workspaced.api;
 					continue;
 				DScannerIssue issue;
 				issue.file = match[1];
+				if (issue.file == "stdin" && canStdin && code.length)
+					issue.file = file;
 				issue.line = match[2].to!int;
 				issue.column = match[3].to!int;
 				issue.type = match[4];
@@ -86,17 +99,26 @@ import workspaced.api;
 }
 
 /// Asynchronously lists all definitions in the specified file.
+/// If you provide code and DScanner supports reading from stdin (stable 0.4.0 and above) then code will be used.
 /// Returns: `[{name: string, line: int, type: string, attributes: string[string]}]`
 /// Call_With: `{"subcmd": "list-definitions"}`
 @arguments("subcmd", "list-definitions")
-@async void listDefinitions(AsyncCallback cb, string file)
+@async void listDefinitions(AsyncCallback cb, string file, string code = "")
 {
 	new Thread({
 		try
 		{
+			if (canStdin && code.length)
+				file = "stdin";
 			ProcessPipes pipes = raw([execPath, "-c", file]);
 			scope (exit)
 				pipes.pid.wait();
+			if (canStdin && code.length)
+			{
+				pipes.stdin.write(code);
+				pipes.stdin.flush();
+				pipes.stdin.close();
+			}
 			string[] res;
 			while (pipes.stdout.isOpen && !pipes.stdout.eof)
 				res ~= pipes.stdout.readln();
@@ -169,6 +191,7 @@ private:
 __gshared
 {
 	string cwd, execPath;
+	bool canStdin;
 }
 
 auto raw(string[] args, Redirect redirect = Redirect.all)
