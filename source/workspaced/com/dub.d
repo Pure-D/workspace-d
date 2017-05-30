@@ -34,7 +34,7 @@ import dub.internal.vibecompat.core.log;
 /// This will start dub and load all import paths. All dub methods are used with `"cmd": "dub"`
 /// Note: This will block any incoming requests while loading.
 @load void startup(string dir, bool registerImportProvider = true,
-		bool registerStringImportProvider = true)
+		bool registerStringImportProvider = true, bool registerImportFilesProvider = true)
 {
 	setLogLevel(LogLevel.none);
 
@@ -42,6 +42,8 @@ import dub.internal.vibecompat.core.log;
 		importPathProvider = &imports;
 	if (registerStringImportProvider)
 		stringImportPathProvider = &stringImports;
+	if (registerImportFilesProvider)
+		importFilesProvider = &fileImports;
 
 	_cwdStr = dir;
 	_cwd = Path(dir);
@@ -121,10 +123,11 @@ bool updateImportPaths(bool restartDub = true)
 	try
 	{
 		auto paths = _dub.project.listBuildSettings(settings, ["import-paths",
-				"string-import-paths"], ListBuildSettingsFormat.listNul);
+				"string-import-paths", "source-files"], ListBuildSettingsFormat.listNul);
 		_importPaths = paths[0].split('\0');
 		_stringImportPaths = paths[1].split('\0');
-		return _importPaths.length > 0;
+		_importFiles = paths[2].split('\0');
+		return _importPaths.length > 0 || _importFiles.length > 0;
 	}
 	catch (Exception e)
 	{
@@ -166,6 +169,14 @@ string[] imports() @property
 string[] stringImports() @property
 {
 	return _stringImportPaths;
+}
+
+/// Lists all import paths to files
+/// Call_With: `{"subcmd": "list:file-import"}`
+@arguments("subcmd", "list:file-import")
+string[] fileImports() @property
+{
+	return _importFiles;
 }
 
 /// Lists all configurations defined in the package description
@@ -431,7 +442,10 @@ __gshared
 	string _buildType = "debug";
 	string _cwdStr;
 	string _compilerBinaryName;
-	string[] _importPaths, _stringImportPaths;
+	BuildSettings _settings;
+	Compiler _compiler;
+	BuildPlatform _platform;
+	string[] _importPaths, _stringImportPaths, _importFiles;
 }
 
 T toOr(T)(string s, T defaultValue)

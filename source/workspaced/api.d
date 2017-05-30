@@ -131,7 +131,9 @@ private string[] noImports()
 	return [];
 }
 
-ImportPathProvider importPathProvider = &noImports, stringImportPathProvider = &noImports;
+ImportPathProvider importPathProvider = &noImports;
+ImportPathProvider stringImportPathProvider = &noImports;
+ImportPathProvider importFilesProvider = &noImports;
 
 enum verRegex = ctRegex!`(\d+)\.(\d+)\.(\d+)`;
 bool checkVersion(string ver, int[3] target)
