@@ -356,8 +356,9 @@ int main(string[] args)
 	}
 	else
 	{
-		static if (is(typeof(registerMemoryErrorHandler)))
-			registerMemoryErrorHandler();
+		version (DigitalMars)
+			static if (is(typeof(registerMemoryErrorHandler)))
+				registerMemoryErrorHandler();
 
 		if (args.length > 1 && (args[1] == "-v" || args[1] == "--version" || args[1] == "-version"))
 		{
