@@ -198,7 +198,7 @@ int main(string[] args)
 				"--config=client"], ["dub", "build", "--build=release", "--config=server"]]))
 			return 1;
 		if (dscanner && !dubInstall("Dscanner", "https://github.com/Hackerpilot/Dscanner.git",
-				[".\\dscanner.exe"], [["git", "submodule", "update", "--init",
+				[".\\bin\\dscanner.exe"], [["git", "submodule", "update", "--init",
 				"--recursive"], ["cmd", "/c", "build.bat"]]))
 			return 1;
 		if (dfmt && !dubInstall("dfmt", "https://github.com/Hackerpilot/dfmt.git", [".\\dfmt.exe"]))
