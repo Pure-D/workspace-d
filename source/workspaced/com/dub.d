@@ -34,7 +34,7 @@ import dub.internal.vibecompat.core.log;
 /// This will start dub and load all import paths. All dub methods are used with `"cmd": "dub"`
 /// Note: This will block any incoming requests while loading.
 @load void startup(string dir, bool registerImportProvider = true,
-		bool registerStringImportProvider = true, bool registerImportFilesProvider = true)
+		bool registerStringImportProvider = true, bool registerImportFilesProvider = false)
 {
 	setLogLevel(LogLevel.none);
 
