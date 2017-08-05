@@ -23,6 +23,8 @@ version (BSD) version = haveUnixSockets;
 version (FreeBSD) version = haveUnixSockets;
 
 @component("dcd") :
+enum currentVersion = [0, 9, 0];
+
 /// Load function for dcd. Call with `{"cmd": "load", "components": ["dcd"]}`
 /// This will start dcd-server and load all import paths specified by previously loaded modules such as dub if autoStart is true.
 /// It also checks for the version. All dcd methods are used with `"cmd": "dcd"`
@@ -42,13 +44,19 @@ version (FreeBSD) version = haveUnixSockets;
 	if (autoStart)
 		startServer();
 	//dfmt off
-	if (!checkVersion(installedVersion, [0, 9, 0]))
+	if (isOutdated)
 		broadcast(JSONValue([
 			"type": JSONValue("outdated"),
 			"component": JSONValue("dcd")
 		]));
 	//dfmt on
 	running = true;
+}
+
+///
+bool isOutdated()
+{
+	return !checkVersion(.clientPath.getVersionAndFixPath, currentVersion);
 }
 
 bool supportsUnixDomainSockets(string ver)
@@ -398,14 +406,12 @@ ushort getRunningPort()
 			int[] emptyArr;
 			if (data.length == 0)
 			{
-				cb(null, JSONValue(["type" : JSONValue("identifiers"),
-					"identifiers" : emptyArr.toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("identifiers"), "identifiers" : emptyArr.toJSON()]));
 				return;
 			}
 			if (data[0] == "calltips")
 			{
-				cb(null, JSONValue(["type" : JSONValue("calltips"), "calltips"
-					: data[1 .. $].toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("calltips"), "calltips" : data[1 .. $].toJSON()]));
 				return;
 			}
 			else if (data[0] == "identifiers")
@@ -416,8 +422,8 @@ ushort getRunningPort()
 					string[] splits = line.split('\t');
 					identifiers ~= DCDIdentifier(splits[0], splits[1]);
 				}
-				cb(null, JSONValue(["type" : JSONValue("identifiers"),
-					"identifiers" : identifiers.toJSON()]));
+				cb(null, JSONValue(["type" : JSONValue("identifiers"), "identifiers"
+					: identifiers.toJSON()]));
 				return;
 			}
 			else

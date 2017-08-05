@@ -15,6 +15,7 @@ import painlessjson;
 import workspaced.api;
 
 @component("dscanner") :
+enum currentVersion = [0, 4, 0];
 
 /// Load function for dscanner. Call with `{"cmd": "load", "components": ["dscanner"]}`
 /// This will store the working directory and executable name for future use.
@@ -23,13 +24,16 @@ import workspaced.api;
 {
 	cwd = dir;
 	execPath = dscannerPath;
-	if (!checkVersion(execPath.getVersionAndFixPath, [0, 4, 0]))
-		broadcast(JSONValue([
-			"type": JSONValue("outdated"),
-			"component": JSONValue("dscanner")
-		]));
+	if (isOutdated)
+		broadcast(JSONValue(["type" : JSONValue("outdated"), "component" : JSONValue("dscanner")]));
 	else
 		canStdin = true;
+}
+
+///
+bool isOutdated()
+{
+	return !checkVersion(execPath.getVersionAndFixPath, currentVersion);
 }
 
 /// Unloads dscanner. Has no purpose right now.
