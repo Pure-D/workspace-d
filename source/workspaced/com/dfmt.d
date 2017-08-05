@@ -1,11 +1,16 @@
 module workspaced.com.dfmt;
 
-import std.json;
+import std.array;
 import std.conv;
-import std.regex;
 import fs = std.file;
+import std.getopt;
+import std.json;
 import std.stdio : stderr;
-import std.process;
+
+import dfmt.formatter : fmt = format;
+import dfmt.config;
+import dfmt.editorconfig;
+
 import core.thread;
 
 import painlessjson;
@@ -14,34 +19,9 @@ import workspaced.api;
 
 @component("dfmt") :
 
-/// Load function for dfmt. Call with `{"cmd": "load", "components": ["dfmt"]}`
-/// This will store the working directory and executable name for future use.
-/// Also it checks for the version. All dub methods are used with `"cmd": "dfmt"`
-@load void start(string dir, string dfmtPath = "dfmt")
+///
+@load void start()
 {
-	cwd = dir;
-	execPath = dfmtPath;
-	auto features = execPath.getVersionAndFixPath;
-	needsConfigFolder = features.hasConfigFolder;
-	if (!checkVersion(features, [0, 5, 0]))
-		broadcast(JSONValue([
-			"type": JSONValue("outdated"),
-			"component": JSONValue("dfmt")
-		]));
-}
-
-enum verRegex = ctRegex!`(\d+)\.(\d+)\.\d+`;
-bool hasConfigFolder(string ver)
-{
-	auto match = ver.matchFirst(verRegex);
-	assert(match);
-	int major = match[1].to!int;
-	int minor = match[2].to!int;
-	if (major > 0)
-		return true;
-	if (major == 0 && minor >= 5)
-		return true;
-	return false;
 }
 
 /// Unloads dfmt. Has no purpose right now.
@@ -57,7 +37,8 @@ bool hasConfigFolder(string ver)
 	new Thread({
 		try
 		{
-			auto args = [execPath];
+			Config config;
+			config.initializeWithDefaults();
 			string configPath;
 			if (getConfigPath("dfmt.json", configPath))
 			{
@@ -65,20 +46,23 @@ bool hasConfigFolder(string ver)
 				try
 				{
 					auto json = parseJSON(fs.readText(configPath));
-					json.tryFetchProperty!bool(args, "align_switch_statements");
-					json.tryFetchProperty(args, "brace_style");
-					json.tryFetchProperty(args, "end_of_line");
-					json.tryFetchProperty!uint(args, "indent_size");
-					json.tryFetchProperty(args, "indent_style");
-					json.tryFetchProperty!uint(args, "max_line_length");
-					json.tryFetchProperty!uint(args, "soft_max_line_length");
-					json.tryFetchProperty!bool(args, "outdent_attributes");
-					json.tryFetchProperty!bool(args, "space_after_cast");
-					json.tryFetchProperty!bool(args, "split_operator_at_line_end");
-					json.tryFetchProperty!uint(args, "tab_width");
-					json.tryFetchProperty!bool(args, "selective_import_space");
-					json.tryFetchProperty!bool(args, "compact_labeled_statements");
-					json.tryFetchProperty(args, "template_constraint_style");
+					json.tryFetchProperty(config.dfmt_align_switch_statements, "align_switch_statements");
+					json.tryFetchProperty(config.dfmt_brace_style, "brace_style");
+					json.tryFetchProperty(config.end_of_line, "end_of_line");
+					json.tryFetchProperty(config.indent_size, "indent_size");
+					json.tryFetchProperty(config.indent_style, "indent_style");
+					json.tryFetchProperty(config.max_line_length, "max_line_length");
+					json.tryFetchProperty(config.dfmt_soft_max_line_length, "soft_max_line_length");
+					json.tryFetchProperty(config.dfmt_outdent_attributes, "outdent_attributes");
+					json.tryFetchProperty(config.dfmt_space_after_cast, "space_after_cast");
+					json.tryFetchProperty(config.dfmt_space_after_keywords, "space_after_keywords");
+					json.tryFetchProperty(config.dfmt_split_operator_at_line_end,
+						"split_operator_at_line_end");
+					json.tryFetchProperty(config.tab_width, "tab_width");
+					json.tryFetchProperty(config.dfmt_selective_import_space, "selective_import_space");
+					json.tryFetchProperty(config.dfmt_compact_labeled_statements,
+						"compact_labeled_statements");
+					json.tryFetchProperty(config.dfmt_template_constraint_style, "template_constraint_style");
 				}
 				catch (Exception e)
 				{
@@ -87,26 +71,62 @@ bool hasConfigFolder(string ver)
 				}
 			}
 			else if (arguments.length)
-				args ~= arguments;
-			else if (needsConfigFolder)
-				args ~= ["-c", cwd];
-			auto pipes = pipeProcess(args, Redirect.all, null, Config.none, cwd);
-			scope (exit)
-				pipes.pid.wait();
-			pipes.stdin.write(code);
-			pipes.stdin.close();
-			ubyte[4096] buffer;
-			ubyte[] data;
-			size_t len;
-			do
 			{
-				auto appended = pipes.stdout.rawRead(buffer);
-				len = appended.length;
-				data ~= appended;
+				void handleBooleans(string option, string value)
+				{
+					import dfmt.editorconfig : OptionalBoolean;
+					import std.exception : enforceEx;
+
+					enforceEx!GetOptException(value == "true" || value == "false", "Invalid argument");
+					immutable OptionalBoolean val = value == "true" ? OptionalBoolean.t : OptionalBoolean.f;
+					switch (option)
+					{
+					case "align_switch_statements":
+						config.dfmt_align_switch_statements = val;
+						break;
+					case "outdent_attributes":
+						config.dfmt_outdent_attributes = val;
+						break;
+					case "space_after_cast":
+						config.dfmt_space_after_cast = val;
+						break;
+					case "split_operator_at_line_end":
+						config.dfmt_split_operator_at_line_end = val;
+						break;
+					case "selective_import_space":
+						config.dfmt_selective_import_space = val;
+						break;
+					case "compact_labeled_statements":
+						config.dfmt_compact_labeled_statements = val;
+						break;
+					default:
+						assert(false, "Invalid command-line switch");
+					}
+				}
+
+				arguments = "dfmt" ~ arguments;
+				//dfmt off
+				getopt(arguments,
+					"align_switch_statements", &handleBooleans,
+					"brace_style", &config.dfmt_brace_style,
+					"end_of_line", &config.end_of_line,
+					"indent_size", &config.indent_size,
+					"indent_style|t", &config.indent_style,
+					"max_line_length", &config.max_line_length,
+					"soft_max_line_length", &config.dfmt_soft_max_line_length,
+					"outdent_attributes", &handleBooleans,
+					"space_after_cast", &handleBooleans,
+					"selective_import_space", &handleBooleans,
+					"split_operator_at_line_end", &handleBooleans,
+					"compact_labeled_statements", &handleBooleans,
+					"tab_width", &config.tab_width,
+					"template_constraint_style", &config.dfmt_template_constraint_style);
+				//dfmt on
 			}
-			while (len == 4096);
-			if (data.length)
-				cb(null, JSONValue(cast(string) data));
+			auto output = appender!string;
+			fmt("stdin", cast(ubyte[]) code, output, &config);
+			if (output.data.length)
+				cb(null, JSONValue(output.data));
 			else
 				cb(null, JSONValue(code));
 		}
@@ -118,20 +138,21 @@ bool hasConfigFolder(string ver)
 }
 
 private __gshared:
-string cwd, execPath;
-bool needsConfigFolder = false;
 
-void tryFetchProperty(T = string)(ref JSONValue json, ref string[] args, string name)
+void tryFetchProperty(T = string)(ref JSONValue json, ref T ret, string name)
 {
 	auto ptr = name in json;
 	if (ptr)
 	{
 		auto val = *ptr;
-		static if (is(T == string))
+		static if (is(T == string) || is(T == enum))
 		{
 			if (val.type != JSON_TYPE.STRING)
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a string");
-			args ~= ["--" ~ name, val.str];
+			static if (is(T == enum))
+				ret = val.str.to!T;
+			else
+				ret = val.str;
 		}
 		else static if (is(T == uint))
 		{
@@ -139,19 +160,19 @@ void tryFetchProperty(T = string)(ref JSONValue json, ref string[] args, string 
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a number");
 			if (val.integer < 0)
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a positive number");
-			args ~= ["--" ~ name, val.integer.to!string];
+			ret = cast(T) val.integer;
 		}
 		else static if (is(T == int))
 		{
 			if (val.type != JSON_TYPE.INTEGER)
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a number");
-			args ~= ["--" ~ name, val.integer.to!string];
+			ret = cast(T) val.integer;
 		}
-		else static if (is(T == bool))
+		else static if (is(T == OptionalBoolean))
 		{
 			if (val.type != JSON_TYPE.TRUE && val.type != JSON_TYPE.FALSE)
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a boolean");
-			args ~= ["--" ~ name, val.type == JSON_TYPE.TRUE ? "true" : "false"];
+			ret = val.type == JSON_TYPE.TRUE ? OptionalBoolean.t : OptionalBoolean.f;
 		}
 		else
 			static assert(false);
