@@ -146,13 +146,22 @@ void upgrade()
 	_dub.upgrade(UpgradeOptions.select | UpgradeOptions.upgrade);
 }
 
-/// Lists all dependencies
+/// Lists all dependencies. This will go through all dependencies and contain the dependencies of dependencies. You need to create a tree structure from this yourself.
 /// Returns: `[{dependencies: [string], ver: string, name: string}]`
 /// Call_With: `{"subcmd": "list:dep"}`
 @arguments("subcmd", "list:dep")
 auto dependencies() @property
 {
 	return _dub.project.listDependencies();
+}
+
+/// Lists dependencies of the root package. This can be used as a base to create a tree structure.
+/// Returns: `[string]`
+/// Call_With: `{"subcmd": "list:rootdep"}`
+@arguments("subcmd", "list:rootdep")
+auto rootDependencies() @property
+{
+	return _dub.project.rootPackage.listDependencies();
 }
 
 /// Lists all import paths
@@ -193,8 +202,8 @@ string[] configurations() @property
 string[] buildTypes() @property
 {
 	string[] types = [
-		"plain", "debug", "release", "release-debug", "release-nobounds", "unittest", "docs",
-		"ddox", "profile", "profile-gc", "cov", "unittest-cov"
+		"plain", "debug", "release", "release-debug", "release-nobounds",
+		"unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov"
 	];
 	foreach (type, info; _dub.project.rootPackage.recipe.buildTypes)
 		types ~= type;
@@ -374,8 +383,8 @@ auto path() @property
 					auto match = line.matchFirst(errorFormat);
 					if (match)
 					{
-						issues ~= BuildIssue(match[2].to!int,
-							match[3].toOr!int(0), match[1], match[4].to!ErrorType, match[5]);
+						issues ~= BuildIssue(match[2].to!int, match[3].toOr!int(0),
+							match[1], match[4].to!ErrorType, match[5]);
 					}
 					else
 					{
@@ -384,8 +393,8 @@ auto path() @property
 							auto contMatch = line.matchFirst(errorFormatCont);
 							if (contMatch)
 							{
-								issues ~= BuildIssue(contMatch[2].to!int, contMatch[3].toOr!int(1),
-									contMatch[1], ErrorType.Error, contMatch[4]);
+								issues ~= BuildIssue(contMatch[2].to!int,
+									contMatch[3].toOr!int(1), contMatch[1], ErrorType.Error, contMatch[4]);
 							}
 						}
 						if (line.canFind("is deprecated"))
@@ -394,7 +403,8 @@ auto path() @property
 							if (deprMatch)
 							{
 								issues ~= BuildIssue(deprMatch[2].to!int, deprMatch[3].toOr!int(1),
-									deprMatch[1], ErrorType.Deprecation, deprMatch[4] ~ " is deprecated, use " ~ deprMatch[5] ~ " instead.");
+									deprMatch[1], ErrorType.Deprecation,
+									deprMatch[4] ~ " is deprecated, use " ~ deprMatch[5] ~ " instead.");
 								// TODO: maybe add special type or output
 							}
 						}
@@ -456,9 +466,10 @@ T toOr(T)(string s, T defaultValue)
 }
 
 enum harmlessExceptionFormat = ctRegex!(`failed with exit code`, "g");
-enum errorFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (Deprecation|Warning|Error): (.*)`, "gi"); // `
-enum errorFormatCont = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*)`, "g"); // `
-enum deprecationFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*?) is deprecated, use (.*?) instead.$`, "g"); // `
+enum errorFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (Deprecation|Warning|Error): (.*)`, "gi");
+enum errorFormatCont = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*)`, "g");
+enum deprecationFormat = ctRegex!(
+			`(.*?)\((\d+)(?:,(\d+))?\): (.*?) is deprecated, use (.*?) instead.$`, "g");
 
 struct BuildIssue
 {
@@ -497,5 +508,16 @@ auto listDependencies(Project project)
 	{
 		dependencies ~= getInfo(dep);
 	}
+	return dependencies;
+}
+
+string[] listDependencies(Package pkg)
+{
+	auto deps = pkg.getAllDependencies();
+	string[] dependencies;
+	if (deps is null)
+		return dependencies;
+	foreach (dep; deps)
+		dependencies ~= dep.name;
 	return dependencies;
 }
