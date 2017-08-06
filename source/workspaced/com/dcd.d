@@ -114,7 +114,16 @@ void startServer(string[] additionalImports = [])
 		{
 			stderr.writeln("Server: ", serverPipes.stderr.readln());
 		}
-		stderr.writeln("DCD-Server stopped with code ", serverPipes.pid.wait());
+		auto code = serverPipes.pid.wait();
+		stderr.writeln("DCD-Server stopped with code ", code);
+		if (code == -11)
+		{
+			stderr.writeln("Broadcasting dcd server crash.");
+			broadcast(JSONValue([
+				"type": JSONValue("crash"),
+				"component": JSONValue("dcd")
+			]));
+		}
 	}).start();
 }
 
