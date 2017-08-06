@@ -155,13 +155,15 @@ bool checkVersion(string ver, int[3] target)
 alias BroadcastCallback = void function(JSONValue);
 /// Broadcast callback which might get called by commands. For example when a component is outdated. Will be called in caller thread of function / while function executes.
 BroadcastCallback broadcastCallback;
-/// Must get called in caller thread
+/// Broadcast callback which might get called by commands. This callback will get called by all threads.
+__gshared BroadcastCallback crossThreadBroadcastCallback;
+
 package void broadcast(JSONValue value)
 {
 	if (broadcastCallback)
 		broadcastCallback(value);
-	else
-		throw new Exception("broadcastCallback not set!");
+	if (crossThreadBroadcastCallback)
+		crossThreadBroadcastCallback(value);
 }
 
 package string getVersionAndFixPath(ref string execPath)
