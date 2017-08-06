@@ -7,6 +7,7 @@ import dparse.rollback_allocator;
 
 import std.algorithm;
 import std.array;
+import std.functional;
 import std.stdio;
 
 import workspaced.api;
@@ -31,7 +32,7 @@ import workspaced.api;
 ImportInfo[] get(string code, int pos)
 {
 	auto tokens = getTokensForParser(cast(ubyte[]) code, config, cache);
-	auto mod = parseModule(tokens, "code", &rba, &doNothing);
+	auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
 	auto reader = new ImporterReaderVisitor(pos);
 	reader.visit(mod);
 	return reader.imports;
@@ -44,7 +45,7 @@ ImportInfo[] get(string code, int pos)
 ImportModification add(string importName, string code, int pos, bool insertOutermost = true)
 {
 	auto tokens = getTokensForParser(cast(ubyte[]) code, config, cache);
-	auto mod = parseModule(tokens, "code", &rba, &doNothing);
+	auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
 	auto reader = new ImporterReaderVisitor(pos);
 	reader.visit(mod);
 	foreach (i; reader.imports)

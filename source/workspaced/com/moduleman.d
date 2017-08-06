@@ -7,9 +7,10 @@ import dparse.rollback_allocator;
 
 import std.algorithm;
 import std.array;
-import std.string;
 import std.file;
+import std.functional;
 import std.path;
+import std.string;
 
 import workspaced.api;
 
@@ -46,7 +47,7 @@ FileChanges[] rename(string mod, string rename, bool renameSubmodules = true)
 			continue;
 		string code = readText(file);
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, cache);
-		auto parsed = parseModule(tokens, file, &rba, &doNothing);
+		auto parsed = parseModule(tokens, file, &rba, (&doNothing).toDelegate);
 		auto reader = new ModuleChangerVisitor(file, from, to, renameSubmodules);
 		reader.visit(parsed);
 		if (reader.changes.replacements.length)
@@ -120,7 +121,7 @@ string projectRoot;
 ModuleFetchVisitor fetchModule(string file, string code)
 {
 	auto tokens = getTokensForParser(cast(ubyte[]) code, config, cache);
-	auto parsed = parseModule(tokens, file, &rba, &doNothing);
+	auto parsed = parseModule(tokens, file, &rba, (&doNothing).toDelegate);
 	auto reader = new ModuleFetchVisitor();
 	reader.visit(parsed);
 	return reader;
