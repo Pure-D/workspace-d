@@ -484,6 +484,31 @@ struct DubPackageInfo
 	string[string] dependencies;
 	string ver;
 	string name;
+	string path;
+	string description;
+	string homepage;
+	const(string)[] authors;
+	string copyright;
+	string license;
+	DubPackageInfo[] subPackages;
+
+	void fill(in PackageRecipe recipe)
+	{
+		description = recipe.description;
+		homepage = recipe.homepage;
+		authors = recipe.authors;
+		copyright = recipe.copyright;
+		license = recipe.license;
+
+		foreach (subpackage; recipe.subPackages)
+		{
+			DubPackageInfo info;
+			info.ver = subpackage.recipe.version_;
+			info.name = subpackage.recipe.name;
+			info.path = subpackage.path;
+			info.fill(subpackage.recipe);
+		}
+	}
 }
 
 DubPackageInfo getInfo(in Package dep)
@@ -491,6 +516,8 @@ DubPackageInfo getInfo(in Package dep)
 	DubPackageInfo info;
 	info.name = dep.name;
 	info.ver = dep.version_.toString;
+	info.path = dep.path.toString;
+	info.fill(dep.recipe);
 	foreach (subDep; dep.getAllDependencies())
 	{
 		info.dependencies[subDep.name] = subDep.spec.toString;
