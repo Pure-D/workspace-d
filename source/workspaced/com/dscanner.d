@@ -209,6 +209,28 @@ private const(Module) parseModule(string file, ubyte[] code, RollbackAllocator* 
 	}).start();
 }
 
+/// Returns: all keys & documentation that can be used in a dscanner.ini
+@arguments("subcmd", "list-ini")
+INIEntry[] listAllIniFields()
+{
+	import std.traits : getUDAs;
+
+	INIEntry[] ret;
+	foreach (mem; __traits(allMembers, StaticAnalysisConfig))
+		static if (is(typeof(__traits(getMember, StaticAnalysisConfig, mem)) == string))
+		{
+			alias docs = getUDAs!(__traits(getMember, StaticAnalysisConfig, mem), INI);
+			ret ~= INIEntry(mem, docs.length ? docs[0].msg : "");
+		}
+	return ret;
+}
+
+/// dscanner.ini setting type
+struct INIEntry
+{
+	string name, documentation;
+}
+
 /// Issue type returned by lint
 struct DScannerIssue
 {
