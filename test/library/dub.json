@@ -1,8 +1,0 @@
-{
-	"name": "libtest",
-	"dependencies": {
-		"workspace-d": {
-			"path": "../../"
-		}
-	}
-}

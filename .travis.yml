@@ -5,4 +5,4 @@ d:
 os:
  - linux
  - osx
-script: dub test --compiler=${DC}
+script: dub test --compiler=${DC} && cd test && bash runtests.sh ${DC}

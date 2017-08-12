@@ -15,8 +15,6 @@
 		"dfmt": "~>0.5.0"
 	},
 	"subPackages": [
-		"./test",
-		"./test/library",
 		"./installer",
 		"./dml"
 	],
