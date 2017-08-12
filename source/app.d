@@ -166,7 +166,7 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 {
 	foreach (name; __traits(derivedMembers, T))
 	{
-		static if (__traits(compiles, __traits(getMember, T, name)))
+		static if (__traits(compiles, __traits(getMember, T, name)) && !hasUDA!(__traits(getMember, T, name), disabledFunc))
 		{
 			alias symbol = Identity!(__traits(getMember, T, name));
 			static if (isSomeFunction!symbol && __traits(getProtection, symbol[0]) == "public")

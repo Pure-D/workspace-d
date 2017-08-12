@@ -24,6 +24,9 @@ enum unload = 2603248028;
 /// Will call this function in any case (cmd: component)
 enum any = 2603248029;
 
+/// Will never call this function
+enum disabledFunc = 2603248030;
+
 /// Component call
 struct component
 {
