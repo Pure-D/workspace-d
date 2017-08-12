@@ -307,10 +307,12 @@ string typeForWarning(string key)
 	case "dscanner.useless.final":
 	case "dscanner.useless-initializer":
 	case "dscanner.vcall_ctor":
-	default:
-		return "warning";
+		return "warn";
 	case "dscanner.syntax":
 		return "error";
+	default:
+		stderr.writeln("Warning: unimplemented DScanner reason, assuming warning: ", key);
+		return "warn";
 	}
 }
 
