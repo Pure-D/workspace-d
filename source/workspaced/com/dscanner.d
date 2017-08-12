@@ -1,39 +1,50 @@
 module workspaced.com.dscanner;
 
-import std.json;
-import std.conv;
-import std.path;
-import std.stdio;
-import std.regex;
-import std.string;
-import std.process;
 import std.algorithm;
+import std.array;
+import std.file;
+import std.json;
+import std.stdio;
+
 import core.thread;
+import core.sync.mutex;
+
+import analysis.base;
+import analysis.run;
+import analysis.config;
+import symbol_finder;
+
+import inifiled;
+
+import dparse.ast;
+import dparse.parser;
+import dparse.lexer;
+import dparse.rollback_allocator;
+import dsymbol.modulecache : ModuleCache, ASTAllocator;
 
 import painlessjson;
 
 import workspaced.api;
 
 @component("dscanner") :
-enum currentVersion = [0, 4, 0];
 
 /// Load function for dscanner. Call with `{"cmd": "load", "components": ["dscanner"]}`
-/// This will store the working directory and executable name for future use.
-/// It also checks for the version. All dub methods are used with `"cmd": "dscanner"`
-@load void start(string dir, string dscannerPath = "dscanner")
+/// This will store the working directory for future use and allocate a module cache and create a mutex.
+@load void start(string dir)
 {
 	cwd = dir;
-	execPath = dscannerPath;
-	if (isOutdated)
-		broadcast(JSONValue(["type" : JSONValue("outdated"), "component" : JSONValue("dscanner")]));
-	else
-		canStdin = true;
+	moduleCache = new ModuleCache(alloc);
+	cacheMutex = new Mutex;
 }
 
-///
-bool isOutdated()
+@disabledFunc deprecated("Always returns false because dscanner is included") bool isOutdated()
 {
-	return !checkVersion(execPath.getVersionAndFixPath, currentVersion);
+	return false;
+}
+
+@disabledFunc deprecated("Path is no longer required") void start(string dir, string dscannerPath)
+{
+	.start(dir);
 }
 
 /// Unloads dscanner. Has no purpose right now.
@@ -42,8 +53,8 @@ bool isOutdated()
 }
 
 /// Asynchronously lints the file passed.
-/// If you provide code and DScanner supports reading from stdin (stable 0.4.0 and above) then code will be used.
-/// Returns: `[{file: string, line: int, column: int, type: string, description: string}]`
+/// If you provide code then the code will be used and file will be ignored.
+/// Returns: `[{file: string, line: int, column: int, type: string, description: string, key: string}]`
 /// Call_With: `{"subcmd": "lint"}`
 @arguments("subcmd", "lint")
 @async void lint(AsyncCallback cb, string file = "", string ini = "dscanner.ini", string code = "")
@@ -51,46 +62,48 @@ bool isOutdated()
 	new Thread({
 		try
 		{
-			if (canStdin && code.length)
+			if (code.length && !file.length)
 				file = "stdin";
-			auto args = [execPath, "-S", file];
+			auto config = defaultStaticAnalysisConfig();
 			if (getConfigPath("dscanner.ini", ini))
 				stderr.writeln("Overriding Dscanner ini with workspace-d dscanner.ini config file");
-			if (ini && ini.length)
-			{
-				if (ini.isAbsolute)
-					args ~= ["--config", ini];
-				else
-					args ~= ["--config", buildPath(cwd, ini)];
-			}
-			ProcessPipes pipes = raw(args);
-			if (canStdin && code.length)
-			{
-				pipes.stdin.write(code);
-				pipes.stdin.flush();
-				pipes.stdin.close();
-			}
-			scope (exit)
-				pipes.pid.wait();
-			string[] res;
-			while (pipes.stdout.isOpen && !pipes.stdout.eof)
-				res ~= pipes.stdout.readln();
+			if (ini.exists)
+				readINIFile(config, ini);
+			if (!code.length)
+				code = readText(file);
 			DScannerIssue[] issues;
-			foreach (line; res)
+			if (!code.length)
 			{
-				if (!line.length)
-					continue;
-				auto match = line.chomp.matchFirst(dscannerIssueRegex);
-				if (!match)
-					continue;
+				cb(null, issues.toJSON);
+				return;
+			}
+			RollbackAllocator r;
+			const(Token)[] tokens;
+			StringCache cache = StringCache(StringCache.defaultBucketCount);
+			const Module m = parseModule(file, cast(ubyte[]) code, &r, cache, tokens, issues);
+			if (!m)
+			{
+				cb(new Exception("parseModule returned null?! - file: '" ~ file ~ "', code: '" ~ code ~ "'"),
+					JSONValue(null));
+				return;
+			}
+			MessageSet results;
+			synchronized (cacheMutex)
+				results = analyze(file, m, config, *moduleCache, tokens, true);
+			if (results is null)
+			{
+				cb(null, issues.toJSON);
+				return;
+			}
+			foreach (msg; results)
+			{
 				DScannerIssue issue;
-				issue.file = match[1];
-				if (issue.file == "stdin" && canStdin && code.length)
-					issue.file = file;
-				issue.line = match[2].to!int;
-				issue.column = match[3].to!int;
-				issue.type = match[4];
-				issue.description = match[5];
+				issue.file = msg.fileName;
+				issue.line = cast(int) msg.line;
+				issue.column = cast(int) msg.column;
+				issue.type = typeForWarning(msg.key);
+				issue.description = msg.message;
+				issue.key = msg.key;
 				issues ~= issue;
 			}
 			cb(null, issues.toJSON);
@@ -100,6 +113,24 @@ bool isOutdated()
 			cb(e, JSONValue(null));
 		}
 	}).start();
+}
+
+private const(Module) parseModule(string file, ubyte[] code, RollbackAllocator* p,
+		ref StringCache cache, ref const(Token)[] tokens, ref DScannerIssue[] issues)
+{
+	LexerConfig config;
+	config.fileName = file;
+	config.stringBehavior = StringBehavior.source;
+	tokens = getTokensForParser(code, config, &cache);
+
+	void addIssue(string fileName, size_t line, size_t column, string message, bool isError)
+	{
+		issues ~= DScannerIssue(file, cast(int) line, cast(int) column, isError
+				? "error" : "warn", message);
+	}
+
+	uint err, warn;
+	return dparse.parser.parseModule(tokens, file, p, &addIssue, &err, &warn);
 }
 
 /// Asynchronously lists all definitions in the specified file.
@@ -112,40 +143,32 @@ bool isOutdated()
 	new Thread({
 		try
 		{
-			if (canStdin && code.length)
+			if (code.length && !file.length)
 				file = "stdin";
-			ProcessPipes pipes = raw([execPath, "-c", file]);
-			scope (exit)
-				pipes.pid.wait();
-			if (canStdin && code.length)
+			if (!code.length)
+				code = readText(file);
+			if (!code.length)
 			{
-				pipes.stdin.write(code);
-				pipes.stdin.flush();
-				pipes.stdin.close();
+				string[] arr;
+				cb(null, arr.toJSON);
+				return;
 			}
-			string[] res;
-			while (pipes.stdout.isOpen && !pipes.stdout.eof)
-				res ~= pipes.stdout.readln();
-			DefinitionElement[] definitions;
-			foreach (line; res)
+
+			RollbackAllocator r;
+			LexerConfig config;
+			StringCache cache = StringCache(StringCache.defaultBucketCount);
+			auto tokens = getTokensForParser(cast(ubyte[]) code, config, &cache);
+
+			void doNothing(string, size_t, size_t, string, bool)
 			{
-				if (!line.length || line[0] == '!')
-					continue;
-				line = line.chomp;
-				string[] splits = line.split('\t');
-				DefinitionElement definition;
-				definition.name = splits[0];
-				definition.type = splits[3];
-				definition.line = splits[4][5 .. $].to!int;
-				if (splits.length > 5)
-					foreach (attribute; splits[5 .. $])
-					{
-						string[] sides = attribute.split(':');
-						definition.attributes[sides[0]] = sides[1 .. $].join(':');
-					}
-				definitions ~= definition;
 			}
-			cb(null, definitions.toJSON);
+
+			auto m = dparse.parser.parseModule(tokens.array, file, &r, &doNothing);
+
+			auto defFinder = new DefinitionFinder();
+			defFinder.visit(m);
+
+			cb(null, defFinder.definitions.toJSON);
 		}
 		catch (Throwable e)
 		{
@@ -163,24 +186,20 @@ bool isOutdated()
 	new Thread({
 		try
 		{
-			ProcessPipes pipes = raw([execPath, "-d", symbol] ~ importPathProvider());
-			scope (exit)
-				pipes.pid.wait();
-			string[] res;
-			while (pipes.stdout.isOpen && !pipes.stdout.eof)
-				res ~= pipes.stdout.readln();
+			static import readers;
+
+			string[] paths = readers.expandArgs([""] ~ importPathProvider());
+			foreach_reverse (i, path; paths)
+				if (path == "stdin")
+					paths = paths.remove(i);
 			FileLocation[] files;
-			foreach (line; res)
-			{
-				auto match = line.chomp.matchFirst(dscannerFileRegex);
-				if (!match)
-					continue;
+			findDeclarationOf((fileName, line, column) {
 				FileLocation file;
-				file.file = match[1];
-				file.line = match[2].to!int;
-				file.column = match[3].to!int;
+				file.file = fileName;
+				file.line = cast(int) line;
+				file.column = cast(int) column;
 				files ~= file;
-			}
+			}, symbol, paths);
 			cb(null, files.toJSON);
 		}
 		catch (Throwable e)
@@ -190,47 +209,361 @@ bool isOutdated()
 	}).start();
 }
 
+/// Issue type returned by lint
+struct DScannerIssue
+{
+	///
+	string file;
+	///
+	int line, column;
+	///
+	string type;
+	///
+	string description;
+	///
+	string key;
+}
+
+/// Returned by find-symbol
+struct FileLocation
+{
+	///
+	string file;
+	///
+	int line, column;
+}
+
+/// Returned by list-definitions
+struct DefinitionElement
+{
+	///
+	string name;
+	///
+	int line;
+	/// One of "c" (class), "s" (struct), "i" (interface), "T" (template), "f" (function/ctor/dtor), "g" (enum {}), "u" (union), "e" (enum member/definition), "v" (variable/invariant)
+	string type;
+	///
+	string[string] attributes;
+}
+
 private:
 
 __gshared
 {
-	string cwd, execPath;
-	bool canStdin;
+	string cwd;
+	ModuleCache* moduleCache;
+	ASTAllocator alloc;
+	Mutex cacheMutex;
 }
 
-auto raw(string[] args, Redirect redirect = Redirect.all)
+string typeForWarning(string key)
 {
-	auto pipes = pipeProcess(args, redirect, null, Config.none, cwd);
-	return pipes;
+	switch (key)
+	{
+	case "dscanner.bugs.backwards_slices":
+	case "dscanner.bugs.if_else_same":
+	case "dscanner.bugs.logic_operator_operands":
+	case "dscanner.bugs.self_assignment":
+	case "dscanner.confusing.argument_parameter_mismatch":
+	case "dscanner.confusing.brexp":
+	case "dscanner.confusing.builtin_property_names":
+	case "dscanner.confusing.constructor_args":
+	case "dscanner.confusing.function_attributes":
+	case "dscanner.confusing.lambda_returns_lambda":
+	case "dscanner.confusing.logical_precedence":
+	case "dscanner.confusing.struct_constructor_default_args":
+	case "dscanner.deprecated.delete_keyword":
+	case "dscanner.deprecated.floating_point_operators":
+	case "dscanner.if_statement":
+	case "dscanner.performance.enum_array_literal":
+	case "dscanner.style.allman":
+	case "dscanner.style.alias_syntax":
+	case "dscanner.style.doc_missing_params":
+	case "dscanner.style.doc_missing_returns":
+	case "dscanner.style.doc_non_existing_params":
+	case "dscanner.style.explicitly_annotated_unittest":
+	case "dscanner.style.has_public_example":
+	case "dscanner.style.imports_sortedness":
+	case "dscanner.style.long_line":
+	case "dscanner.style.number_literals":
+	case "dscanner.style.phobos_naming_convention":
+	case "dscanner.style.undocumented_declaration":
+	case "dscanner.suspicious.auto_ref_assignment":
+	case "dscanner.suspicious.catch_em_all":
+	case "dscanner.suspicious.comma_expression":
+	case "dscanner.suspicious.incomplete_operator_overloading":
+	case "dscanner.suspicious.incorrect_infinite_range":
+	case "dscanner.suspicious.label_var_same_name":
+	case "dscanner.suspicious.length_subtraction":
+	case "dscanner.suspicious.local_imports":
+	case "dscanner.suspicious.missing_return":
+	case "dscanner.suspicious.object_const":
+	case "dscanner.suspicious.redundant_attributes":
+	case "dscanner.suspicious.redundant_parens":
+	case "dscanner.suspicious.static_if_else":
+	case "dscanner.suspicious.unmodified":
+	case "dscanner.suspicious.unused_label":
+	case "dscanner.suspicious.unused_parameter":
+	case "dscanner.suspicious.unused_variable":
+	case "dscanner.suspicious.useless_assert":
+	case "dscanner.unnecessary.duplicate_attribute":
+	case "dscanner.useless.final":
+	case "dscanner.useless-initializer":
+	case "dscanner.vcall_ctor":
+	default:
+		return "warning";
+	case "dscanner.syntax":
+		return "error";
+	}
 }
 
-auto dscannerIssueRegex = ctRegex!`^(.+?)\((\d+)\:(\d+)\)\[(.*?)\]: (.*)`;
-auto dscannerFileRegex = ctRegex!`^(.*?)\((\d+):(\d+)\)`;
-struct DScannerIssue
+final class DefinitionFinder : ASTVisitor
 {
-	string file;
-	int line, column;
-	string type;
-	string description;
+	override void visit(const ClassDeclaration dec)
+	{
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "c", context);
+		auto c = context;
+		context = ContextType(["class" : dec.name.text], "public");
+		dec.accept(this);
+		context = c;
+	}
+
+	override void visit(const StructDeclaration dec)
+	{
+		if (dec.name == tok!"")
+		{
+			dec.accept(this);
+			return;
+		}
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "s", context);
+		auto c = context;
+		context = ContextType(["struct" : dec.name.text], "public");
+		dec.accept(this);
+		context = c;
+	}
+
+	override void visit(const InterfaceDeclaration dec)
+	{
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "i", context);
+		auto c = context;
+		context = ContextType(["interface:" : dec.name.text], context.access);
+		dec.accept(this);
+		context = c;
+	}
+
+	override void visit(const TemplateDeclaration dec)
+	{
+		auto def = makeDefinition(dec.name.text, dec.name.line, "T", context);
+		def.attributes["signature"] = paramsToString(dec);
+		definitions ~= def;
+		auto c = context;
+		context = ContextType(["template" : dec.name.text], context.access);
+		dec.accept(this);
+		context = c;
+	}
+
+	override void visit(const FunctionDeclaration dec)
+	{
+		auto def = makeDefinition(dec.name.text, dec.name.line, "f", context);
+		def.attributes["signature"] = paramsToString(dec);
+		definitions ~= def;
+	}
+
+	override void visit(const Constructor dec)
+	{
+		auto def = makeDefinition("this", dec.line, "f", context);
+		def.attributes["signature"] = paramsToString(dec);
+		definitions ~= def;
+	}
+
+	override void visit(const Destructor dec)
+	{
+		definitions ~= makeDefinition("~this", dec.line, "f", context);
+	}
+
+	override void visit(const EnumDeclaration dec)
+	{
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "g", context);
+		auto c = context;
+		context = ContextType(["enum" : dec.name.text], context.access);
+		dec.accept(this);
+		context = c;
+	}
+
+	override void visit(const UnionDeclaration dec)
+	{
+		if (dec.name == tok!"")
+		{
+			dec.accept(this);
+			return;
+		}
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "u", context);
+		auto c = context;
+		context = ContextType(["union" : dec.name.text], context.access);
+		dec.accept(this);
+		context = c;
+	}
+
+	override void visit(const AnonymousEnumMember mem)
+	{
+		definitions ~= makeDefinition(mem.name.text, mem.name.line, "e", context);
+	}
+
+	override void visit(const EnumMember mem)
+	{
+		definitions ~= makeDefinition(mem.name.text, mem.name.line, "e", context);
+	}
+
+	override void visit(const VariableDeclaration dec)
+	{
+		foreach (d; dec.declarators)
+			definitions ~= makeDefinition(d.name.text, d.name.line, "v", context);
+		dec.accept(this);
+	}
+
+	override void visit(const AutoDeclaration dec)
+	{
+		foreach (i; dec.parts.map!(a => a.identifier))
+			definitions ~= makeDefinition(i.text, i.line, "v", context);
+		dec.accept(this);
+	}
+
+	override void visit(const Invariant dec)
+	{
+		definitions ~= makeDefinition("invariant", dec.line, "v", context);
+	}
+
+	override void visit(const ModuleDeclaration dec)
+	{
+		context = ContextType(null, "public");
+		dec.accept(this);
+	}
+
+	override void visit(const Attribute attribute)
+	{
+		if (attribute.attribute != tok!"")
+		{
+			switch (attribute.attribute.type)
+			{
+			case tok!"export":
+				context.access = "public";
+				break;
+			case tok!"public":
+				context.access = "public";
+				break;
+			case tok!"package":
+				context.access = "protected";
+				break;
+			case tok!"protected":
+				context.access = "protected";
+				break;
+			case tok!"private":
+				context.access = "private";
+				break;
+			default:
+			}
+		}
+
+		attribute.accept(this);
+	}
+
+	override void visit(const AttributeDeclaration dec)
+	{
+		accessSt = AccessState.Keep;
+		dec.accept(this);
+	}
+
+	override void visit(const Declaration dec)
+	{
+		auto c = context;
+		dec.accept(this);
+
+		final switch (accessSt) with (AccessState)
+		{
+		case Reset:
+			context = c;
+			break;
+		case Keep:
+			break;
+		}
+		accessSt = AccessState.Reset;
+	}
+
+	override void visit(const Unittest dec)
+	{
+		// skipping symbols inside a unit test to not clutter the ctags file
+		// with "temporary" symbols.
+		// TODO when phobos have a unittest library investigate how that could
+		// be used to describe the tests.
+		// Maybe with UDA's to give the unittest a "name".
+	}
+
+	override void visit(const AliasDeclaration dec)
+	{
+		// Old style alias
+		if (dec.identifierList)
+			foreach (i; dec.identifierList.identifiers)
+				definitions ~= makeDefinition(i.text, i.line, "a", context);
+		dec.accept(this);
+	}
+
+	override void visit(const AliasInitializer dec)
+	{
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "a", context);
+
+		dec.accept(this);
+	}
+
+	override void visit(const AliasThisDeclaration dec)
+	{
+		auto name = dec.identifier;
+		definitions ~= makeDefinition(name.text, name.line, "a", context);
+
+		dec.accept(this);
+	}
+
+	alias visit = ASTVisitor.visit;
+
+	ContextType context;
+	AccessState accessSt;
+	DefinitionElement[] definitions;
 }
 
-struct FileLocation
+string paramsToString(Dec)(const Dec dec)
 {
-	string file;
-	int line, column;
+	import dparse.formatter : Formatter;
+
+	auto app = appender!string();
+	auto formatter = new Formatter!(typeof(app))(app);
+
+	static if (is(Dec == FunctionDeclaration) || is(Dec == Constructor))
+	{
+		formatter.format(dec.parameters);
+	}
+	else static if (is(Dec == TemplateDeclaration))
+	{
+		formatter.format(dec.templateParameters);
+	}
+
+	return app.data;
 }
 
-struct OutlineTreeNode
+DefinitionElement makeDefinition(string name, size_t line, string type, ContextType context)
 {
-	string definition;
-	int line;
-	OutlineTreeNode[] children;
+	string[string] attr = context.attr;
+	if (context.access.length)
+		attr["access"] = context.access;
+	return DefinitionElement(name, cast(int) line, type, attr);
 }
 
-struct DefinitionElement
+enum AccessState
 {
-	string name;
-	int line;
-	string type;
-	string[string] attributes;
+	Reset, /// when ascending the AST reset back to the previous access.
+	Keep /// when ascending the AST keep the new access.
+}
+
+struct ContextType
+{
+	string[string] attr;
+	string access;
 }

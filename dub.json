@@ -12,7 +12,9 @@
 		"painlessjson": "~>1.3.8",
 		"libdparse": "*",
 		"standardpaths": "~>0.7.1",
-		"dfmt": "~>0.5.0"
+		"dfmt": "~>0.5.0",
+		"dscanner": "~master",
+		"inifiled": "~>1.0.2"
 	},
 	"subPackages": [
 		"./installer",
