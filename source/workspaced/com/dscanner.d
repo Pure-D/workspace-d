@@ -5,6 +5,7 @@ import std.array;
 import std.file;
 import std.json;
 import std.stdio;
+import std.typecons;
 
 import core.thread;
 import core.sync.mutex;
@@ -29,12 +30,10 @@ import workspaced.api;
 @component("dscanner") :
 
 /// Load function for dscanner. Call with `{"cmd": "load", "components": ["dscanner"]}`
-/// This will store the working directory for future use and allocate a module cache and create a mutex.
+/// This will store the working directory for future use.
 @load void start(string dir)
 {
 	cwd = dir;
-	moduleCache = new ModuleCache(alloc);
-	cacheMutex = new Mutex;
 }
 
 @disabledFunc deprecated("Always returns false because dscanner is included") bool isOutdated()
@@ -88,8 +87,9 @@ import workspaced.api;
 				return;
 			}
 			MessageSet results;
-			synchronized (cacheMutex)
-				results = analyze(file, m, config, *moduleCache, tokens, true);
+			auto alloc = scoped!ASTAllocator();
+			auto moduleCache = ModuleCache(alloc);
+			results = analyze(file, m, config, moduleCache, tokens, true);
 			if (results is null)
 			{
 				cb(null, issues.toJSON);
@@ -251,9 +251,6 @@ private:
 __gshared
 {
 	string cwd;
-	ModuleCache* moduleCache;
-	ASTAllocator alloc;
-	Mutex cacheMutex;
 }
 
 string typeForWarning(string key)
