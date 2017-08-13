@@ -22,6 +22,7 @@ import dparse.parser;
 import dparse.lexer;
 import dparse.rollback_allocator;
 import dsymbol.modulecache : ModuleCache, ASTAllocator;
+import dsymbol.builtin.names;
 
 import painlessjson;
 
@@ -134,7 +135,7 @@ private const(Module) parseModule(string file, ubyte[] code, RollbackAllocator* 
 }
 
 /// Asynchronously lists all definitions in the specified file.
-/// If you provide code and DScanner supports reading from stdin (stable 0.4.0 and above) then code will be used.
+/// If you provide code the file wont be manually read.
 /// Returns: `[{name: string, line: int, type: string, attributes: string[string]}]`
 /// Call_With: `{"subcmd": "list-definitions"}`
 @arguments("subcmd", "list-definitions")
@@ -388,6 +389,8 @@ final class DefinitionFinder : ASTVisitor
 	{
 		auto def = makeDefinition(dec.name.text, dec.name.line, "f", context);
 		def.attributes["signature"] = paramsToString(dec);
+		if (dec.returnType !is null)
+			def.attributes["return"] = typeToString(dec.returnType);
 		definitions ~= def;
 	}
 
@@ -485,6 +488,11 @@ final class DefinitionFinder : ASTVisitor
 			default:
 			}
 		}
+		else if (attribute.deprecated_ !is null)
+		{
+			// TODO: find out how to get deprecation message
+			context.attr["deprecation"] = "";
+		}
 
 		attribute.accept(this);
 	}
@@ -568,6 +576,38 @@ string paramsToString(Dec)(const Dec dec)
 	}
 
 	return app.data;
+}
+
+string makeString(in IdentifierOrTemplateChain c)
+{
+	return c.identifiersOrTemplateInstances.map!(a => a.identifier.text).join(".");
+}
+
+string typeToString(in Type type)
+{
+	if (type.type2 !is null)
+	{
+		// TODO: templates, fixed arrays, etc
+		string suffix;
+		foreach (s; type.typeSuffixes)
+		{
+			if (s.array)
+				suffix ~= "[]";
+			if (s.star != tok!"")
+				suffix ~= "*";
+		}
+		if (type.type2.builtinType != tok!"")
+			return getBuiltinTypeName(type.type2.builtinType) ~ suffix;
+		if (type.type2.identifierOrTemplateChain !is null)
+			return type.type2.identifierOrTemplateChain.makeString ~ suffix;
+		if (type.type2.symbol !is null && type.type2.symbol.identifierOrTemplateChain !is null)
+			return type.type2.symbol.identifierOrTemplateChain.makeString ~ suffix;
+		if (type.type2.type !is null)
+			return type.type2.type.typeToString;
+		return "";
+	}
+	else
+		return "";
 }
 
 DefinitionElement makeDefinition(string name, size_t line, string type, ContextType context)
