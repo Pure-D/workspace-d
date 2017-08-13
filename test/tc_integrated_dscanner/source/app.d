@@ -26,7 +26,7 @@ void main()
 	assert(defs[1].name == "main");
 	assert(defs[1].line == mainLine);
 	assert(defs[1].type == "f");
-	assert(defs[1].attributes.length == 1);
+	assert(defs[1].attributes.length >= 1);
 	assert(defs[1].attributes["signature"] == "()");
 
 	fsworkspace.start(getcwd);

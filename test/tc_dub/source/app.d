@@ -1,4 +1,5 @@
 import std.file;
+import std.path;
 import std.string;
 
 import workspaced.api;
@@ -6,7 +7,7 @@ import workspaced.coms;
 
 void main()
 {
-	dub.startup(getcwd);
+	dub.startup(buildNormalizedPath(getcwd, "..", "tc_fsworkspace"));
 	scope (exit)
 		dub.stop();
 	dub.upgrade();
@@ -23,8 +24,8 @@ void main()
 	assert(dub.archType.length);
 	assert(dub.buildType == "debug");
 	assert(dub.compiler.length);
-	assert(dub.name == "test-dub");
-	assert(dub.path.toString.endsWith("tc_dub")
-			|| dub.path.toString.endsWith("tc_dub/") || dub.path.toString.endsWith("tc_dub\\"));
+	assert(dub.name == "test-fsworkspace");
+	assert(dub.path.toString.endsWith("tc_fsworkspace")
+			|| dub.path.toString.endsWith("tc_fsworkspace/") || dub.path.toString.endsWith("tc_fsworkspace\\"));
 	assert(syncBlocking!(dub.build).array.length == 0);
 }
