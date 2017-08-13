@@ -1,8 +1,8 @@
 module workspaced.com.importer;
 
-import dparse.parser;
-import dparse.lexer;
 import dparse.ast;
+import dparse.lexer;
+import dparse.parser;
 import dparse.rollback_allocator;
 
 import std.algorithm;
@@ -218,6 +218,12 @@ struct SelectiveImport
 	{
 		return rename.length ? rename : name;
 	}
+
+	/// Returns a D source code part
+	string toString() const
+	{
+		return (rename.length ? rename ~ " = " : "") ~ name;
+	}
 }
 
 /// Information about one import statement
@@ -234,6 +240,16 @@ struct ImportInfo
 	string effectiveName() const
 	{
 		return rename.length ? rename : name.join('.');
+	}
+
+	/// Returns D source code for this import
+	string toString() const
+	{
+		import std.conv : to;
+
+		return "import " ~ (rename.length ? rename ~ " = "
+				: "") ~ name.join('.') ~ (selectives.length
+				? " : " ~ selectives.to!(string[]).join(", ") : "") ~ ';';
 	}
 }
 

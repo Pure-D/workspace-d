@@ -3,30 +3,30 @@ module workspaced.com.dub;
 import core.sync.mutex;
 import core.thread;
 
-import std.json : JSONValue;
-import std.conv;
-import std.stdio;
-import std.regex;
-import std.string;
-import std.parallelism;
 import std.algorithm;
+import std.conv;
+import std.json : JSONValue;
+import std.parallelism;
+import std.regex;
+import std.stdio;
+import std.string;
 
 import painlessjson : toJSON, fromJSON;
 
 import workspaced.api;
 
-import dub.dub;
-import dub.project;
-import dub.package_;
 import dub.description;
+import dub.dub;
+import dub.package_;
+import dub.project;
 
-import dub.generators.generator;
 import dub.compilers.compiler;
+import dub.generators.generator;
 
 import dub.compilers.buildsettings;
 
-import dub.internal.vibecompat.inet.url;
 import dub.internal.vibecompat.core.log;
+import dub.internal.vibecompat.inet.url;
 
 @component("dub") :
 

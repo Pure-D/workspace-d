@@ -1,8 +1,8 @@
 module workspaced.com.moduleman;
 
-import dparse.parser;
-import dparse.lexer;
 import dparse.ast;
+import dparse.lexer;
+import dparse.parser;
 import dparse.rollback_allocator;
 
 import std.algorithm;

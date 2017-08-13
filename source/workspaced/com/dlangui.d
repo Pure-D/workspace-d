@@ -1,11 +1,11 @@
 module workspaced.com.dlangui;
 
+import core.thread;
+import std.algorithm;
 import std.json;
 import std.process;
-import std.algorithm;
 import std.string;
 import std.uni;
-import core.thread;
 
 import painlessjson;
 

@@ -1,15 +1,15 @@
 module workspaced.com.dfmt;
 
+import fs = std.file;
 import std.array;
 import std.conv;
-import fs = std.file;
 import std.getopt;
 import std.json;
 import std.stdio : stderr;
 
-import dfmt.formatter : fmt = format;
 import dfmt.config;
 import dfmt.editorconfig;
+import dfmt.formatter : fmt = format;
 
 import core.thread;
 

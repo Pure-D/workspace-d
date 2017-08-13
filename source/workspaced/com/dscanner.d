@@ -7,22 +7,22 @@ import std.json;
 import std.stdio;
 import std.typecons;
 
-import core.thread;
 import core.sync.mutex;
+import core.thread;
 
 import analysis.base;
-import analysis.run;
 import analysis.config;
+import analysis.run;
 import symbol_finder;
 
 import inifiled : INI, readINIFile;
 
 import dparse.ast;
-import dparse.parser;
 import dparse.lexer;
+import dparse.parser;
 import dparse.rollback_allocator;
-import dsymbol.modulecache : ModuleCache, ASTAllocator;
 import dsymbol.builtin.names;
+import dsymbol.modulecache : ASTAllocator, ModuleCache;
 
 import painlessjson;
 
