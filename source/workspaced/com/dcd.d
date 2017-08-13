@@ -459,6 +459,33 @@ void updateImports()
 	execClient(args);
 }
 
+/// Returned by status
+struct DCDServerStatus
+{
+	///
+	bool isRunning;
+}
+
+/// Type of the identifiers value in listCompletion
+struct DCDIdentifier
+{
+	///
+	string identifier;
+	///
+	string type;
+}
+
+/// Returned by search-symbol
+struct DCDSearchResult
+{
+	///
+	string file;
+	///
+	int position;
+	///
+	string type;
+}
+
 private:
 
 __gshared
@@ -519,22 +546,4 @@ ushort findOpen(ushort port)
 	}
 	while (isRunning);
 	return port;
-}
-
-private struct DCDServerStatus
-{
-	bool isRunning;
-}
-
-private struct DCDIdentifier
-{
-	string identifier;
-	string type;
-}
-
-private struct DCDSearchResult
-{
-	string file;
-	int position;
-	string type;
 }

@@ -441,6 +441,19 @@ enum ErrorType : ubyte
 	Deprecation = 2
 }
 
+/// Returned by build
+struct BuildIssue
+{
+	///
+	int line, column;
+	///
+	string file;
+	///
+	ErrorType type;
+	///
+	string text;
+}
+
 private:
 
 __gshared
@@ -470,14 +483,6 @@ enum errorFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (Deprecation|Warning|Err
 enum errorFormatCont = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*)`, "g");
 enum deprecationFormat = ctRegex!(
 			`(.*?)\((\d+)(?:,(\d+))?\): (.*?) is deprecated, use (.*?) instead.$`, "g");
-
-struct BuildIssue
-{
-	int line, column;
-	string file;
-	ErrorType type;
-	string text;
-}
 
 struct DubPackageInfo
 {

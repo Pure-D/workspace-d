@@ -164,11 +164,16 @@ enum CompletionType : ubyte
 	Keyword = 9,
 }
 
+/// Returned by list-completion
 struct CompletionItem
 {
+	///
 	CompletionType type;
+	///
 	string value;
+	///
 	string documentation = "";
+	///
 	string enumName = "";
 }
 

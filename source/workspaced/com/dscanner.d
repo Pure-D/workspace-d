@@ -15,7 +15,7 @@ import analysis.run;
 import analysis.config;
 import symbol_finder;
 
-import inifiled;
+import inifiled : INI, readINIFile;
 
 import dparse.ast;
 import dparse.parser;
@@ -228,6 +228,7 @@ INIEntry[] listAllIniFields()
 /// dscanner.ini setting type
 struct INIEntry
 {
+	///
 	string name, documentation;
 }
 
