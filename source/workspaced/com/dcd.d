@@ -116,7 +116,7 @@ void startServer(string[] additionalImports = [])
 		}
 		auto code = serverPipes.pid.wait();
 		stderr.writeln("DCD-Server stopped with code ", code);
-		if (code == -11)
+		if (code != 0)
 		{
 			stderr.writeln("Broadcasting dcd server crash.");
 			broadcast(JSONValue([
