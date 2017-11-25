@@ -50,6 +50,7 @@ enum currentVersion = [0, 9, 0];
 			"component": JSONValue("dcd")
 		]));
 	//dfmt on
+	supportsFullOutput = rawExec([.clientPath, "--help"]).output.canFind("--full");
 	running = true;
 }
 
@@ -119,10 +120,7 @@ void startServer(string[] additionalImports = [])
 		if (code != 0)
 		{
 			stderr.writeln("Broadcasting dcd server crash.");
-			broadcast(JSONValue([
-				"type": JSONValue("crash"),
-				"component": JSONValue("dcd")
-			]));
+			broadcast(JSONValue(["type" : JSONValue("crash"), "component" : JSONValue("dcd")]));
 		}
 	}).start();
 }
@@ -353,7 +351,7 @@ void addImports(string[] imports)
 				if (line.length)
 					data ~= line.chomp;
 			}
-			cb(null, JSONValue(data.replace("\\n", "\n")));
+			cb(null, JSONValue(data.unescapeTabs));
 		}
 		catch (Throwable t)
 		{
@@ -383,10 +381,11 @@ ushort getRunningPort()
 
 /// Queries for code completion at position `pos` in code
 /// Returns: `{type:string}` where type is either identifiers, calltips or raw.
-/// When identifiers: `{type:"identifiers", identifiers:[{identifier:string, type:string}]}`
-/// When calltips: `{type:"calltips", calltips:[string]}`
+/// When identifiers: `{type:"identifiers", identifiers:[{identifier:string, type:string, definition:string, file:string, location:number, documentation:string}]}`
+/// When calltips: `{type:"calltips", calltips:[string], symbols:[{file:string, location:number, documentation:string}]}`
 /// When raw: `{type:"raw", raw:[string]}`
 /// Raw is anything else than identifiers and calltips which might not be implemented by this point.
+/// calltips.symbols and identifiers.definition, identifiers.file, identifiers.location and identifiers.documentation are only available with dcd ~master as of now.
 /// Call_With: `{"subcmd": "list-completion"}`
 @arguments("subcmd", "list-completion")
 @async void listCompletion(AsyncCallback cb, string code, int pos)
@@ -396,7 +395,7 @@ ushort getRunningPort()
 		{
 			if (!running)
 				return;
-			auto pipes = doClient(["-c", pos.to!string]);
+			auto pipes = doClient((supportsFullOutput ? ["--full"] : []) ~ ["-c", pos.to!string]);
 			scope (exit)
 			{
 				pipes.pid.wait();
@@ -420,7 +419,39 @@ ushort getRunningPort()
 			}
 			if (data[0] == "calltips")
 			{
-				cb(null, JSONValue(["type" : JSONValue("calltips"), "calltips" : data[1 .. $].toJSON()]));
+				string[] calltips;
+				JSONValue[] symbols;
+				if (supportsFullOutput)
+				{
+					foreach (line; data[1 .. $])
+					{
+						auto parts = line.split("\t");
+						if (parts.length < 5)
+							continue;
+						calltips ~= parts[2];
+						string location = parts[3];
+						string file;
+						int index;
+						if (location.length)
+						{
+							auto space = location.indexOf(' ');
+							if (space != -1)
+							{
+								file = location[0 .. space];
+								index = location[space + 1 .. $].to!int;
+							}
+						}
+						symbols ~= JSONValue(["file" : JSONValue(file), "location"
+							: JSONValue(index), "documentation" : JSONValue(parts[4].unescapeTabs)]);
+					}
+				}
+				else
+				{
+					calltips = data[1 .. $];
+					symbols.length = calltips.length;
+				}
+				cb(null, JSONValue(["type" : JSONValue("calltips"), "calltips"
+					: calltips.toJSON(), "symbols" : JSONValue(symbols)]));
 				return;
 			}
 			else if (data[0] == "identifiers")
@@ -429,7 +460,33 @@ ushort getRunningPort()
 				foreach (line; data[1 .. $])
 				{
 					string[] splits = line.split('\t');
-					identifiers ~= DCDIdentifier(splits[0], splits[1]);
+					DCDIdentifier symbol;
+					if (supportsFullOutput)
+					{
+						if (splits.length < 5)
+							continue;
+						string location = splits[3];
+						string file;
+						int index;
+						if (location.length)
+						{
+							auto space = location.indexOf(' ');
+							if (space != -1)
+							{
+								file = location[0 .. space];
+								index = location[space + 1 .. $].to!int;
+							}
+						}
+						symbol = DCDIdentifier(splits[0], splits[1], splits[2], file,
+							index, splits[4].unescapeTabs);
+					}
+					else
+					{
+						if (splits.length < 2)
+							continue;
+						symbol = DCDIdentifier(splits[0], splits[1]);
+					}
+					identifiers ~= symbol;
 				}
 				cb(null, JSONValue(["type" : JSONValue("identifiers"), "identifiers"
 					: identifiers.toJSON()]));
@@ -473,6 +530,14 @@ struct DCDIdentifier
 	string identifier;
 	///
 	string type;
+	///
+	string definition;
+	///
+	string file;
+	/// byte location
+	int location;
+	///
+	string documentation;
 }
 
 /// Returned by search-symbol
@@ -492,6 +557,7 @@ __gshared
 {
 	string clientPath, serverPath, cwd;
 	string installedVersion;
+	bool supportsFullOutput;
 	bool hasUnixDomainSockets = false;
 	bool running = false;
 	ProcessPipes serverPipes;
@@ -546,4 +612,9 @@ ushort findOpen(ushort port)
 	}
 	while (isRunning);
 	return port;
+}
+
+string unescapeTabs(string val)
+{
+	return val.replace("\\t", "\t").replace("\\n", "\n").replace("\\\\", "\\");
 }
