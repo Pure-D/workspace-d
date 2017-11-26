@@ -27,5 +27,5 @@ void main()
 	assert(dub.name == "test-fsworkspace");
 	assert(dub.path.toString.endsWith("tc_fsworkspace")
 			|| dub.path.toString.endsWith("tc_fsworkspace/") || dub.path.toString.endsWith("tc_fsworkspace\\"));
-	assert(syncBlocking!(dub.build).array.length == 0);
+	assert(syncBlocking!(dub.build).array.count!(a => a["type"].uinteger != dub.ErrorType.Deprecation) == 0);
 }
