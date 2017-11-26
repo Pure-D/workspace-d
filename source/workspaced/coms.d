@@ -8,3 +8,4 @@ public import dub = workspaced.com.dub;
 public import fsworkspace = workspaced.com.fsworkspace;
 public import importer = workspaced.com.importer;
 public import moduleman = workspaced.com.moduleman;
+public import dcdext = workspaced.com.dcdext;

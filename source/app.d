@@ -51,6 +51,8 @@ static import workspaced.com.importer;
 
 static import workspaced.com.moduleman;
 
+static import workspaced.com.dcdext;
+
 __gshared Mutex writeMutex, commandMutex;
 
 void sendFinal(int id, JSONValue value)
@@ -166,7 +168,8 @@ void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values
 {
 	foreach (name; __traits(derivedMembers, T))
 	{
-		static if (__traits(compiles, __traits(getMember, T, name)) && !hasUDA!(__traits(getMember, T, name), disabledFunc))
+		static if (__traits(compiles, __traits(getMember, T, name))
+				&& !hasUDA!(__traits(getMember, T, name), disabledFunc))
 		{
 			alias symbol = Identity!(__traits(getMember, T, name));
 			static if (isSomeFunction!symbol && __traits(getProtection, symbol[0]) == "public")
@@ -304,8 +307,10 @@ void handleRequest(int id, JSONValue request)
 			asyncWaiting, isAsync, hasArgs, asyncCallback);
 	handleRequestMod!(workspaced.com.importer)(id, request, values, asyncWaiting,
 			isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.moduleman)(id, request, values, asyncWaiting,
-			isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.moduleman)(id, request, values,
+			asyncWaiting, isAsync, hasArgs, asyncCallback);
+	handleRequestMod!(workspaced.com.dcdext)(id, request, values,
+			asyncWaiting, isAsync, hasArgs, asyncCallback);
 
 	if (isAsync)
 	{
