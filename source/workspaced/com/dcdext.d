@@ -78,7 +78,7 @@ private import dcd = workspaced.com.dcd;
 									changes ~= "return " ~ fn.returnType ~ ".init; // TODO: implement";
 							}
 							else
-								changes ~= `throw new Exception("Method ` ~ fn.name ~ ` not implemented");`;
+								changes ~= `assert(false, "Method ` ~ fn.name ~ ` not implemented");`;
 							changes ~= "\n";
 						}
 						changes ~= "}\n\n";
