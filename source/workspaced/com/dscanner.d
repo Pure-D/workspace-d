@@ -391,7 +391,7 @@ final class DefinitionFinder : ASTVisitor
 		auto def = makeDefinition(dec.name.text, dec.name.line, "f", context);
 		def.attributes["signature"] = paramsToString(dec);
 		if (dec.returnType !is null)
-			def.attributes["return"] = typeToString(dec.returnType);
+			def.attributes["return"] = astToString(dec.returnType);
 		definitions ~= def;
 	}
 
