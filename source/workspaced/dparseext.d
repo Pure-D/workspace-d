@@ -16,12 +16,13 @@ string makeString(in IdentifierOrTemplateChain c)
 	return c.identifiersOrTemplateInstances.map!(a => a.identifier.text).join(".");
 }
 
-string astToString(T)(in T ast)
+string astToString(T, Args...)(in T ast, Args args)
 {
 	import dparse.formatter : Formatter;
+
 	auto app = appender!string();
 	auto formatter = new Formatter!(typeof(app))(app);
-	formatter.format(ast);
+	formatter.format(ast, args);
 	return app.data;
 }
 
