@@ -17,10 +17,11 @@ for testCase in tc*; do
 
 	dub --compiler="${COMPILER}" >testout.txt 2>&1
 	if [[ $? -eq 0 ]]; then
-		echo -e "${YELLOW}$socket:$testCase:${NORMAL} ... ${GREEN}Pass${NORMAL}";
+		echo -e "${YELLOW}$testCase:${NORMAL} ... ${GREEN}Pass${NORMAL}";
+		rm testout.txt
 		let pass_count=pass_count+1
 	else
-		echo -e "${YELLOW}$socket:$testCase:${NORMAL} ... ${RED}Fail${NORMAL}";
+		echo -e "${YELLOW}$testCase:${NORMAL} ... ${RED}Fail${NORMAL}";
 		cat testout.txt
 		let fail_count=fail_count+1
 	fi
