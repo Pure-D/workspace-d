@@ -46,7 +46,7 @@ import dub.internal.vibecompat.inet.url;
 		importFilesProvider = &fileImports;
 
 	_cwdStr = dir;
-	_cwd = Path(dir);
+	_cwd = NativePath(dir);
 
 	start();
 	upgrade();
@@ -459,7 +459,7 @@ private:
 __gshared
 {
 	Dub _dub;
-	Path _cwd;
+	NativePath _cwd;
 	string _configuration;
 	string _archType = "x86_64";
 	string _buildType = "debug";
