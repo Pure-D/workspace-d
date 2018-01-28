@@ -8,8 +8,9 @@ import std.conv;
 static immutable Version = [2, 11, 0];
 
 version (Windows) version (CRuntime_DigitalMars) static assert(false, "DigitalMars C Runtime not supported! Compile with -m32mscoff (dmd) or -a x86_mscoff (dub) See Also: https://github.com/Pure-D/code-d/issues/38");
-version (Windows) version (X86_64) static assert(false,
-		"Compiling 64 bit on windows is not supported (it breaks dub)");
+version (Windows) version (X86_64) static if (Compiler.name == "Digital Mars D")
+	static assert(false,
+			"Compiling 64 bit on windows is not supported! (it breaks dub) Compile with -m32mscoff (dmd) or -a x86_mscoff (dub)");
 
 string getVersionInfoString()
 {
