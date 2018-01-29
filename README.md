@@ -34,7 +34,9 @@ git submodule update
 # Linux:
 dub build --build=release
 # Windows:
-dub build --build=release --compiler=ldc
+dub build --build=debug --arch=x86_mscoff
+# or
+dub build --build=release --compiler=ldc2
 ```
 
 Either move all the executable binaries to one path and add that path to the Windows PATH
@@ -48,4 +50,7 @@ variable or $PATH on Posix, or change the binary path configuration in your edit
 
 **For plugin developers**
 
+Microsoft Language Server Protocol (LSP) wrapper: [serve-d](https://github.com/Pure-D/serve-d)
+
 [Wiki/Message Format](https://github.com/Pure-D/workspace-d/wiki/Message-Format)
+
