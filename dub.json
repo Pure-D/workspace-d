@@ -13,7 +13,7 @@
 		"libdparse": "*",
 		"standardpaths": "~>0.8.0",
 		"dfmt": "~>0.6.0-alpha.1",
-		"dscanner": "~>0.4.2-alpha.1",
+		"dscanner": "~>0.4.2",
 		"inifiled": "~>1.0.2",
 		"fluent-asserts": "~>0.8.5"
 	},
