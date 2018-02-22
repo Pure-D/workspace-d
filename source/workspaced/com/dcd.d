@@ -50,7 +50,7 @@ enum currentVersion = [0, 9, 0];
 			"component": JSONValue("dcd")
 		]));
 	//dfmt on
-	supportsFullOutput = rawExec([.clientPath, "--help"]).output.canFind("--full");
+	supportsFullOutput = rawExec([.clientPath, "--help"]).output.canFind("--extended");
 	running = true;
 }
 
@@ -395,7 +395,7 @@ ushort getRunningPort()
 		{
 			if (!running)
 				return;
-			auto pipes = doClient((supportsFullOutput ? ["--full"] : []) ~ ["-c", pos.to!string]);
+			auto pipes = doClient((supportsFullOutput ? ["--extended"] : []) ~ ["-c", pos.to!string]);
 			scope (exit)
 			{
 				pipes.pid.wait();
