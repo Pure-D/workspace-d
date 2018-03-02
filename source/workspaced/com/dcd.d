@@ -387,7 +387,7 @@ ushort getRunningPort()
 /// calltips.symbols and identifiers.definition, identifiers.file, identifiers.location and identifiers.documentation are only available with dcd ~master as of now.
 /// Call_With: `{"subcmd": "list-completion"}`
 @arguments("subcmd", "list-completion")
-@async void listCompletion(AsyncCallback cb, string code, int pos, bool full)
+@async void listCompletion(AsyncCallback cb, string code, int pos, bool full = false)
 {
 	new Thread({
 		try
