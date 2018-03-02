@@ -50,7 +50,6 @@ enum currentVersion = [0, 9, 0];
 			"component": JSONValue("dcd")
 		]));
 	//dfmt on
-	supportsFullOutput = rawExec([.clientPath, "--help"]).output.canFind("--full");
 	running = true;
 }
 
@@ -388,14 +387,14 @@ ushort getRunningPort()
 /// calltips.symbols and identifiers.definition, identifiers.file, identifiers.location and identifiers.documentation are only available with dcd ~master as of now.
 /// Call_With: `{"subcmd": "list-completion"}`
 @arguments("subcmd", "list-completion")
-@async void listCompletion(AsyncCallback cb, string code, int pos)
+@async void listCompletion(AsyncCallback cb, string code, int pos, bool full = false)
 {
 	new Thread({
 		try
 		{
 			if (!running)
 				return;
-			auto pipes = doClient((supportsFullOutput ? ["--full"] : []) ~ ["-c", pos.to!string]);
+			auto pipes = doClient((full ? ["--extended"] : []) ~ ["-c", pos.to!string]);
 			scope (exit)
 			{
 				pipes.pid.wait();
@@ -421,7 +420,7 @@ ushort getRunningPort()
 			{
 				string[] calltips;
 				JSONValue[] symbols;
-				if (supportsFullOutput)
+				if (full)
 				{
 					foreach (line; data[1 .. $])
 					{
@@ -461,7 +460,7 @@ ushort getRunningPort()
 				{
 					string[] splits = line.split('\t');
 					DCDIdentifier symbol;
-					if (supportsFullOutput)
+					if (full)
 					{
 						if (splits.length < 5)
 							continue;
@@ -557,7 +556,6 @@ __gshared
 {
 	string clientPath, serverPath, cwd;
 	string installedVersion;
-	bool supportsFullOutput;
 	bool hasUnixDomainSockets = false;
 	bool running = false;
 	ProcessPipes serverPipes;
