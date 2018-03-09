@@ -19,8 +19,5 @@
 	"subPackages": [
 		"./installer",
 		"./dml"
-	],
-	"versions": [
-		"NoMain"
 	]
 }
