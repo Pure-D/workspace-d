@@ -14,8 +14,7 @@
 		"standardpaths": "~>0.8.0",
 		"dfmt": "0.5.3",
 		"dscanner": "~>0.4.2",
-		"inifiled": "~>1.0.2",
-		"fluent-asserts": "~>0.8.5"
+		"inifiled": "~>1.0.2"
 	},
 	"subPackages": [
 		"./installer",

@@ -116,7 +116,11 @@ ImportBlock sortImports(string code, int pos)
 
 unittest
 {
-	import fluent.asserts;
+	import std.conv : to;
+
+	void assertEqual(A, B)(A a, B b) {
+		assert(a == b, a.to!string ~ " is not equal to " ~ b.to!string);
+	}
 
 	start();
 	string code = `import std.stdio;
@@ -144,7 +148,7 @@ import std.stdio : writeln, File, stdout, err = stderr;
 void main() {}`;
 
 	//dfmt off
-	Assert.equal(code.sortImports(0), ImportBlock(0, 164, [
+	assertEqual(code.sortImports(0), ImportBlock(0, 164, [
 		ImportInfo(["std", "algorithm"]),
 		ImportInfo(["std", "array"]),
 		ImportInfo(["std", "experimental", "logger"]),
@@ -155,12 +159,12 @@ void main() {}`;
 		ImportInfo(["std", "stdio"])
 	]));
 
-	Assert.equal(code.sortImports(192), ImportBlock(166, 209, [
+	assertEqual(code.sortImports(192), ImportBlock(166, 209, [
 		ImportInfo(["core", "sync", "mutex"]),
 		ImportInfo(["core", "thread"])
 	]));
 
-	Assert.equal(code.sortImports(238), ImportBlock(211, 457, [
+	assertEqual(code.sortImports(238), ImportBlock(211, 457, [
 		ImportInfo(["gdk", "Event"]),
 		ImportInfo(["gdk", "Screen"]),
 		ImportInfo(["gtk", "Button"]),
@@ -181,9 +185,9 @@ void main() {}`;
 		ImportInfo(["gtkc", "gtk"])
 	]));
 
-	Assert.equal(code.sortImports(467), ImportBlock.init);
+	assertEqual(code.sortImports(467), ImportBlock.init);
 
-	Assert.equal(code.sortImports(546), ImportBlock(491, 546, [
+	assertEqual(code.sortImports(546), ImportBlock(491, 546, [
 		ImportInfo(["std", "stdio"], "", [
 			SelectiveImport("stderr", "err"),
 			SelectiveImport("File"),
