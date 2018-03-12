@@ -96,6 +96,8 @@ DMDMeasureReturn measureSync(string code, string[] dmdArguments = [],
 			pipes.stdout.close();
 		}
 		effective++;
+		if (!ret.success)
+			break;
 	}
 
 	ret.duration = sw.peek;
