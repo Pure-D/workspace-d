@@ -107,7 +107,7 @@ void startServer(string[] additionalImports = [])
 		string line = serverPipes.stderr.readln();
 		stderr.writeln("Server: ", line);
 		stderr.flush();
-		if (line.canFind(" Startup completed in "))
+		if (line.canFind("Startup completed in "))
 			break;
 	}
 	new Thread({
