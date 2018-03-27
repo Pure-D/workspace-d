@@ -100,7 +100,7 @@ import workspaced.api;
 						config.dfmt_compact_labeled_statements = val;
 						break;
 					default:
-						assert(false, "Invalid command-line switch");
+						throw new Exception("Invalid command-line switch");
 					}
 				}
 
