@@ -5,7 +5,8 @@ import core.thread;
 
 import std.algorithm;
 import std.conv;
-import std.json : JSONValue;
+import std.exception;
+import std.json : JSONValue, JSON_TYPE;
 import std.parallelism;
 import std.regex;
 import std.stdio;
@@ -57,8 +58,14 @@ import dub.internal.vibecompat.inet.url;
 	auto platform = compiler.determinePlatform(settings, _compilerBinaryName);
 
 	_configuration = _dub.project.getDefaultConfiguration(platform);
-	assert(_dub.project.configurations.canFind(_configuration), "No configuration available");
-	updateImportPaths(false);
+	if (!_dub.project.configurations.canFind(_configuration))
+	{
+		stderr.writeln("Dub Error: No configuration available");
+		broadcast(JSONValue(["type" : JSONValue("warning"), "component"
+				: JSONValue("dub"), "detail" : JSONValue("invalid-default-config")]));
+	}
+	else
+		updateImportPaths(false);
 }
 
 /// Stops dub when called.
@@ -103,6 +110,8 @@ private void restart()
 
 bool updateImportPaths(bool restartDub = true)
 {
+	validateConfiguration();
+
 	if (restartDub)
 		restart();
 
@@ -146,12 +155,23 @@ void upgrade()
 	_dub.upgrade(UpgradeOptions.select | UpgradeOptions.upgrade);
 }
 
+/// Throws if configuration is invalid, otherwise does nothing.
+/// Call_With: `{"subcmd": "revalidate-config"}`
+@arguments("subcmd", "revalidate-config")
+void validateConfiguration()
+{
+	if (!_dub.project.configurations.canFind(_configuration))
+		throw new Exception("Cannot use dub with invalid configuration");
+}
+
 /// Lists all dependencies. This will go through all dependencies and contain the dependencies of dependencies. You need to create a tree structure from this yourself.
 /// Returns: `[{dependencies: [string], ver: string, name: string}]`
 /// Call_With: `{"subcmd": "list:dep"}`
 @arguments("subcmd", "list:dep")
 auto dependencies() @property
 {
+	validateConfiguration();
+
 	return _dub.project.listDependencies();
 }
 
@@ -161,6 +181,8 @@ auto dependencies() @property
 @arguments("subcmd", "list:rootdep")
 auto rootDependencies() @property
 {
+	validateConfiguration();
+
 	return _dub.project.rootPackage.listDependencies();
 }
 
@@ -268,7 +290,7 @@ string archType() @property
 @arguments("subcmd", "set:arch-type")
 bool setArchType(JSONValue request)
 {
-	assert("arch-type" in request, "arch-type not in request");
+	enforce(request.type == JSON_TYPE.OBJECT && "arch-type" in request, "arch-type not in request");
 	auto type = request["arch-type"].fromJSON!string;
 	if (archTypes.canFind(type))
 	{
@@ -295,7 +317,7 @@ string buildType() @property
 @arguments("subcmd", "set:build-type")
 bool setBuildType(JSONValue request)
 {
-	assert("build-type" in request, "build-type not in request");
+	enforce(request.type == JSON_TYPE.OBJECT && "build-type" in request, "build-type not in request");
 	auto type = request["build-type"].fromJSON!string;
 	if (buildTypes.canFind(type))
 	{
@@ -356,6 +378,8 @@ auto path() @property
 @arguments("subcmd", "build")
 @async void build(AsyncCallback cb)
 {
+	validateConfiguration();
+
 	new Thread({
 		try
 		{
@@ -363,6 +387,9 @@ auto path() @property
 			BuildSettings buildSettings;
 			auto buildPlatform = compiler.determinePlatform(buildSettings,
 				_compilerBinaryName, _archType);
+
+			if (!buildSettings.targetName.length)
+				throw new Exception("No target name");
 
 			GeneratorSettings settings;
 			settings.platform = buildPlatform;
@@ -393,8 +420,8 @@ auto path() @property
 							auto contMatch = line.matchFirst(errorFormatCont);
 							if (contMatch)
 							{
-								issues ~= BuildIssue(contMatch[2].to!int,
-									contMatch[3].toOr!int(1), contMatch[1], ErrorType.Error, contMatch[4]);
+								issues ~= BuildIssue(contMatch[2].to!int, contMatch[3].toOr!int(1),
+									contMatch[1], ErrorType.Error, contMatch[4]);
 							}
 						}
 						if (line.canFind("is deprecated"))
@@ -469,6 +496,8 @@ __gshared
 	Compiler _compiler;
 	BuildPlatform _platform;
 	string[] _importPaths, _stringImportPaths, _importFiles;
+
+	static immutable string invalidConfiguration = "$INVALID$";
 }
 
 T toOr(T)(string s, T defaultValue)
