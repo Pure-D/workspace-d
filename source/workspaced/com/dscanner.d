@@ -10,10 +10,11 @@ import std.typecons;
 import core.sync.mutex;
 import core.thread;
 
-import analysis.base;
-import analysis.config;
-import analysis.run;
-import symbol_finder;
+//@Reviewer: D-Scanner src got moved under the package "dscanner" as of v0.5.2.
+import dscanner.analysis.base;
+import dscanner.analysis.config;
+import dscanner.analysis.run;
+import dscanner.symbol_finder;
 
 import inifiled : INI, readINIFile;
 
@@ -188,9 +189,9 @@ private const(Module) parseModule(string file, ubyte[] code, RollbackAllocator* 
 	new Thread({
 		try
 		{
-			static import readers;
+			static import dscanner.utils;
 
-			string[] paths = readers.expandArgs([""] ~ importPathProvider());
+			string[] paths = dscanner.utils.expandArgs([""] ~ importPathProvider());
 			foreach_reverse (i, path; paths)
 				if (path == "stdin")
 					paths = paths.remove(i);
@@ -532,8 +533,9 @@ final class DefinitionFinder : ASTVisitor
 	override void visit(const AliasDeclaration dec)
 	{
 		// Old style alias
-		if (dec.identifierList)
-			foreach (i; dec.identifierList.identifiers)
+		//@Reviewer: AliasDeclaration.identifierList was renamed to declaratorIdentifierList in fix #158 of libdparse
+		if (dec.declaratorIdentifierList)
+			foreach (i; dec.declaratorIdentifierList.identifiers)
 				definitions ~= makeDefinition(i.text, i.line, "a", context);
 		dec.accept(this);
 	}

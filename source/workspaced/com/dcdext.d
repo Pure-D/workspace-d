@@ -175,13 +175,14 @@ final class InterfaceMethodFinder : ASTVisitor
 			if (baseClassList)
 				foreach (base; baseClassList.items)
 				{
-					if (!base.type2 || !base.type2.symbol || !base.type2.symbol.identifierOrTemplateChain
-							|| !base.type2.symbol.identifierOrTemplateChain.identifiersOrTemplateInstances.length)
+					//@Reviewer: type2.symbol was removed as of libdparse fix #158, replaced by typeIdentifierChain
+					//           TypeIdentifierChain was renamed to TypeIdentifierPart as of commit 0964cee3e6e
+					if (!base.type2 || !base.type2.typeIdentifierPart || !base.type2.typeIdentifierPart.identifierOrTemplateInstance)
 						continue;
 					details.parents ~= astToString(base.type2);
 					details.parentPositions ~= cast(
-							int) base.type2.symbol.identifierOrTemplateChain
-						.identifiersOrTemplateInstances[0].identifier.index + 1;
+							int) base.type2.typeIdentifierPart.identifierOrTemplateInstance
+						.identifier.index + 1;
 				}
 			inTarget = true;
 			details.needsOverride = needsOverride;
