@@ -3,39 +3,34 @@ module workspaced.com.fsworkspace;
 import std.json;
 import workspaced.api;
 
-@component("fsworkspace") :
-
-/// Load function for custom import management. Call with `{"cmd": "load", "components": ["fsworkspace"]}`
-/// Calling this will make fsworkspace the import-, string import- & file import provider!
-@load void start(string dir, string[] additionalPaths = [])
+@component("fsworkspace")
+class FSWorkspaceComponent : ComponentWrapper
 {
-	paths = dir ~ additionalPaths;
-	importPathProvider = &imports;
-	stringImportPathProvider = &imports;
-	importFilesProvider = &imports;
-}
+	mixin DefaultComponentWrapper;
 
-/// Unloads allocated strings
-@unload void stop()
-{
-	paths.length = 0;
-}
+	protected void load()
+	{
+		if (!refInstance)
+			throw new Exception("fsworkspace requires to be instanced");
 
-/// Adds new import paths to the workspace. You can add import paths, string import paths or file paths.
-/// Call_With: `{"subcmd": "add:imports"}`
-@arguments("subcmd", "add:imports")
-void addImports(string[] values)
-{
-	paths ~= values;
-}
+		paths = instance.cwd ~ config.get!(string[])("fsworkspace", "additionalPaths");
+		importPathProvider = &imports;
+		stringImportPathProvider = &imports;
+		importFilesProvider = &imports;
+	}
 
-/// Lists all import-, string import- & file import paths
-/// Call_With: `{"subcmd": "list:import"}`
-@arguments("subcmd", "list:import")
-string[] imports()
-{
-	return paths;
-}
+	/// Adds new import paths to the workspace. You can add import paths, string import paths or file paths.
+	void addImports(string[] values)
+	{
+		paths ~= values;
+	}
 
-private __gshared:
-string[] paths;
+	/// Lists all import-, string import- & file import paths
+	string[] imports()
+	{
+		return paths;
+	}
+
+private:
+	string[] paths;
+}

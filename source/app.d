@@ -7,14 +7,18 @@ import painlessjson;
 import standardpaths;
 
 import workspaced.api;
+import workspaced.coms;
 
-import std.exception;
+import std.algorithm;
 import std.bitmanip;
+import std.exception;
+import std.functional;
 import std.process;
+import std.stdio : File, stderr;
 import std.traits;
-import std.stdio : stderr, File;
 
 static import std.stdio;
+import std.string;
 import std.json;
 import std.meta;
 import std.conv;
@@ -35,296 +39,148 @@ shared static this()
 	std.stdio.stdout = stderr;
 }
 
-static import workspaced.com.dcd;
-
-static import workspaced.com.dfmt;
-
-static import workspaced.com.dlangui;
-
-static import workspaced.com.dscanner;
-
-static import workspaced.com.dub;
-
-static import workspaced.com.fsworkspace;
-
-static import workspaced.com.importer;
-
-static import workspaced.com.moduleman;
-
-static import workspaced.com.dcdext;
-
 __gshared Mutex writeMutex, commandMutex;
 
-void sendFinal(int id, JSONValue value)
+void sendResponse(int id, JSONValue message)
 {
 	synchronized (writeMutex)
 	{
-		ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) value.toString());
+		ubyte[] data = nativeToBigEndian(id) ~ (cast(ubyte[]) message.toString());
 		stdout.rawWrite(nativeToBigEndian(cast(int) data.length) ~ data);
 		stdout.flush();
 	}
 }
 
-void broadcast(JSONValue value)
+void sendException(int id, Throwable t)
 {
-	sendFinal(0x7F000000, value);
+	JSONValue[string] message;
+	message["error"] = JSONValue(true);
+	message["msg"] = JSONValue(t.msg);
+	message["exception"] = JSONValue(t.toString);
+	sendResponse(id, JSONValue(message));
 }
 
-void send(int id, JSONValue[] values)
+void broadcast(WorkspaceD workspaced, WorkspaceD.Instance instance, JSONValue message)
 {
-	if (values.length == 0)
-	{
-		throw new Exception("Unknown arguments!");
-	}
-	else if (values.length == 1)
-	{
-		sendFinal(id, values[0]);
-	}
-	else
-	{
-		sendFinal(id, JSONValue(values));
-	}
+	sendResponse(0x7F000000, JSONValue([
+		"workspace": JSONValue(instance ? instance.cwd : null),
+		"data": message
+	]));
 }
 
-JSONValue toJSONArray(T)(T value)
-{
-	JSONValue[] vals;
-	foreach (val; value)
-	{
-		vals ~= JSONValue(val);
-	}
-	return JSONValue(vals);
-}
-
-alias Identity(I...) = I;
-
-template JSONCallBody(alias T, string fn, string jsonvar, size_t i, Args...)
-{
-	static if (Args.length == 1 && Args[0] == "request" && is(Parameters!T[0] == JSONValue))
-		enum JSONCallBody = jsonvar;
-	else static if (Args.length == i)
-		enum JSONCallBody = "";
-	else static if (is(ParameterDefaults!T[i] == void))
-		enum JSONCallBody = "(fromJSON!(Parameters!(" ~ fn ~ ")[" ~ i.to!string
-				~ "])(*enforce(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ", `"
-				~ Args[i] ~ " has no default value and is not in the JSON request`))),"
-				~ JSONCallBody!(T, fn, jsonvar, i + 1, Args);
-	else
-					enum JSONCallBody = "(`" ~ Args[i] ~ "` in " ~ jsonvar ~ ") ? fromJSON!(Parameters!("
-							~ fn ~ ")[" ~ i.to!string ~ "])(" ~ jsonvar ~ "[`" ~ Args[i] ~ "`]"
-							~ ") : ParameterDefaults!(" ~ fn ~ ")[" ~ i.to!string ~ "]," ~ JSONCallBody!(T,
-									fn, jsonvar, i + 1, Args);
-}
-
-template JSONCallNoRet(alias T, string fn, string jsonvar, bool async)
-{
-	alias Args = ParameterIdentifierTuple!T;
-	static if (Args.length > 0)
-		enum JSONCallNoRet = fn ~ "(" ~ (async ? "asyncCallback,"
-					: "") ~ JSONCallBody!(T, fn, jsonvar, async ? 1 : 0, Args) ~ ")";
-	else
-		enum JSONCallNoRet = fn ~ "(" ~ (async ? "asyncCallback" : "") ~ ")";
-}
-
-template JSONCall(alias T, string fn, string jsonvar, bool async)
-{
-	static if (async)
-	{
-		static assert(is(ReturnType!T == void),
-				"Async functions cant have an return type! For function " ~ fn);
-		enum JSONCall = JSONCallNoRet!(T, fn, jsonvar, async) ~ ";";
-	}
-	else
-	{
-		alias Ret = ReturnType!T;
-		static if (is(Ret == void))
-			enum JSONCall = JSONCallNoRet!(T, fn, jsonvar, async) ~ ";";
-		else
-			enum JSONCall = "values ~= " ~ JSONCallNoRet!(T, fn, jsonvar, async) ~ ".toJSON;";
-	}
-}
-
-template compatibleGetUDAs(alias symbol, alias attribute)
-{
-	import std.typetuple : Filter;
-
-	template isDesiredUDA(alias S)
-	{
-		static if (__traits(compiles, is(typeof(S) == attribute)))
-		{
-			enum isDesiredUDA = is(typeof(S) == attribute);
-		}
-		else
-		{
-			enum isDesiredUDA = isInstanceOf!(attribute, typeof(S));
-		}
-	}
-
-	alias compatibleGetUDAs = Filter!(isDesiredUDA, __traits(getAttributes, symbol));
-}
-
-void handleRequestMod(alias T)(int id, JSONValue request, ref JSONValue[] values,
-		ref int asyncWaiting, ref bool isAsync, ref bool hasArgs, in AsyncCallback asyncCallback)
-{
-	foreach (name; __traits(derivedMembers, T))
-	{
-		static if (__traits(compiles, __traits(getMember, T, name))
-				&& !hasUDA!(__traits(getMember, T, name), disabledFunc))
-		{
-			alias symbol = Identity!(__traits(getMember, T, name));
-			static if (isSomeFunction!symbol && __traits(getProtection, symbol[0]) == "public")
-			{
-				bool matches = false;
-				foreach (Arguments args; compatibleGetUDAs!(symbol, Arguments))
-				{
-					if (!matches)
-					{
-						foreach (arg; args.arguments)
-						{
-							if (!matches)
-							{
-								auto nodeptr = arg.key in request;
-								if (nodeptr && *nodeptr == arg.value)
-									matches = true;
-							}
-						}
-					}
-				}
-				static if (hasUDA!(symbol, any))
-					matches = true;
-				static if (hasUDA!(symbol, component))
-				{
-					if (("cmd" in request) !is null && request["cmd"].type == JSON_TYPE.STRING
-							&& compatibleGetUDAs!(symbol, component)[0].name != request["cmd"].str)
-						matches = false;
-				}
-				static if (hasUDA!(symbol, load) && hasUDA!(symbol, component))
-				{
-					if (("components" in request) !is null && ("cmd" in request) !is null
-							&& request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "load")
-					{
-						if (request["components"].type == JSON_TYPE.ARRAY)
-						{
-							foreach (com; request["components"].array)
-								if (com.type == JSON_TYPE.STRING
-										&& com.str == compatibleGetUDAs!(symbol, component)[0].name)
-									matches = true;
-						}
-						else if (request["components"].type == JSON_TYPE.STRING
-								&& request["components"].str == compatibleGetUDAs!(symbol, component)[0].name)
-							matches = true;
-					}
-				}
-				static if (hasUDA!(symbol, unload) && hasUDA!(symbol, component))
-				{
-					if (("components" in request) !is null && ("cmd" in request) !is null
-							&& request["cmd"].type == JSON_TYPE.STRING && request["cmd"].str == "unload")
-					{
-						if (request["components"].type == JSON_TYPE.ARRAY)
-						{
-							foreach (com; request["components"].array)
-								if (com.type == JSON_TYPE.STRING && (com.str == compatibleGetUDAs!(symbol,
-										component)[0].name || com.str == "*"))
-									matches = true;
-						}
-						else if (request["components"].type == JSON_TYPE.STRING
-								&& (request["components"].str == compatibleGetUDAs!(symbol,
-									component)[0].name || request["components"].str == "*"))
-							matches = true;
-					}
-				}
-				if (matches)
-				{
-					static if (hasUDA!(symbol, async))
-					{
-						assert(!hasArgs);
-						isAsync = true;
-						asyncWaiting++;
-						mixin(JSONCall!(symbol[0], "symbol[0]", "request", true));
-					}
-					else
-					{
-						assert(!isAsync);
-						hasArgs = true;
-						mixin(JSONCall!(symbol[0], "symbol[0]", "request", false));
-					}
-				}
-			}
-		}
-	}
-}
+WorkspaceD engine;
 
 void handleRequest(int id, JSONValue request)
 {
-	if (("cmd" in request) && request["cmd"].type == JSON_TYPE.STRING
-			&& request["cmd"].str == "version")
+	if ("cmd" !in request || request["cmd"].type != JSON_TYPE.STRING)
 	{
-		sendFinal(id, getVersionInfoJson);
-		return;
+		goto printUsage;
 	}
-
-	JSONValue[] values;
-	JSONValue[] asyncValues;
-	int asyncWaiting = 0;
-	bool isAsync = false;
-	bool hasArgs = false;
-
-	const AsyncCallback asyncCallback = (err, value) {
-		synchronized (commandMutex)
-		{
-			try
-			{
-				assert(isAsync);
-				if (err)
-					throw err;
-				asyncValues ~= value;
-				asyncWaiting--;
-				if (asyncWaiting <= 0)
-					send(id, asyncValues);
-			}
-			catch (Exception e)
-			{
-				processException(id, e);
-			}
-			catch (AssertError e)
-			{
-				processException(id, e);
-			}
-		}
-	};
-
-	handleRequestMod!(workspaced.com.dub)(id, request, values, asyncWaiting,
-			isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dcd)(id, request, values, asyncWaiting,
-			isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dfmt)(id, request, values, asyncWaiting,
-			isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dscanner)(id, request, values, asyncWaiting,
-			isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dlangui)(id, request, values, asyncWaiting,
-			isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.fsworkspace)(id, request, values,
-			asyncWaiting, isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.importer)(id, request, values, asyncWaiting,
-			isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.moduleman)(id, request, values,
-			asyncWaiting, isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dcdext)(id, request, values,
-			asyncWaiting, isAsync, hasArgs, asyncCallback);
-	handleRequestMod!(workspaced.com.dmd)(id, request, values,
-			asyncWaiting, isAsync, hasArgs, asyncCallback);
-
-	if (isAsync)
+	else if (request["cmd"].str == "version")
 	{
-		if (values.length > 0)
-			throw new Exception("Cannot mix sync and async functions! In request " ~ request.toString);
+		sendResponse(id, getVersionInfoJson);
+	}
+	else if (request["cmd"].str == "load")
+	{
+		if ("component" !in request || request["component"].type != JSON_TYPE.STRING)
+		{
+			sendException(id,
+					new Exception(`Expected load message to be in format {"cmd":"load", "component":string}`));
+		}
+		else
+		{
+			string[] allComponents;
+			static foreach (Component; AllComponents)
+				allComponents ~= getUDAs!(Component, ComponentInfo)[0].name;
+		ComponentSwitch:
+			switch (request["component"].str)
+			{
+				static foreach (Component; AllComponents)
+				{
+			case getUDAs!(Component, ComponentInfo)[0].name:
+					engine.register!Component;
+					break ComponentSwitch;
+				}
+			default:
+				sendException(id,
+						new Exception(
+							"Unknown Component '" ~ request["component"].str ~ "', built-in are " ~ allComponents.join(
+							", ")));
+				return;
+			}
+			sendResponse(id, JSONValue(true));
+		}
+	}
+	else if (request["cmd"].str == "new")
+	{
+		if ("cwd" !in request || request["cwd"].type != JSON_TYPE.STRING)
+		{
+			sendException(id,
+					new Exception(
+						`Expected new message to be in format {"cmd":"new", "cwd":string, ("config":object)}`));
+		}
+		else
+		{
+			string cwd = request["cwd"].str;
+			if ("config" in request)
+				engine.addInstance(cwd, Configuration(request["config"]));
+			else
+				engine.addInstance(cwd);
+			sendResponse(id, JSONValue(true));
+		}
+	}
+	else if (request["cmd"].str == "config")
+	{
+		throw new Exception("Not implemented");
+	}
+	else if (request["cmd"].str == "call")
+	{
+		JSONValue[] params;
+		if ("params" in request)
+		{
+			if (request["params"].type != JSON_TYPE.ARRAY)
+				goto callFail;
+			params = request["params"].array;
+		}
+		if ("method" !in request || request["method"].type != JSON_TYPE.STRING
+				|| "component" !in request || request["component"].type != JSON_TYPE.STRING)
+		{
+		callFail:
+			sendException(id, new Exception(`Expected call message to be in format {"cmd":"call", "component":string, "method":string, ("cwd":string), ("params":object[])}`));
+		}
+		else
+		{
+			Future!JSONValue ret;
+			string component = request["component"].str;
+			string method = request["method"].str;
+			if ("cwd" in request)
+			{
+				if (request["cwd"].type != JSON_TYPE.STRING)
+				{
+					goto callFail;
+				}
+				else
+				{
+					string cwd = request["cwd"].str;
+					ret = engine.run(cwd, component, method, params);
+				}
+			}
+			else
+				ret = engine.run(component, method, params);
+
+			ret.onDone = {
+				if (ret.exception)
+					sendException(id, ret.exception);
+				else
+					sendResponse(id, ret.value);
+			};
+		}
 	}
 	else
 	{
-		if (hasArgs && values.length == 0)
-			sendFinal(id, JSONValue(null));
-		else
-			send(id, values);
+	printUsage:
+		sendException(id, new Exception(
+				"Invalid request, must contain a cmd string key with one of the values [version, load, new, config, call]"));
 	}
 }
 
@@ -332,7 +188,7 @@ void processException(int id, Throwable e)
 {
 	stderr.writeln(e);
 	// dfmt off
-	sendFinal(id, JSONValue([
+	sendResponse(id, JSONValue([
 		"error": JSONValue(true),
 		"msg": JSONValue(e.msg),
 		"exception": JSONValue(e.toString())
@@ -344,7 +200,7 @@ void processException(int id, JSONValue request, Throwable e)
 {
 	stderr.writeln(e);
 	// dfmt off
-	sendFinal(id, JSONValue([
+	sendResponse(id, JSONValue([
 		"error": JSONValue(true),
 		"msg": JSONValue(e.msg),
 		"exception": JSONValue(e.toString()),
@@ -373,7 +229,8 @@ int main(string[] args)
 			return 0;
 		}
 
-		broadcastCallback = &broadcast;
+		engine = new WorkspaceD();
+		engine.onBroadcast = (&broadcast).toDelegate;
 
 		writeMutex = new Mutex;
 		commandMutex = new Mutex;

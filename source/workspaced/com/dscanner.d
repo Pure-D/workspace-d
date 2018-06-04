@@ -29,202 +29,177 @@ import painlessjson;
 import workspaced.api;
 import workspaced.dparseext;
 
-@component("dscanner") :
-
-/// Load function for dscanner. Call with `{"cmd": "load", "components": ["dscanner"]}`
-/// This will store the working directory for future use.
-@load void start(string dir)
+@component("dscanner")
+class DscannerComponent : ComponentWrapper
 {
-	cwd = dir;
-}
+	mixin DefaultComponentWrapper;
 
-@disabledFunc deprecated("Always returns false because dscanner is included") bool isOutdated()
-{
-	return false;
-}
-
-@disabledFunc deprecated("Path is no longer required") void start(string dir, string dscannerPath)
-{
-	.start(dir);
-}
-
-/// Unloads dscanner. Has no purpose right now.
-@unload void stop()
-{
-}
-
-/// Asynchronously lints the file passed.
-/// If you provide code then the code will be used and file will be ignored.
-/// Returns: `[{file: string, line: int, column: int, type: string, description: string, key: string}]`
-/// Call_With: `{"subcmd": "lint"}`
-@arguments("subcmd", "lint")
-@async void lint(AsyncCallback cb, string file = "", string ini = "dscanner.ini", string code = "")
-{
-	new Thread({
-		try
-		{
-			if (code.length && !file.length)
-				file = "stdin";
-			auto config = defaultStaticAnalysisConfig();
-			if (getConfigPath("dscanner.ini", ini))
-				stderr.writeln("Overriding Dscanner ini with workspace-d dscanner.ini config file");
-			if (ini.exists)
-				readINIFile(config, ini);
-			if (!code.length)
-				code = readText(file);
-			DScannerIssue[] issues;
-			if (!code.length)
-			{
-				cb(null, issues.toJSON);
-				return;
-			}
-			RollbackAllocator r;
-			const(Token)[] tokens;
-			StringCache cache = StringCache(StringCache.defaultBucketCount);
-			const Module m = parseModule(file, cast(ubyte[]) code, &r, cache, tokens, issues);
-			if (!m)
-			{
-				cb(new Exception("parseModule returned null?! - file: '" ~ file ~ "', code: '" ~ code ~ "'"),
-					JSONValue(null));
-				return;
-			}
-			MessageSet results;
-			auto alloc = scoped!ASTAllocator();
-			auto moduleCache = ModuleCache(alloc);
-			results = analyze(file, m, config, moduleCache, tokens, true);
-			if (results is null)
-			{
-				cb(null, issues.toJSON);
-				return;
-			}
-			foreach (msg; results)
-			{
-				DScannerIssue issue;
-				issue.file = msg.fileName;
-				issue.line = cast(int) msg.line;
-				issue.column = cast(int) msg.column;
-				issue.type = typeForWarning(msg.key);
-				issue.description = msg.message;
-				issue.key = msg.key;
-				issues ~= issue;
-			}
-			cb(null, issues.toJSON);
-		}
-		catch (Throwable e)
-		{
-			cb(e, JSONValue(null));
-		}
-	}).start();
-}
-
-private const(Module) parseModule(string file, ubyte[] code, RollbackAllocator* p,
-		ref StringCache cache, ref const(Token)[] tokens, ref DScannerIssue[] issues)
-{
-	LexerConfig config;
-	config.fileName = file;
-	config.stringBehavior = StringBehavior.source;
-	tokens = getTokensForParser(code, config, &cache);
-
-	void addIssue(string fileName, size_t line, size_t column, string message, bool isError)
+	/// Asynchronously lints the file passed.
+	/// If you provide code then the code will be used and file will be ignored.
+	Future!(DScannerIssue[]) lint(string file = "", string ini = "dscanner.ini", string code = "")
 	{
-		issues ~= DScannerIssue(file, cast(int) line, cast(int) column, isError
-				? "error" : "warn", message);
+		auto ret = new Future!(DScannerIssue[]);
+		new Thread({
+			try
+			{
+				if (code.length && !file.length)
+					file = "stdin";
+				auto config = defaultStaticAnalysisConfig();
+				if (getConfigPath("dscanner.ini", ini))
+					stderr.writeln("Overriding Dscanner ini with workspace-d dscanner.ini config file");
+				if (ini.exists)
+					readINIFile(config, ini);
+				if (!code.length)
+					code = readText(file);
+				DScannerIssue[] issues;
+				if (!code.length)
+				{
+					ret.finish(issues);
+					return;
+				}
+				RollbackAllocator r;
+				const(Token)[] tokens;
+				StringCache cache = StringCache(StringCache.defaultBucketCount);
+				const Module m = parseModule(file, cast(ubyte[]) code, &r, cache, tokens, issues);
+				if (!m)
+					throw new Exception(
+						"parseModule returned null?! - file: '" ~ file ~ "', code: '" ~ code ~ "'");
+				MessageSet results;
+				auto alloc = scoped!ASTAllocator();
+				auto moduleCache = ModuleCache(alloc);
+				results = analyze(file, m, config, moduleCache, tokens, true);
+				if (results is null)
+				{
+					ret.finish(issues);
+					return;
+				}
+				foreach (msg; results)
+				{
+					DScannerIssue issue;
+					issue.file = msg.fileName;
+					issue.line = cast(int) msg.line;
+					issue.column = cast(int) msg.column;
+					issue.type = typeForWarning(msg.key);
+					issue.description = msg.message;
+					issue.key = msg.key;
+					issues ~= issue;
+				}
+				ret.finish(issues);
+			}
+			catch (Throwable e)
+			{
+				ret.error(e);
+			}
+		}).start();
+		return ret;
 	}
 
-	uint err, warn;
-	return dparse.parser.parseModule(tokens, file, p, &addIssue, &err, &warn);
-}
+	private const(Module) parseModule(string file, ubyte[] code, RollbackAllocator* p,
+			ref StringCache cache, ref const(Token)[] tokens, ref DScannerIssue[] issues)
+	{
+		LexerConfig config;
+		config.fileName = file;
+		config.stringBehavior = StringBehavior.source;
+		tokens = getTokensForParser(code, config, &cache);
 
-/// Asynchronously lists all definitions in the specified file.
-/// If you provide code the file wont be manually read.
-/// Returns: `[{name: string, line: int, type: string, attributes: string[string]}]`
-/// Call_With: `{"subcmd": "list-definitions"}`
-@arguments("subcmd", "list-definitions")
-@async void listDefinitions(AsyncCallback cb, string file, string code = "")
-{
-	new Thread({
-		try
+		void addIssue(string fileName, size_t line, size_t column, string message, bool isError)
 		{
-			if (code.length && !file.length)
-				file = "stdin";
-			if (!code.length)
-				code = readText(file);
-			if (!code.length)
+			issues ~= DScannerIssue(file, cast(int) line, cast(int) column, isError
+					? "error" : "warn", message);
+		}
+
+		uint err, warn;
+		return dparse.parser.parseModule(tokens, file, p, &addIssue, &err, &warn);
+	}
+
+	/// Asynchronously lists all definitions in the specified file.
+	/// If you provide code the file wont be manually read.
+	Future!(DefinitionElement[]) listDefinitions(string file, string code = "")
+	{
+		auto ret = new Future!(DefinitionElement[]);
+		new Thread({
+			try
 			{
-				string[] arr;
-				cb(null, arr.toJSON);
-				return;
+				if (code.length && !file.length)
+					file = "stdin";
+				if (!code.length)
+					code = readText(file);
+				if (!code.length)
+				{
+					DefinitionElement[] arr;
+					ret.finish(arr);
+					return;
+				}
+
+				RollbackAllocator r;
+				LexerConfig config;
+				StringCache cache = StringCache(StringCache.defaultBucketCount);
+				auto tokens = getTokensForParser(cast(ubyte[]) code, config, &cache);
+
+				void doNothing(string, size_t, size_t, string, bool)
+				{
+				}
+
+				auto m = dparse.parser.parseModule(tokens.array, file, &r, &doNothing);
+
+				auto defFinder = new DefinitionFinder();
+				defFinder.visit(m);
+
+				ret.finish(defFinder.definitions);
 			}
-
-			RollbackAllocator r;
-			LexerConfig config;
-			StringCache cache = StringCache(StringCache.defaultBucketCount);
-			auto tokens = getTokensForParser(cast(ubyte[]) code, config, &cache);
-
-			void doNothing(string, size_t, size_t, string, bool)
+			catch (Throwable e)
 			{
+				ret.error(e);
 			}
+		}).start();
+		return ret;
+	}
 
-			auto m = dparse.parser.parseModule(tokens.array, file, &r, &doNothing);
+	/// Asynchronously finds all definitions of a symbol in the import paths.
+	Future!(FileLocation[]) findSymbol(string symbol)
+	{
+		auto ret = new Future!(FileLocation[]);
+		new Thread({
+			try
+			{
+				static import readers;
 
-			auto defFinder = new DefinitionFinder();
-			defFinder.visit(m);
+				string[] paths = readers.expandArgs([""] ~ importPaths);
+				foreach_reverse (i, path; paths)
+					if (path == "stdin")
+						paths = paths.remove(i);
+				FileLocation[] files;
+				findDeclarationOf((fileName, line, column) {
+					FileLocation file;
+					file.file = fileName;
+					file.line = cast(int) line;
+					file.column = cast(int) column;
+					files ~= file;
+				}, symbol, paths);
+				ret.finish(files);
+			}
+			catch (Throwable e)
+			{
+				ret.error(e);
+			}
+		}).start();
+		return ret;
+	}
 
-			cb(null, defFinder.definitions.toJSON);
-		}
-		catch (Throwable e)
-		{
-			cb(e, JSONValue(null));
-		}
-	}).start();
-}
+	/// Returns: all keys & documentation that can be used in a dscanner.ini
+	INIEntry[] listAllIniFields()
+	{
+		import std.traits : getUDAs;
 
-/// Asynchronously finds all definitions of a symbol in the import paths.
-/// Returns: `[{name: string, line: int, column: int}]`
-/// Call_With: `{"subcmd": "find-symbol"}`
-@arguments("subcmd", "find-symbol")
-@async void findSymbol(AsyncCallback cb, string symbol)
-{
-	new Thread({
-		try
-		{
-			static import readers;
-
-			string[] paths = readers.expandArgs([""] ~ importPathProvider());
-			foreach_reverse (i, path; paths)
-				if (path == "stdin")
-					paths = paths.remove(i);
-			FileLocation[] files;
-			findDeclarationOf((fileName, line, column) {
-				FileLocation file;
-				file.file = fileName;
-				file.line = cast(int) line;
-				file.column = cast(int) column;
-				files ~= file;
-			}, symbol, paths);
-			cb(null, files.toJSON);
-		}
-		catch (Throwable e)
-		{
-			cb(e, JSONValue(null));
-		}
-	}).start();
-}
-
-/// Returns: all keys & documentation that can be used in a dscanner.ini
-@arguments("subcmd", "list-ini")
-INIEntry[] listAllIniFields()
-{
-	import std.traits : getUDAs;
-
-	INIEntry[] ret;
-	foreach (mem; __traits(allMembers, StaticAnalysisConfig))
-		static if (is(typeof(__traits(getMember, StaticAnalysisConfig, mem)) == string))
-		{
-			alias docs = getUDAs!(__traits(getMember, StaticAnalysisConfig, mem), INI);
-			ret ~= INIEntry(mem, docs.length ? docs[0].msg : "");
-		}
-	return ret;
+		INIEntry[] ret;
+		foreach (mem; __traits(allMembers, StaticAnalysisConfig))
+			static if (is(typeof(__traits(getMember, StaticAnalysisConfig, mem)) == string))
+			{
+				alias docs = getUDAs!(__traits(getMember, StaticAnalysisConfig, mem), INI);
+				ret ~= INIEntry(mem, docs.length ? docs[0].msg : "");
+			}
+		return ret;
+	}
 }
 
 /// dscanner.ini setting type
@@ -272,11 +247,6 @@ struct DefinitionElement
 }
 
 private:
-
-__gshared
-{
-	string cwd;
-}
 
 string typeForWarning(string key)
 {
