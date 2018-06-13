@@ -1,6 +1,7 @@
 module workspaced.com.dub;
 
 import core.sync.mutex;
+import core.exception;
 import core.thread;
 
 import std.algorithm;
@@ -72,6 +73,12 @@ class DubComponent : ComponentWrapper
 				updateImportPaths(false);
 		}
 		catch (Exception e)
+		{
+			if (!_dub)
+				throw e;
+			stderr.writeln("Dub Error (ignored): ", e);
+		}
+		catch (AssertError e)
 		{
 			if (!_dub)
 				throw e;
