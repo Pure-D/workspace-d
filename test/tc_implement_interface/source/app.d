@@ -2,24 +2,42 @@ import std.algorithm;
 import std.file;
 import std.stdio;
 import std.string;
+import std.process;
 
 import workspaced.api;
 import workspaced.coms;
 
 void main()
 {
-	fsworkspace.start(getcwd);
-	scope (exit)
-		fsworkspace.stop();
-	fsworkspace.addImports(["source"]);
-	dcd.start(".");
-	scope (exit)
-		dcd.stop();
-	dcdext.start();
-	scope (exit)
-		dcdext.stop();
+	string dir = getcwd;
+	auto backend = new WorkspaceD();
+	auto instance = backend.addInstance(dir);
+	backend.register!FSWorkspaceComponent;
+	backend.register!DCDComponent;
+	backend.register!DCDExtComponent;
 
-	auto ret = syncBlocking!(dcdext.implement)(q{
+	auto fsworkspace = backend.get!FSWorkspaceComponent(dir);
+	auto dcd = backend.get!DCDComponent(dir);
+	auto dcdext = backend.get!DCDExtComponent(dir);
+
+	fsworkspace.addImports(["source"]);
+
+	try
+	{
+		dcd.start();
+	}
+	catch (ProcessException e)
+	{
+		// dcd not installed
+		stderr.writeln("WARNING: skipping test tc_implement_interface because DCD is not installed");
+		stderr.writeln(e);
+		return;
+	}
+
+	scope (exit)
+		dcd.stopServerSync();
+
+	string code = dcdext.implement(q{
 class Bar : Foo
 {
 }
@@ -60,9 +78,7 @@ interface Foo2
 {
 	void world();
 }
-	}, 14);
-
-	string code = ret.str;
+	}, 14).getBlocking;
 
 	writeln(code);
 

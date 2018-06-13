@@ -46,6 +46,9 @@ class DCDComponent : ComponentWrapper
 		config.set("dcd", "clientPath", clientPath);
 		config.set("dcd", "serverPath", serverPath);
 
+		assert(this.clientPath == clientPath);
+		assert(this.serverPath == serverPath);
+
 		version (haveUnixSockets)
 			hasUnixDomainSockets = supportsUnixDomainSockets(installedVersion);
 		startServer();
@@ -127,7 +130,7 @@ class DCDComponent : ComponentWrapper
 
 	void stopServerSync()
 	{
-		if (serverPipes.pid.tryWait().terminated)
+		if (!running || serverPipes.pid.tryWait().terminated)
 			return;
 		int i = 0;
 		running = false;

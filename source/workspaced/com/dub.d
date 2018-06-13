@@ -66,21 +66,21 @@ class DubComponent : ComponentWrapper
 			if (!_dub.project.configurations.canFind(_configuration))
 			{
 				stderr.writeln("Dub Error: No configuration available");
-				workspaced.broadcast(refInstance, JSONValue(["type" : JSONValue("warning"), "component"
-						: JSONValue("dub"), "detail" : JSONValue("invalid-default-config")]));
+				workspaced.broadcast(refInstance, JSONValue(["type" : JSONValue("warning"),
+						"component" : JSONValue("dub"), "detail" : JSONValue("invalid-default-config")]));
 			}
 			else
 				updateImportPaths(false);
 		}
 		catch (Exception e)
 		{
-			if (!_dub)
+			if (!_dub || !_dub.project)
 				throw e;
 			stderr.writeln("Dub Error (ignored): ", e);
 		}
 		catch (AssertError e)
 		{
-			if (!_dub)
+			if (!_dub || !_dub.project)
 				throw e;
 			stderr.writeln("Dub Error (ignored): ", e);
 		}
@@ -152,7 +152,9 @@ class DubComponent : ComponentWrapper
 		}
 		catch (Exception e)
 		{
-			stderr.writeln("Exception while listing import paths: ", e);
+			workspaced.broadcast(refInstance, JSONValue(["type" : JSONValue("error"), "component"
+					: JSONValue("dub"), "detail"
+					: JSONValue("Error while listing import paths: " ~ e.toString)]));
 			_importPaths = [];
 			_stringImportPaths = [];
 			return false;
@@ -343,6 +345,17 @@ class DubComponent : ComponentWrapper
 	auto path() @property
 	{
 		return _dub.projectPath;
+	}
+
+	/// Returns whether there is a target set to build. If this is false then build will throw an exception.
+	bool canBuild() @property
+	{
+		if (!_dub.project.configurations.canFind(_configuration))
+			return false;
+		auto compiler = getCompiler(_compilerBinaryName);
+		BuildSettings buildSettings;
+		compiler.determinePlatform(buildSettings, _compilerBinaryName, _archType);
+		return buildSettings.targetName.length > 0;
 	}
 
 	/// Asynchroniously builds the project WITHOUT OUTPUT. This is intended for linting code and showing build errors quickly inside the IDE.

@@ -105,8 +105,12 @@ unittest
 {
 	import std.stdio;
 
-	auto dmd = new DMDComponent;
-	auto measure = dmd.measure("import std.stdio;", null, 100).getBlocking;
+	auto backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DMDComponent;
+	auto measure = backend.get!DMDComponent(workspace.directory)
+		.measure("import std.stdio;", null, 100).getBlocking;
 	assert(measure.success);
 	assert(measure.duration < 5.seconds);
 }

@@ -3,13 +3,17 @@ import std.path;
 import std.string;
 
 import workspaced.api;
-import workspaced.coms;
+import workspaced.com.dub;
 
 void main()
 {
-	dub.startup(buildNormalizedPath(getcwd, "..", "tc_fsworkspace"));
-	scope (exit)
-		dub.stop();
+	string dir = buildNormalizedPath(getcwd, "..", "tc_fsworkspace");
+	auto backend = new WorkspaceD();
+	auto instance = backend.addInstance(dir);
+	backend.register!DubComponent;
+
+	auto dub = backend.get!DubComponent(dir);
+
 	dub.upgrade();
 	assert(dub.dependencies.length > 2);
 	assert(dub.rootDependencies == ["workspace-d"]);
@@ -26,6 +30,8 @@ void main()
 	assert(dub.compiler.length);
 	assert(dub.name == "test-fsworkspace");
 	assert(dub.path.toString.endsWith("tc_fsworkspace")
-			|| dub.path.toString.endsWith("tc_fsworkspace/") || dub.path.toString.endsWith("tc_fsworkspace\\"));
-	assert(syncBlocking!(dub.build).array.count!(a => a["type"].uinteger != dub.ErrorType.Deprecation) == 0);
+			|| dub.path.toString.endsWith("tc_fsworkspace/")
+			|| dub.path.toString.endsWith("tc_fsworkspace\\"));
+	if (dub.canBuild)
+		assert(dub.build.getBlocking.count!(a => a.type == ErrorType.Deprecation) == 0);
 }

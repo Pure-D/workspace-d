@@ -6,10 +6,14 @@ import workspaced.coms;
 
 void main()
 {
-	assert(importPathProvider().length == 0);
-	fsworkspace.start(getcwd);
+	string dir = getcwd;
+	auto backend = new WorkspaceD();
+	auto instance = backend.addInstance(dir);
+	backend.register!FSWorkspaceComponent;
+
+	auto fsworkspace = backend.get!FSWorkspaceComponent(dir);
+
+	assert(instance.importPaths == [getcwd]);
 	fsworkspace.addImports(["source"]);
-	assert(importPathProvider() == [getcwd, "source"]);
-	fsworkspace.stop();
-	assert(importPathProvider().length == 0);
+	assert(instance.importPaths == [getcwd, "source"]);
 }

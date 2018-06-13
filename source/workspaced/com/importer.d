@@ -122,7 +122,10 @@ unittest
 		assert(a == b, a.to!string ~ " is not equal to " ~ b.to!string);
 	}
 
-	auto importer = new ImporterComponent();
+	auto backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!ImporterComponent;
 
 	string code = `import std.stdio;
 import std.algorithm;
@@ -149,7 +152,7 @@ import std.stdio : writeln, File, stdout, err = stderr;
 void main() {}`;
 
 	//dfmt off
-	assertEqual(importer.sortImports(code, 0), ImportBlock(0, 164, [
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 0), ImportBlock(0, 164, [
 		ImportInfo(["std", "algorithm"]),
 		ImportInfo(["std", "array"]),
 		ImportInfo(["std", "experimental", "logger"]),
@@ -160,12 +163,12 @@ void main() {}`;
 		ImportInfo(["std", "stdio"])
 	]));
 
-	assertEqual(importer.sortImports(code, 192), ImportBlock(166, 209, [
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 192), ImportBlock(166, 209, [
 		ImportInfo(["core", "sync", "mutex"]),
 		ImportInfo(["core", "thread"])
 	]));
 
-	assertEqual(importer.sortImports(code, 238), ImportBlock(211, 457, [
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 238), ImportBlock(211, 457, [
 		ImportInfo(["gdk", "Event"]),
 		ImportInfo(["gdk", "Screen"]),
 		ImportInfo(["gtk", "Button"]),
@@ -186,9 +189,9 @@ void main() {}`;
 		ImportInfo(["gtkc", "gtk"])
 	]));
 
-	assertEqual(importer.sortImports(code, 467), ImportBlock.init);
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 467), ImportBlock.init);
 
-	assertEqual(importer.sortImports(code, 546), ImportBlock(491, 546, [
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 546), ImportBlock(491, 546, [
 		ImportInfo(["std", "stdio"], "", [
 			SelectiveImport("stderr", "err"),
 			SelectiveImport("File"),
@@ -390,8 +393,11 @@ unittest
 {
 	import std.conv;
 
-	auto importer = new ImporterComponent();
-	auto imports = importer.get("import std.stdio; void foo() { import fs = std.file; import std.algorithm : map, each2 = each; writeln(\"hi\"); } void bar() { import std.string; import std.regex : ctRegex; }",
+	auto backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!ImporterComponent;
+	auto imports = backend.get!ImporterComponent(workspace.directory).get("import std.stdio; void foo() { import fs = std.file; import std.algorithm : map, each2 = each; writeln(\"hi\"); } void bar() { import std.string; import std.regex : ctRegex; }",
 			81);
 	bool equalsImport(ImportInfo i, string s)
 	{
@@ -414,47 +420,47 @@ unittest
 	assertEquals(imports[2].selectives[1].rename, "each2");
 
 	string code = "void foo() { import std.stdio : stderr; writeln(\"hi\"); }";
-	auto mod = importer.add("std.stdio", code, 45);
+	auto mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"void foo() { import std.stdio : stderr; import std.stdio; writeln(\"hi\"); }");
 
 	code = "void foo() {\n\timport std.stdio : stderr;\n\twriteln(\"hi\");\n}";
-	mod = importer.add("std.stdio", code, 45);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"void foo() {\n\timport std.stdio : stderr;\n\timport std.stdio;\n\twriteln(\"hi\");\n}");
 
 	code = "void foo() {\n\timport std.file : readText;\n\twriteln(\"hi\");\n}";
-	mod = importer.add("std.stdio", code, 45);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"import std.stdio;\nvoid foo() {\n\timport std.file : readText;\n\twriteln(\"hi\");\n}");
 
 	code = "void foo() { import io = std.stdio; io.writeln(\"hi\"); }";
-	mod = importer.add("std.stdio", code, 45);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 45);
 	assertEquals(mod.rename, "io");
 	assertEquals(mod.replacements.length, 0);
 
 	code = "import std.file : readText;\n\nvoid foo() {\n\twriteln(\"hi\");\n}";
-	mod = importer.add("std.stdio", code, 45);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"import std.file : readText;\nimport std.stdio;\n\nvoid foo() {\n\twriteln(\"hi\");\n}");
 
 	code = "import std.file;\nimport std.regex;\n\nvoid foo() {\n\twriteln(\"hi\");\n}";
-	mod = importer.add("std.stdio", code, 54);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 54);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"import std.file;\nimport std.regex;\nimport std.stdio;\n\nvoid foo() {\n\twriteln(\"hi\");\n}");
 
 	code = "module a;\n\nvoid foo() {\n\twriteln(\"hi\");\n}";
-	mod = importer.add("std.stdio", code, 30);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 30);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),

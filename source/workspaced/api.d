@@ -280,7 +280,10 @@ struct Configuration
 	bool get(string component, string key, out JSONValue val)
 	{
 		if (base.type != JSON_TYPE.OBJECT)
-			return false;
+		{
+			JSONValue[string] tmp;
+			base = JSONValue(tmp);
+		}
 		auto com = component in base.object;
 		if (!com)
 			return false;
@@ -302,7 +305,10 @@ struct Configuration
 	bool set(T)(string component, string key, T value)
 	{
 		if (base.type != JSON_TYPE.OBJECT)
-			return false;
+		{
+			JSONValue[string] tmp;
+			base = JSONValue(tmp);
+		}
 		auto com = component in base.object;
 		if (!com)
 		{
@@ -465,7 +471,7 @@ class WorkspaceD
 	Instance getInstance(string cwd) nothrow
 	{
 		cwd = buildNormalizedPath(cwd);
-		foreach (ref instance; instances)
+		foreach (instance; instances)
 			if (instance.cwd == cwd)
 				return instance;
 		return null;
@@ -857,6 +863,8 @@ version (unittest)
 	struct TestingWorkspace
 	{
 		string directory;
+
+		@disable this(this);
 
 		this(string path)
 		{
