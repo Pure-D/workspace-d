@@ -63,21 +63,25 @@ class DMDComponent : ComponentWrapper
 			pipes.stdin.close();
 			if (i == 0)
 			{
-				sw.start();
+				if (count == 0)
+					sw.start();
 				ret.log = pipes.stdout.byLineCopy().array;
 				auto status = pipes.pid.wait();
-				sw.stop();
+				if (count == 0)
+					sw.stop();
 				ret.success = status == 0;
 				ret.crash = status < 0;
 			}
 			else
 			{
-				sw.start();
+				if (count < 10 || i != 1)
+					sw.start();
 				pipes.pid.wait();
-				sw.stop();
+				if (count < 10 || i != 1)
+					sw.stop();
 				pipes.stdout.close();
+				effective++;
 			}
-			effective++;
 			if (!ret.success)
 				break;
 		}
