@@ -107,6 +107,9 @@ private:
 		string file = data.file;
 		int newPosition = data.position;
 
+		if (!file.length)
+			return InterfaceDetails.init;
+
 		string newCode = code;
 		if (file != "stdin")
 			newCode = readText(file);
