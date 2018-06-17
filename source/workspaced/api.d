@@ -600,6 +600,21 @@ class WorkspaceD
 		return inst;
 	}
 
+	bool removeInstance(string cwd)
+	{
+		cwd = buildNormalizedPath(cwd);
+		foreach (i, instance; instances)
+			if (instance.cwd == cwd)
+			{
+				foreach (com; instance.instanceComponents)
+					destroy(com.wrapper);
+				destroy(instance);
+				instances = instances.remove(i);
+				return true;
+			}
+		return false;
+	}
+
 	bool attach(Instance instance, string component)
 	{
 		foreach (factory; components)
