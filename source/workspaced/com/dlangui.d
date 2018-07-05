@@ -12,60 +12,32 @@ import painlessjson;
 import workspaced.api;
 import workspaced.completion.dml;
 
-@component("dlangui") :
-
-@load void start()
+@component("dlangui")
+class DlanguiComponent : ComponentWrapper
 {
-}
+	mixin DefaultComponentWrapper;
 
-@unload void stop()
-{
-}
-
-/// Queries for code completion at position `pos` in DML code
-/// Returns: `[{type: CompletionType, value: string, documentation: string, enumName: string}]`
-/// Where type is an integer
-/// Call_With: `{"subcmd": "list-completion"}`
-@arguments("subcmd", "list-completion")
-@async void complete(AsyncCallback cb, string code, int pos)
-{
-	new Thread({
-		try
-		{
-			LocationInfo info = getLocationInfo(code, pos);
-			CompletionItem[] suggestions;
-			string name = info.itemScope[$ - 1];
-			string[] stack;
-			if (info.itemScope.length > 1)
-				stack = info.itemScope[0 .. $ - 1];
-			string[][] curScope = stack.getProvidedScope();
-			if (info.type == LocationType.RootMember)
+	/// Queries for code completion at position `pos` in DML code
+	/// Returns: `[{type: CompletionType, value: string, documentation: string, enumName: string}]`
+	/// Where type is an integer
+	Future!(CompletionItem[]) complete(string code, int pos)
+	{
+		auto ret = new Future!(CompletionItem[]);
+		new Thread({
+			try
 			{
-				foreach (CompletionLookup item; dmlCompletions)
+				LocationInfo info = getLocationInfo(code, pos);
+				CompletionItem[] suggestions;
+				string name = info.itemScope[$ - 1];
+				string[] stack;
+				if (info.itemScope.length > 1)
+					stack = info.itemScope[0 .. $ - 1];
+				string[][] curScope = stack.getProvidedScope();
+				if (info.type == LocationType.RootMember)
 				{
-					if (item.item.type == CompletionType.Class)
+					foreach (CompletionLookup item; dmlCompletions)
 					{
-						if (name.length == 0 || item.item.value.canFind(name))
-						{
-							suggestions ~= item.item;
-						}
-					}
-				}
-			}
-			else if (info.type == LocationType.Member)
-			{
-				foreach (CompletionLookup item; dmlCompletions)
-				{
-					if (item.item.type == CompletionType.Class)
-					{
-						if (name.length == 0 || item.item.value.canFind(name))
-						{
-							suggestions ~= item.item;
-						}
-					}
-					else if (item.item.type != CompletionType.EnumDefinition)
-					{
-						if (curScope.canFind(item.requiredScope))
+						if (item.item.type == CompletionType.Class)
 						{
 							if (name.length == 0 || item.item.value.canFind(name))
 							{
@@ -74,69 +46,74 @@ import workspaced.completion.dml;
 						}
 					}
 				}
-			}
-			else if (info.type == LocationType.PropertyValue)
-			{
-				foreach (CompletionLookup item; dmlCompletions)
+				else if (info.type == LocationType.Member)
 				{
-					if (item.item.type == CompletionType.EnumValue)
+					foreach (CompletionLookup item; dmlCompletions)
 					{
-						if (curScope.canFind(item.requiredScope))
+						if (item.item.type == CompletionType.Class)
 						{
-							if (item.item.value == name)
+							if (name.length == 0 || item.item.value.canFind(name))
 							{
-								foreach (CompletionLookup enumdef; dmlCompletions)
-								{
-									if (enumdef.item.type == CompletionType.EnumDefinition)
-									{
-										if (enumdef.item.enumName == item.item.enumName)
-											suggestions ~= enumdef.item;
-									}
-								}
-								break;
+								suggestions ~= item.item;
 							}
 						}
-					}
-					else if (item.item.type == CompletionType.Boolean)
-					{
-						if (curScope.canFind(item.requiredScope))
+						else if (item.item.type != CompletionType.EnumDefinition)
 						{
-							if (item.item.value == name)
+							if (curScope.canFind(item.requiredScope))
 							{
-								suggestions ~= CompletionItem(CompletionType.Keyword, "true");
-								suggestions ~= CompletionItem(CompletionType.Keyword, "false");
-								break;
+								if (name.length == 0 || item.item.value.canFind(name))
+								{
+									suggestions ~= item.item;
+								}
 							}
 						}
 					}
 				}
+				else if (info.type == LocationType.PropertyValue)
+				{
+					foreach (CompletionLookup item; dmlCompletions)
+					{
+						if (item.item.type == CompletionType.EnumValue)
+						{
+							if (curScope.canFind(item.requiredScope))
+							{
+								if (item.item.value == name)
+								{
+									foreach (CompletionLookup enumdef; dmlCompletions)
+									{
+										if (enumdef.item.type == CompletionType.EnumDefinition)
+										{
+											if (enumdef.item.enumName == item.item.enumName)
+												suggestions ~= enumdef.item;
+										}
+									}
+									break;
+								}
+							}
+						}
+						else if (item.item.type == CompletionType.Boolean)
+						{
+							if (curScope.canFind(item.requiredScope))
+							{
+								if (item.item.value == name)
+								{
+									suggestions ~= CompletionItem(CompletionType.Keyword, "true");
+									suggestions ~= CompletionItem(CompletionType.Keyword, "false");
+									break;
+								}
+							}
+						}
+					}
+				}
+				ret.finish(suggestions);
 			}
-			cb(null, suggestions.toJSON);
-		}
-		catch (Throwable e)
-		{
-			cb(e, JSONValue(null));
-		}
-	}).start();
-}
-
-string[][] getProvidedScope(string[] stack)
-{
-	if (stack.length == 0)
-		return [];
-	string[][] providedScope;
-	foreach (CompletionLookup item; dmlCompletions)
-	{
-		if (item.item.type == CompletionType.Class)
-		{
-			if (item.item.value == stack[$ - 1])
+			catch (Throwable e)
 			{
-				providedScope ~= item.providedScope;
-				break;
+				ret.error(e);
 			}
-		}
+		}).start();
+		return ret;
 	}
-	return providedScope;
 }
 
 ///
@@ -185,6 +162,25 @@ struct CompletionLookup
 }
 
 private:
+
+string[][] getProvidedScope(string[] stack)
+{
+	if (stack.length == 0)
+		return [];
+	string[][] providedScope;
+	foreach (CompletionLookup item; dmlCompletions)
+	{
+		if (item.item.type == CompletionType.Class)
+		{
+			if (item.item.value == stack[$ - 1])
+			{
+				providedScope ~= item.providedScope;
+				break;
+			}
+		}
+	}
+	return providedScope;
+}
 
 enum LocationType : ubyte
 {
@@ -307,8 +303,7 @@ unittest
 	assertEqual(info.itemScope, ["TableLayout", "margins"]);
 	assertEqual(info.type, LocationType.PropertyValue);
 	info = getLocationInfo(
-			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\" } } ",
-			int.max);
+			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\" } } ", int.max);
 	assertEqual(info.itemScope, [""]);
 	assertEqual(info.type, LocationType.RootMember);
 	info = getLocationInfo(

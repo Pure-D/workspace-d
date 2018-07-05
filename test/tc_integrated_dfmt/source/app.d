@@ -6,5 +6,10 @@ import workspaced.coms;
 
 void main()
 {
-	assert(syncBlocking!(dfmt.format)("void main(){}").str.splitLines.length > 1);
+	string dir = getcwd;
+	auto backend = new WorkspaceD();
+	backend.register!DfmtComponent;
+
+	auto dfmt = backend.get!DfmtComponent;
+	assert(dfmt.format("void main(){}").getBlocking.splitLines.length > 1);
 }

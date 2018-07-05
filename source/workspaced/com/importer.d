@@ -13,116 +13,120 @@ import std.string;
 
 import workspaced.api;
 
-@component("importer") :
-
-/// Initializes the import parser. Call with `{"cmd": "load", "components": ["importer"]}`
-@load void start()
+@component("importer")
+class ImporterComponent : ComponentWrapper
 {
-	config.stringBehavior = StringBehavior.source;
-	cache = new StringCache(StringCache.defaultBucketCount);
-}
+	mixin DefaultComponentWrapper;
 
-/// Has no purpose right now.
-@unload void stop()
-{
-}
-
-/// Returns all imports available at some code position.
-/// Call_With: `{"subcmd": "get"}`
-@arguments("subcmd", "get")
-ImportInfo[] get(string code, int pos)
-{
-	auto tokens = getTokensForParser(cast(ubyte[]) code, config, cache);
-	auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
-	auto reader = new ImporterReaderVisitor(pos);
-	reader.visit(mod);
-	return reader.imports;
-}
-
-/// Returns a list of code patches for adding an import.
-/// If `insertOutermost` is false, the import will get added to the innermost block.
-/// Call_With: `{"subcmd": "add"}`
-@arguments("subcmd", "add")
-ImportModification add(string importName, string code, int pos, bool insertOutermost = true)
-{
-	auto tokens = getTokensForParser(cast(ubyte[]) code, config, cache);
-	auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
-	auto reader = new ImporterReaderVisitor(pos);
-	reader.visit(mod);
-	foreach (i; reader.imports)
+	protected void load()
 	{
-		if (i.name.join('.') == importName)
+		if (!refInstance)
+			throw new Exception("importer requires to be instanced");
+
+		config.stringBehavior = StringBehavior.source;
+	}
+
+	/// Returns all imports available at some code position.
+	ImportInfo[] get(string code, int pos)
+	{
+		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
+		auto reader = new ImporterReaderVisitor(pos);
+		reader.visit(mod);
+		return reader.imports;
+	}
+
+	/// Returns a list of code patches for adding an import.
+	/// If `insertOutermost` is false, the import will get added to the innermost block.
+	ImportModification add(string importName, string code, int pos, bool insertOutermost = true)
+	{
+		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
+		auto reader = new ImporterReaderVisitor(pos);
+		reader.visit(mod);
+		foreach (i; reader.imports)
 		{
-			if (i.selectives.length == 0)
-				return ImportModification(i.rename, []);
-			else
-				insertOutermost = false;
+			if (i.name.join('.') == importName)
+			{
+				if (i.selectives.length == 0)
+					return ImportModification(i.rename, []);
+				else
+					insertOutermost = false;
+			}
+		}
+		string indentation = "";
+		if (insertOutermost)
+		{
+			indentation = reader.outerImportLocation == 0 ? "" : (cast(ubyte[]) code)
+				.getIndentation(reader.outerImportLocation);
+			if (reader.isModule)
+				indentation = '\n' ~ indentation;
+			return ImportModification("", [CodeReplacement([reader.outerImportLocation, reader.outerImportLocation],
+					indentation ~ "import " ~ importName ~ ";" ~ (reader.outerImportLocation == 0 ? "\n" : ""))]);
+		}
+		else
+		{
+			indentation = (cast(ubyte[]) code).getIndentation(reader.innermostBlockStart);
+			if (reader.isModule)
+				indentation = '\n' ~ indentation;
+			return ImportModification("", [CodeReplacement([reader.innermostBlockStart,
+					reader.innermostBlockStart], indentation ~ "import " ~ importName ~ ";")]);
 		}
 	}
-	string indentation = "";
-	if (insertOutermost)
-	{
-		indentation = reader.outerImportLocation == 0 ? "" : (cast(ubyte[]) code)
-			.getIndentation(reader.outerImportLocation);
-		if (reader.isModule)
-			indentation = '\n' ~ indentation;
-		return ImportModification("", [CodeReplacement([reader.outerImportLocation, reader.outerImportLocation],
-				indentation ~ "import " ~ importName ~ ";" ~ (reader.outerImportLocation == 0 ? "\n" : ""))]);
-	}
-	else
-	{
-		indentation = (cast(ubyte[]) code).getIndentation(reader.innermostBlockStart);
-		if (reader.isModule)
-			indentation = '\n' ~ indentation;
-		return ImportModification("", [CodeReplacement([reader.innermostBlockStart,
-				reader.innermostBlockStart], indentation ~ "import " ~ importName ~ ";")]);
-	}
-}
 
-/// Sorts the imports in a whitespace separated group of code
-/// Returns `ImportBlock.init` if no changes would be done.
-@arguments("subcmd", "sort-imports")
-ImportBlock sortImports(string code, int pos)
-{
-	bool startBlock = true;
-	size_t start, end;
-	// find block of code separated by empty lines
-	foreach (line; code.lineSplitter!(KeepTerminator.yes))
+	/// Sorts the imports in a whitespace separated group of code
+	/// Returns `ImportBlock.init` if no changes would be done.
+	ImportBlock sortImports(string code, int pos)
 	{
-		if (startBlock)
-			start = end;
-		startBlock = line.strip.length == 0;
-		if (startBlock && end >= pos)
-			break;
-		end += line.length;
+		bool startBlock = true;
+		size_t start, end;
+		// find block of code separated by empty lines
+		foreach (line; code.lineSplitter!(KeepTerminator.yes))
+		{
+			if (startBlock)
+				start = end;
+			startBlock = line.strip.length == 0;
+			if (startBlock && end >= pos)
+				break;
+			end += line.length;
+		}
+		if (end > start && end + 1 < code.length)
+			end--;
+		if (start >= end || end >= code.length)
+			return ImportBlock.init;
+		auto part = code[start .. end];
+		auto tokens = getTokensForParser(cast(ubyte[]) part, config, &workspaced.stringCache);
+		auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
+		auto reader = new ImporterReaderVisitor(-1);
+		reader.visit(mod);
+		auto imports = reader.imports;
+		auto sorted = imports.map!(a => ImportInfo(a.name, a.rename,
+				a.selectives.dup.sort!((c, d) => icmp(c.effectiveName, d.effectiveName) < 0).array)).array.sort!((a,
+				b) => icmp(a.effectiveName, b.effectiveName) < 0).array;
+		if (sorted == imports)
+			return ImportBlock.init;
+		return ImportBlock(cast(int) start, cast(int) end, sorted);
 	}
-	if (end > start && end + 1 < code.length)
-		end--;
-	if (start >= end || end >= code.length)
-		return ImportBlock.init;
-	auto part = code[start .. end];
-	auto tokens = getTokensForParser(cast(ubyte[]) part, config, cache);
-	auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
-	auto reader = new ImporterReaderVisitor(-1);
-	reader.visit(mod);
-	auto imports = reader.imports;
-	auto sorted = imports.map!(a => ImportInfo(a.name, a.rename,
-			a.selectives.dup.sort!((c, d) => icmp(c.effectiveName, d.effectiveName) < 0).array)).array.sort!((a,
-			b) => icmp(a.effectiveName, b.effectiveName) < 0).array;
-	if (sorted == imports)
-		return ImportBlock.init;
-	return ImportBlock(cast(int) start, cast(int) end, sorted);
+
+private:
+	RollbackAllocator rba;
+	LexerConfig config;
 }
 
 unittest
 {
 	import std.conv : to;
 
-	void assertEqual(A, B)(A a, B b) {
+	void assertEqual(A, B)(A a, B b)
+	{
 		assert(a == b, a.to!string ~ " is not equal to " ~ b.to!string);
 	}
 
-	start();
+	auto backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!ImporterComponent;
+
 	string code = `import std.stdio;
 import std.algorithm;
 import std.array;
@@ -148,7 +152,7 @@ import std.stdio : writeln, File, stdout, err = stderr;
 void main() {}`;
 
 	//dfmt off
-	assertEqual(code.sortImports(0), ImportBlock(0, 164, [
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 0), ImportBlock(0, 164, [
 		ImportInfo(["std", "algorithm"]),
 		ImportInfo(["std", "array"]),
 		ImportInfo(["std", "experimental", "logger"]),
@@ -159,12 +163,12 @@ void main() {}`;
 		ImportInfo(["std", "stdio"])
 	]));
 
-	assertEqual(code.sortImports(192), ImportBlock(166, 209, [
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 192), ImportBlock(166, 209, [
 		ImportInfo(["core", "sync", "mutex"]),
 		ImportInfo(["core", "thread"])
 	]));
 
-	assertEqual(code.sortImports(238), ImportBlock(211, 457, [
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 238), ImportBlock(211, 457, [
 		ImportInfo(["gdk", "Event"]),
 		ImportInfo(["gdk", "Screen"]),
 		ImportInfo(["gtk", "Button"]),
@@ -185,9 +189,9 @@ void main() {}`;
 		ImportInfo(["gtkc", "gtk"])
 	]));
 
-	assertEqual(code.sortImports(467), ImportBlock.init);
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 467), ImportBlock.init);
 
-	assertEqual(code.sortImports(546), ImportBlock(491, 546, [
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 546), ImportBlock(491, 546, [
 		ImportInfo(["std", "stdio"], "", [
 			SelectiveImport("stderr", "err"),
 			SelectiveImport("File"),
@@ -196,8 +200,6 @@ void main() {}`;
 		])
 	]));
 	//dfmt on
-
-	stop();
 }
 
 /// Information about how to add an import
@@ -266,10 +268,7 @@ struct ImportBlock
 	ImportInfo[] imports;
 }
 
-private __gshared:
-RollbackAllocator rba;
-LexerConfig config;
-StringCache* cache;
+private:
 
 string getIndentation(ubyte[] code, size_t index)
 {
@@ -394,8 +393,11 @@ unittest
 {
 	import std.conv;
 
-	start();
-	auto imports = get("import std.stdio; void foo() { import fs = std.file; import std.algorithm : map, each2 = each; writeln(\"hi\"); } void bar() { import std.string; import std.regex : ctRegex; }",
+	auto backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!ImporterComponent;
+	auto imports = backend.get!ImporterComponent(workspace.directory).get("import std.stdio; void foo() { import fs = std.file; import std.algorithm : map, each2 = each; writeln(\"hi\"); } void bar() { import std.string; import std.regex : ctRegex; }",
 			81);
 	bool equalsImport(ImportInfo i, string s)
 	{
@@ -418,51 +420,49 @@ unittest
 	assertEquals(imports[2].selectives[1].rename, "each2");
 
 	string code = "void foo() { import std.stdio : stderr; writeln(\"hi\"); }";
-	auto mod = add("std.stdio", code, 45);
+	auto mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"void foo() { import std.stdio : stderr; import std.stdio; writeln(\"hi\"); }");
 
 	code = "void foo() {\n\timport std.stdio : stderr;\n\twriteln(\"hi\");\n}";
-	mod = add("std.stdio", code, 45);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"void foo() {\n\timport std.stdio : stderr;\n\timport std.stdio;\n\twriteln(\"hi\");\n}");
 
 	code = "void foo() {\n\timport std.file : readText;\n\twriteln(\"hi\");\n}";
-	mod = add("std.stdio", code, 45);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"import std.stdio;\nvoid foo() {\n\timport std.file : readText;\n\twriteln(\"hi\");\n}");
 
 	code = "void foo() { import io = std.stdio; io.writeln(\"hi\"); }";
-	mod = add("std.stdio", code, 45);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 45);
 	assertEquals(mod.rename, "io");
 	assertEquals(mod.replacements.length, 0);
 
 	code = "import std.file : readText;\n\nvoid foo() {\n\twriteln(\"hi\");\n}";
-	mod = add("std.stdio", code, 45);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 45);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"import std.file : readText;\nimport std.stdio;\n\nvoid foo() {\n\twriteln(\"hi\");\n}");
 
 	code = "import std.file;\nimport std.regex;\n\nvoid foo() {\n\twriteln(\"hi\");\n}";
-	mod = add("std.stdio", code, 54);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 54);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"import std.file;\nimport std.regex;\nimport std.stdio;\n\nvoid foo() {\n\twriteln(\"hi\");\n}");
 
 	code = "module a;\n\nvoid foo() {\n\twriteln(\"hi\");\n}";
-	mod = add("std.stdio", code, 30);
+	mod = backend.get!ImporterComponent(workspace.directory).add("std.stdio", code, 30);
 	assertEquals(mod.rename, "");
 	assertEquals(mod.replacements.length, 1);
 	assertEquals(mod.replacements[0].apply(code),
 			"module a;\n\nimport std.stdio;\n\nvoid foo() {\n\twriteln(\"hi\");\n}");
-
-	stop();
 }

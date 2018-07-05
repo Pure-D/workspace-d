@@ -14,98 +14,90 @@ import painlessjson;
 
 import workspaced.api;
 
-///
-@load void start(string dir, string dmdPath = "dmd")
+@component("dmd")
+class DMDComponent : ComponentWrapper
 {
-	_cwd = dir;
-	_dmd = dmdPath;
-}
+	mixin DefaultComponentWrapper;
 
-/// Unloads dfmt. Has no purpose right now.
-@unload void stop()
-{
-}
-
-/// Tries to compile a snippet of code with the import paths in the current directory. The arguments `-c -o-` are implicit.
-/// The sync function may be used to prevent other measures from running while this is running.
-/// Params:
-///   cb = async callback
-///   code = small code snippet to try to compile
-///   dmdArguments = additional arguments to pass to dmd before file name
-///   count = how often to compile (duration is divided by either this or less in case timeout is reached)
-///   timeoutMsecs = when to abort compilation after, note that this will not abort mid-compilation but not do another iteration if this timeout has been reached.
-/// Returns: [DMDMeasureReturn] containing logs from only the first compilation pass
-/// Call_With: `{"subcmd": "measure"}`
-@arguments("subcmd", "measure")
-@async void measure(AsyncCallback cb, string code, string[] dmdArguments = [],
-		int count = 1, int timeoutMsecs = 5000)
-{
-	new Thread({
-		try
-		{
-			cb(null, measureSync(code, dmdArguments, count, timeoutMsecs).toJSON);
-		}
-		catch (Throwable t)
-		{
-			cb(t, JSONValue(null));
-		}
-	}).start();
-}
-
-/// ditto
-@arguments("subcmd", "measure-sync")
-DMDMeasureReturn measureSync(string code, string[] dmdArguments = [],
-		int count = 1, int timeoutMsecs = 5000)
-{
-	dmdArguments ~= ["-c", "-o-"];
-	DMDMeasureReturn ret;
-
-	auto timeout = timeoutMsecs.msecs;
-
-	StopWatch sw;
-
-	int effective;
-
-	foreach (i; 0 .. count)
+	/// Tries to compile a snippet of code with the import paths in the current directory. The arguments `-c -o-` are implicit.
+	/// The sync function may be used to prevent other measures from running while this is running.
+	/// Params:
+	///   cb = async callback
+	///   code = small code snippet to try to compile
+	///   dmdArguments = additional arguments to pass to dmd before file name
+	///   count = how often to compile (duration is divided by either this or less in case timeout is reached)
+	///   timeoutMsecs = when to abort compilation after, note that this will not abort mid-compilation but not do another iteration if this timeout has been reached.
+	/// Returns: [DMDMeasureReturn] containing logs from only the first compilation pass
+	Future!DMDMeasureReturn measure(string code, string[] dmdArguments = [],
+			int count = 1, int timeoutMsecs = 5000)
 	{
-		if (sw.peek >= timeout)
-			break;
-		string[] baseArgs = [_dmd];
-		foreach (path; importPathProvider())
-			baseArgs ~= "-I=" ~ path;
-		foreach (path; stringImportPathProvider())
-			baseArgs ~= "-J=" ~ path;
-		auto pipes = pipeProcess(baseArgs ~ dmdArguments ~ "-",
-			Redirect.stderrToStdout | Redirect.stdout | Redirect.stdin, null, Config.none, _cwd);
-		pipes.stdin.write(code);
-		pipes.stdin.close();
-		if (i == 0)
-		{
-			sw.start();
-			ret.log = pipes.stdout.byLineCopy().array;
-			auto status = pipes.pid.wait();
-			sw.stop();
-			ret.success = status == 0;
-			ret.crash = status < 0;
-		}
-		else
-		{
-			sw.start();
-			pipes.pid.wait();
-			sw.stop();
-			pipes.stdout.close();
-		}
-		effective++;
-		if (!ret.success)
-			break;
+		return Future!DMDMeasureReturn.async(() => measureSync(code, dmdArguments, count, timeoutMsecs));
 	}
 
-	ret.duration = sw.peek;
+	/// ditto
+	DMDMeasureReturn measureSync(string code, string[] dmdArguments = [],
+			int count = 1, int timeoutMsecs = 5000)
+	{
+		dmdArguments ~= ["-c", "-o-"];
+		DMDMeasureReturn ret;
 
-	if (effective > 0)
-		ret.duration = ret.duration / effective;
+		auto timeout = timeoutMsecs.msecs;
 
-	return ret;
+		StopWatch sw;
+
+		int effective;
+
+		foreach (i; 0 .. count)
+		{
+			if (sw.peek >= timeout)
+				break;
+			string[] baseArgs = [path];
+			foreach (path; importPaths)
+				baseArgs ~= "-I=" ~ path;
+			foreach (path; stringImportPaths)
+				baseArgs ~= "-J=" ~ path;
+			auto pipes = pipeProcess(baseArgs ~ dmdArguments ~ "-",
+					Redirect.stderrToStdout | Redirect.stdout | Redirect.stdin, null,
+					Config.none, instance.cwd);
+			pipes.stdin.write(code);
+			pipes.stdin.close();
+			if (i == 0)
+			{
+				if (count == 0)
+					sw.start();
+				ret.log = pipes.stdout.byLineCopy().array;
+				auto status = pipes.pid.wait();
+				if (count == 0)
+					sw.stop();
+				ret.success = status == 0;
+				ret.crash = status < 0;
+			}
+			else
+			{
+				if (count < 10 || i != 1)
+					sw.start();
+				pipes.pid.wait();
+				if (count < 10 || i != 1)
+					sw.stop();
+				pipes.stdout.close();
+				effective++;
+			}
+			if (!ret.success)
+				break;
+		}
+
+		ret.duration = sw.peek;
+
+		if (effective > 0)
+			ret.duration = ret.duration / effective;
+
+		return ret;
+	}
+
+	string path() @property @ignoredFunc
+	{
+		return config.get("dmd", "path", "dmd");
+	}
 }
 
 ///
@@ -113,10 +105,12 @@ unittest
 {
 	import std.stdio;
 
-	start(".", "dmd");
-	scope (exit)
-		stop();
-	auto measure = DMDMeasureReturn.fromJSON(syncBlocking!measure("import std.stdio;", null, 100));
+	auto backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DMDComponent;
+	auto measure = backend.get!DMDComponent(workspace.directory)
+		.measure("import std.stdio;", null, 100).getBlocking;
 	assert(measure.success);
 	assert(measure.duration < 5.seconds);
 }
@@ -161,7 +155,3 @@ struct DMDMeasureReturn
 		//dfmt on
 	}
 }
-
-private __gshared:
-
-string _cwd, _dmd;

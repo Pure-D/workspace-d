@@ -9,8 +9,14 @@ import std.traits;
 import workspaced.api;
 import workspaced.coms;
 
+WorkspaceD backend;
+
 void main()
 {
+	string dir = buildNormalizedPath(getcwd, "..", "tc_fsworkspace");
+	backend = new WorkspaceD();
+	backend.register!DubComponent;
+
 	assert(tryDub("valid"));
 	assert(!tryDub("empty1"));
 	assert(!tryDub("empty2"));
@@ -24,6 +30,7 @@ void main()
 
 bool tryDub(string path)
 {
+	DubComponent dub;
 	try
 	{
 		if (exists(buildNormalizedPath(getcwd, path, ".dub")))
@@ -31,7 +38,9 @@ bool tryDub(string path)
 		if (exists(buildNormalizedPath(getcwd, path, "dub.selections.json")))
 			remove(buildNormalizedPath(getcwd, path, "dub.selections.json"));
 
-		dub.startup(buildNormalizedPath(getcwd, path));
+		auto dir = buildNormalizedPath(getcwd, path);
+		backend.addInstance(dir);
+		dub = backend.get!DubComponent(dir);
 	}
 	catch (Exception e)
 	{
@@ -39,56 +48,57 @@ bool tryDub(string path)
 		return false;
 	}
 
-	scope (exit)
-		dub.stop();
+	auto tryRun(string fn, Args...)(string trace, Args args)
+	{
+		try
+		{
+			scope (success)
+				stderr.writeln(trace, ": pass ", fn);
+			mixin("return dub." ~ fn ~ "(args);");
+		}
+		catch (Exception e)
+		{
+			stderr.writeln(trace, ": failed to run ", fn, ": ", e.msg);
+			static if (!is(typeof(return) == void))
+				return typeof(return).init;
+		}
+		catch (Error e)
+		{
+			stderr.writeln(trace, ": assert error in ", fn, ": ", e.msg);
+			throw e;
+		}
+	}
+
 	foreach (step; 0 .. 2)
 	{
-		path.tryRun!(dub.upgrade)();
-		path.tryRun!(dub.dependencies)();
-		path.tryRun!(dub.rootDependencies)();
-		path.tryRun!(dub.imports)();
-		path.tryRun!(dub.stringImports)();
-		path.tryRun!(dub.fileImports)();
-		path.tryRun!(dub.configurations)();
-		path.tryRun!(dub.buildTypes)();
-		path.tryRun!(dub.configuration)();
-		path.tryRun!(dub.setConfiguration)(dub.configuration);
-		path.tryRun!(dub.archTypes)();
-		path.tryRun!(dub.archType)();
-		path.tryRun!(dub.setArchType)(JSONValue(["arch-type" : JSONValue("x86")]));
-		path.tryRun!(dub.buildType)();
-		path.tryRun!(dub.setBuildType)(JSONValue(["build-type" : JSONValue("debug")]));
-		path.tryRun!(dub.compiler)();
+		tryRun!"upgrade"(path);
+		tryRun!"dependencies"(path);
+		tryRun!"rootDependencies"(path);
+		tryRun!"imports"(path);
+		tryRun!"stringImports"(path);
+		tryRun!"fileImports"(path);
+		tryRun!"configurations"(path);
+		tryRun!"buildTypes"(path);
+		tryRun!"configuration"(path);
+		tryRun!"setConfiguration"(path, dub.configuration);
+		tryRun!"archTypes"(path);
+		tryRun!"archType"(path);
+		tryRun!"setArchType"(path, JSONValue(["arch-type" : JSONValue("x86")]));
+		tryRun!"buildType"(path);
+		tryRun!"setBuildType"(path, JSONValue(["build-type" : JSONValue("debug")]));
+		tryRun!"compiler"(path);
 		static if (Compiler.vendor == Compiler.Vendor.gnu)
-			path.tryRun!(dub.setCompiler)("gdc");
+			tryRun!"setCompiler"(path, "gdc");
 		else static if (Compiler.vendor == Compiler.Vendor.llvm)
-			path.tryRun!(dub.setCompiler)("ldc");
+			tryRun!"setCompiler"(path, "ldc");
 		else
-			path.tryRun!(dub.setCompiler)("dmd");
-		path.tryRun!(dub.name)();
-		path.tryRun!(dub.path)();
-		path.tryRun!(syncBlocking!(dub.build));
+			tryRun!"setCompiler"(path, "dmd");
+		tryRun!"name"(path);
+		tryRun!"path"(path);
+		tryRun!"build.getBlocking"(path);
 		// restart
-		path.tryRun!(syncBlocking!(dub.update));
+		tryRun!"update.getBlocking"(path);
 	}
 
 	return true;
-}
-
-void tryRun(alias fn, Args...)(string trace, Args args)
-{
-	try
-	{
-		fn(args);
-		stderr.writeln(trace, ": pass ", fullyQualifiedName!fn);
-	}
-	catch (Exception e)
-	{
-		stderr.writeln(trace, ": failed to run ", fullyQualifiedName!fn, ": ", e.msg);
-	}
-	catch (Error e)
-	{
-		stderr.writeln(trace, ": assert error in ", fullyQualifiedName!fn, ": ", e.msg);
-		throw e;
-	}
 }

@@ -15,94 +15,119 @@ import std.string;
 
 import workspaced.api;
 import workspaced.dparseext;
+import workspaced.com.dcd;
 
-private import dcd = workspaced.com.dcd;
-
-@component("dcdext") :
-
-/// Loads dcd extension methods. Call with `{"cmd": "load", "components": ["dcdext"]}`
-@load void start()
+@component("dcdext")
+class DCDExtComponent : ComponentWrapper
 {
-	config.stringBehavior = StringBehavior.source;
-	cache = new StringCache(StringCache.defaultBucketCount);
-}
+	mixin DefaultComponentWrapper;
 
-/// Has no purpose right now.
-@unload void stop()
-{
-}
+	/// Loads dcd extension methods. Call with `{"cmd": "load", "components": ["dcdext"]}`
+	void load()
+	{
+		if (!refInstance)
+			return;
 
-/// Implements an interface or abstract class
-/// Returns: string
-/// Call_With: `{"subcmd": "implement"}`
-@arguments("subcmd", "implement")
-@async void implement(AsyncCallback cb, string code, int position)
-{
-	new Thread({
-		try
-		{
-			string changes;
-			void prependInterface(InterfaceDetails details, int maxDepth = 50)
+		config.stringBehavior = StringBehavior.source;
+	}
+
+	/// Implements an interface or abstract class
+	Future!string implement(string code, int position)
+	{
+		auto ret = new Future!string;
+		new Thread({
+			try
 			{
-				if (maxDepth <= 0)
-					return;
-				if (details.methods.length)
+				string changes;
+				void prependInterface(InterfaceDetails details, int maxDepth = 50)
 				{
-					changes ~= "// implement " ~ details.name ~ "\n\n";
-					foreach (fn; details.methods)
+					if (maxDepth <= 0)
+						return;
+					if (details.methods.length)
 					{
-						if (details.needsOverride)
-							changes ~= "override ";
-						changes ~= fn.signature[0 .. $ - 1];
-						changes ~= " {";
-						if (fn.signature[$ - 1] == '{') // has body
+						changes ~= "// implement " ~ details.name ~ "\n\n";
+						foreach (fn; details.methods)
 						{
-							changes ~= "\n\t";
-							if (fn.returnType != "void")
-								changes ~= "return ";
-							changes ~= "super." ~ fn.name;
-							if (fn.arguments.length)
-								changes ~= "(" ~ fn.arguments ~ ")";
-							else if (fn.returnType == "void")
-								changes ~= "()"; // make functions that don't return add (), otherwise they might be attributes and don't need that
-							changes ~= ";\n";
-						}
-						else if (fn.returnType != "void")
-						{
-							changes ~= "\n\t";
-							if (fn.isNothrowOrNogc)
+							if (details.needsOverride)
+								changes ~= "override ";
+							changes ~= fn.signature[0 .. $ - 1];
+							changes ~= " {";
+							if (fn.signature[$ - 1] == '{') // has body
 							{
-								if (fn.returnType.endsWith("[]"))
-									changes ~= "return null; // TODO: implement";
-								else
-									changes ~= "return " ~ fn.returnType ~ ".init; // TODO: implement";
+								changes ~= "\n\t";
+								if (fn.returnType != "void")
+									changes ~= "return ";
+								changes ~= "super." ~ fn.name;
+								if (fn.arguments.length)
+									changes ~= "(" ~ fn.arguments ~ ")";
+								else if (fn.returnType == "void")
+									changes ~= "()"; // make functions that don't return add (), otherwise they might be attributes and don't need that
+								changes ~= ";\n";
 							}
-							else
-								changes ~= `assert(false, "Method ` ~ fn.name ~ ` not implemented");`;
-							changes ~= "\n";
+							else if (fn.returnType != "void")
+							{
+								changes ~= "\n\t";
+								if (fn.isNothrowOrNogc)
+								{
+									if (fn.returnType.endsWith("[]"))
+										changes ~= "return null; // TODO: implement";
+									else
+										changes ~= "return " ~ fn.returnType ~ ".init; // TODO: implement";
+								}
+								else
+									changes ~= `assert(false, "Method ` ~ fn.name ~ ` not implemented");`;
+								changes ~= "\n";
+							}
+							changes ~= "}\n\n";
 						}
-						changes ~= "}\n\n";
 					}
+					if (!details.needsOverride || details.methods.length)
+						foreach (parent; details.parentPositions)
+							prependInterface(lookupInterface(details.code, parent), maxDepth - 1);
 				}
-				if (!details.needsOverride || details.methods.length)
-					foreach (parent; details.parentPositions)
-						prependInterface(lookupInterface(details.code, parent), maxDepth - 1);
-			}
 
-			prependInterface(lookupInterface(code, position));
-			cb(null, JSONValue(changes));
-		}
-		catch (Throwable t)
-		{
-			cb(t, JSONValue.init);
-		}
-	}).start();
+				prependInterface(lookupInterface(code, position));
+				ret.finish(changes);
+			}
+			catch (Throwable t)
+			{
+				ret.error(t);
+			}
+		}).start();
+		return ret;
+	}
+
+private:
+	RollbackAllocator rba;
+	LexerConfig config;
+
+	InterfaceDetails lookupInterface(string code, int position)
+	{
+		auto data = get!DCDComponent.findDeclaration(code, position).getBlocking;
+		string file = data.file;
+		int newPosition = data.position;
+
+		if (!file.length)
+			return InterfaceDetails.init;
+
+		string newCode = code;
+		if (file != "stdin")
+			newCode = readText(file);
+
+		return getInterfaceDetails(file, newCode, newPosition);
+	}
+
+	InterfaceDetails getInterfaceDetails(string file, string code, int position)
+	{
+		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		auto parsed = parseModule(tokens, file, &rba, (&doNothing).toDelegate);
+		auto reader = new InterfaceMethodFinder(code, position);
+		reader.visit(parsed);
+		return reader.details;
+	}
 }
 
-private __gshared:
-RollbackAllocator rba;
-LexerConfig config;
-StringCache* cache;
+private:
 
 struct MethodDetails
 {
@@ -119,30 +144,6 @@ struct InterfaceDetails
 	MethodDetails[] methods;
 	string[] parents;
 	int[] parentPositions;
-}
-
-InterfaceDetails lookupInterface(string code, int position)
-{
-	auto data = syncBlocking!(dcd.findDeclaration)(code, position);
-	if (data.type != JSON_TYPE.ARRAY)
-		return InterfaceDetails.init;
-	string file = data.array[0].str;
-	int newPosition = cast(int) data.array[1].integer;
-
-	string newCode = code;
-	if (file != "stdin")
-		newCode = readText(file);
-
-	return getInterfaceDetails(file, newCode, newPosition);
-}
-
-InterfaceDetails getInterfaceDetails(string file, string code, int position)
-{
-	auto tokens = getTokensForParser(cast(ubyte[]) code, config, cache);
-	auto parsed = parseModule(tokens, file, &rba, (&doNothing).toDelegate);
-	auto reader = new InterfaceMethodFinder(code, position);
-	reader.visit(parsed);
-	return reader.details;
 }
 
 final class InterfaceMethodFinder : ASTVisitor
