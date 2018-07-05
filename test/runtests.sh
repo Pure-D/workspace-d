@@ -10,6 +10,12 @@ COMPILER="$1"
 fail_count=0
 pass_count=0
 
+echo "Compiling workspace-d in release mode with ${COMPILER}..."
+
+pushd ..
+dub build --build=release --compiler="${COMPILER}"
+popd
+
 echo "Running tests with ${COMPILER}..."
 
 for testCase in tc*; do
