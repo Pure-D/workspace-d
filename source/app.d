@@ -231,6 +231,8 @@ int main(string[] args)
 
 		engine = new WorkspaceD();
 		engine.onBroadcast = (&broadcast).toDelegate;
+		scope (exit)
+			engine.shutdown();
 
 		writeMutex = new Mutex;
 		commandMutex = new Mutex;

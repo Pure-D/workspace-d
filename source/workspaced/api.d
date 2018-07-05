@@ -112,6 +112,10 @@ mixin template DefaultComponentWrapper()
 			return instance.cwd;
 		}
 
+		override void shutdown()
+		{
+		}
+
 		override void bind(WorkspaceD workspaced, WorkspaceD.Instance instance)
 		{
 			this.workspaced = workspaced;
@@ -251,6 +255,7 @@ interface ComponentWrapper
 {
 	void bind(WorkspaceD workspaced, WorkspaceD.Instance instance);
 	Future!JSONValue run(string method, JSONValue[] args);
+	void shutdown();
 }
 
 interface ComponentFactory
@@ -392,6 +397,13 @@ class WorkspaceD
 			return importFilesProvider ? importFilesProvider() : [];
 		}
 
+		void shutdown()
+		{
+			foreach (ref com; instanceComponents)
+				com.wrapper.shutdown();
+			instanceComponents = null;
+		}
+
 		ImportPathProvider importPathProvider;
 		ImportPathProvider stringImportPathProvider;
 		ImportPathProvider importFilesProvider;
@@ -460,6 +472,17 @@ class WorkspaceD
 	this()
 	{
 		stringCache = StringCache(StringCache.defaultBucketCount);
+	}
+
+	void shutdown()
+	{
+		foreach (ref instance; instances)
+			instance.shutdown();
+		instances = null;
+		foreach (ref com; globalComponents)
+			com.wrapper.shutdown();
+		globalComponents = null;
+		components = null;
 	}
 
 	void broadcast(WorkspaceD.Instance instance, JSONValue value)

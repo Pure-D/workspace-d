@@ -77,8 +77,13 @@ class DCDComponent : ComponentWrapper
 		return !checkVersion(installedVersion, latestKnownVersion);
 	}
 
-	/// This stops the dcd-server instance safely and waits for it to exit
 	~this()
+	{
+		shutdown();
+	}
+
+	/// This stops the dcd-server instance safely and waits for it to exit
+	override void shutdown()
 	{
 		stopServerSync();
 	}
