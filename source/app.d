@@ -70,7 +70,8 @@ WorkspaceD engine;
 
 void handleRequest(int id, JSONValue request)
 {
-	if (request.type != JSON_TYPE.OBJECT || "cmd" !in request || request["cmd"].type != JSON_TYPE.STRING)
+	if (request.type != JSON_TYPE.OBJECT || "cmd" !in request
+			|| request["cmd"].type != JSON_TYPE.STRING)
 	{
 		goto printUsage;
 	}
@@ -131,9 +132,42 @@ void handleRequest(int id, JSONValue request)
 			sendResponse(id, JSONValue(true));
 		}
 	}
-	else if (request["cmd"].str == "config")
+	else if (request["cmd"].str == "config-set")
 	{
-		throw new Exception("Not implemented");
+		if ("config" !in request || request["config"].type != JSON_TYPE.OBJECT)
+		{
+		configSetFail:
+			sendException(id,
+					new Exception(
+						`Expected new message to be in format {"cmd":"config-set", ("cwd":string), "config":object}`));
+		}
+		else
+		{
+			if ("cwd" in request)
+			{
+				if (request["cwd"].type != JSON_TYPE.STRING)
+					goto configSetFail;
+				else
+					engine.getInstance(request["cwd"].str).config.base = request["config"];
+			}
+			else
+				engine.globalConfiguration.base = request["config"];
+			sendResponse(id, JSONValue(true));
+		}
+	}
+	else if (request["cmd"].str == "config-get")
+	{
+		if ("cwd" in request)
+		{
+			if (request["cwd"].type != JSON_TYPE.STRING)
+				sendException(id,
+						new Exception(
+							`Expected new message to be in format {"cmd":"config-get", ("cwd":string)}`));
+			else
+				sendResponse(id, engine.getInstance(request["cwd"].str).config.base);
+		}
+		else
+			sendResponse(id, engine.globalConfiguration.base);
 	}
 	else if (request["cmd"].str == "call")
 	{
@@ -206,8 +240,7 @@ void handleRequest(int id, JSONValue request)
 	else
 	{
 	printUsage:
-		sendException(id, new Exception(
-				"Invalid request, must contain a cmd string key with one of the values [version, load, new, config, call]"));
+		sendException(id, new Exception("Invalid request, must contain a cmd string key with one of the values [version, load, new, config-get, config-set, call, import-paths, import-files, string-import-paths]"));
 	}
 }
 
