@@ -62,17 +62,15 @@ void sendException(int id, Throwable t)
 
 void broadcast(WorkspaceD workspaced, WorkspaceD.Instance instance, JSONValue message)
 {
-	sendResponse(0x7F000000, JSONValue([
-		"workspace": JSONValue(instance ? instance.cwd : null),
-		"data": message
-	]));
+	sendResponse(0x7F000000, JSONValue(["workspace" : JSONValue(instance
+			? instance.cwd : null), "data" : message]));
 }
 
 WorkspaceD engine;
 
 void handleRequest(int id, JSONValue request)
 {
-	if ("cmd" !in request || request["cmd"].type != JSON_TYPE.STRING)
+	if (request.type != JSON_TYPE.OBJECT || "cmd" !in request || request["cmd"].type != JSON_TYPE.STRING)
 	{
 		goto printUsage;
 	}
@@ -85,10 +83,14 @@ void handleRequest(int id, JSONValue request)
 		if ("component" !in request || request["component"].type != JSON_TYPE.STRING)
 		{
 			sendException(id,
-					new Exception(`Expected load message to be in format {"cmd":"load", "component":string}`));
+					new Exception(
+						`Expected load message to be in format {"cmd":"load", "component":string, ("autoregister":bool)}`));
 		}
 		else
 		{
+			bool autoRegister = true;
+			if (auto v = "autoregister" in request)
+				autoRegister = v.type != JSON_TYPE.FALSE;
 			string[] allComponents;
 			static foreach (Component; AllComponents)
 				allComponents ~= getUDAs!(Component, ComponentInfo)[0].name;
@@ -98,7 +100,7 @@ void handleRequest(int id, JSONValue request)
 				static foreach (Component; AllComponents)
 				{
 			case getUDAs!(Component, ComponentInfo)[0].name:
-					engine.register!Component;
+					engine.register!Component(autoRegister);
 					break ComponentSwitch;
 				}
 			default:
@@ -175,6 +177,31 @@ void handleRequest(int id, JSONValue request)
 					sendResponse(id, ret.value);
 			};
 		}
+	}
+	else if (request["cmd"].str == "import-paths")
+	{
+		if ("cwd" !in request || request["cwd"].type != JSON_TYPE.STRING)
+			sendException(id,
+					new Exception(`Expected new message to be in format {"cmd":"import-paths", "cwd":string}`));
+		else
+			sendResponse(id, engine.getInstance(request["cwd"].str).importPaths.toJSON);
+	}
+	else if (request["cmd"].str == "import-files")
+	{
+		if ("cwd" !in request || request["cwd"].type != JSON_TYPE.STRING)
+			sendException(id,
+					new Exception(`Expected new message to be in format {"cmd":"import-files", "cwd":string}`));
+		else
+			sendResponse(id, engine.getInstance(request["cwd"].str).importFiles.toJSON);
+	}
+	else if (request["cmd"].str == "string-import-paths")
+	{
+		if ("cwd" !in request || request["cwd"].type != JSON_TYPE.STRING)
+			sendException(id,
+					new Exception(
+						`Expected new message to be in format {"cmd":"string-import-paths", "cwd":string}`));
+		else
+			sendResponse(id, engine.getInstance(request["cwd"].str).stringImportPaths.toJSON);
 	}
 	else
 	{
