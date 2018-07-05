@@ -21,6 +21,7 @@ echo "Running tests with ${COMPILER}..."
 for testCase in tc*; do
 	cd $testCase
 
+	dub upgrade
 	dub --compiler="${COMPILER}" >testout.txt 2>&1
 	if [[ $? -eq 0 ]]; then
 		echo -e "${YELLOW}$testCase:${NORMAL} ... ${GREEN}Pass${NORMAL}";
