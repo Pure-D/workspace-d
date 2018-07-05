@@ -133,8 +133,7 @@ class DscannerComponent : ComponentWrapper
 
 				RollbackAllocator r;
 				LexerConfig config;
-				StringCache cache = StringCache(StringCache.defaultBucketCount);
-				auto tokens = getTokensForParser(cast(ubyte[]) code, config, &cache);
+				auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 
 				void doNothing(string, size_t, size_t, string, bool)
 				{

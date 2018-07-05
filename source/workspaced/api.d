@@ -471,7 +471,7 @@ class WorkspaceD
 
 	this()
 	{
-		stringCache = StringCache(StringCache.defaultBucketCount);
+		stringCache = StringCache(StringCache.defaultBucketCount * 4);
 	}
 
 	void shutdown()
