@@ -234,7 +234,8 @@ class DCDComponent : ComponentWrapper
 					if (line.length == 0)
 						continue;
 					string[] splits = line.chomp.split('\t');
-					results ~= DCDSearchResult(splits[0], splits[2].to!int, splits[1]);
+					if (splits.length >= 3)
+						results ~= DCDSearchResult(splits[0], splits[2].to!int, splits[1]);
 				}
 				ret.finish(results);
 			}
