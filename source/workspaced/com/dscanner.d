@@ -10,10 +10,10 @@ import std.typecons;
 import core.sync.mutex;
 import core.thread;
 
-import analysis.base;
-import analysis.config;
-import analysis.run;
-import symbol_finder;
+import dscanner.analysis.base;
+import dscanner.analysis.config;
+import dscanner.analysis.run;
+import dscanner.symbol_finder;
 
 import inifiled : INI, readINIFile;
 
@@ -162,9 +162,9 @@ class DscannerComponent : ComponentWrapper
 		new Thread({
 			try
 			{
-				static import readers;
+				import dscanner.utils : expandArgs;
 
-				string[] paths = readers.expandArgs([""] ~ importPaths);
+				string[] paths = expandArgs([""] ~ importPaths);
 				foreach_reverse (i, path; paths)
 					if (path == "stdin")
 						paths = paths.remove(i);
@@ -502,8 +502,8 @@ final class DefinitionFinder : ASTVisitor
 	override void visit(const AliasDeclaration dec)
 	{
 		// Old style alias
-		if (dec.identifierList)
-			foreach (i; dec.identifierList.identifiers)
+		if (dec.declaratorIdentifierList)
+			foreach (i; dec.declaratorIdentifierList.identifiers)
 				definitions ~= makeDefinition(i.text, i.line, "a", context);
 		dec.accept(this);
 	}

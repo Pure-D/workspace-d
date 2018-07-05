@@ -176,13 +176,12 @@ final class InterfaceMethodFinder : ASTVisitor
 			if (baseClassList)
 				foreach (base; baseClassList.items)
 				{
-					if (!base.type2 || !base.type2.symbol || !base.type2.symbol.identifierOrTemplateChain
-							|| !base.type2.symbol.identifierOrTemplateChain.identifiersOrTemplateInstances.length)
+					if (!base.type2 || !base.type2.typeIdentifierPart
+							|| !base.type2.typeIdentifierPart.identifierOrTemplateInstance)
 						continue;
 					details.parents ~= astToString(base.type2);
 					details.parentPositions ~= cast(
-							int) base.type2.symbol.identifierOrTemplateChain
-						.identifiersOrTemplateInstances[0].identifier.index + 1;
+							int) base.type2.typeIdentifierPart.identifierOrTemplateInstance.identifier.index + 1;
 				}
 			inTarget = true;
 			details.needsOverride = needsOverride;
