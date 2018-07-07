@@ -5,7 +5,7 @@ import OS = std.system;
 import std.json;
 import std.conv;
 
-static immutable Version = [3, 1, 0];
+static immutable Version = [3, 2, 0];
 
 version (Windows) version (CRuntime_DigitalMars) static assert(false, "DigitalMars C Runtime not supported! Compile with -m32mscoff (dmd) or -a x86_mscoff (dub) See Also: https://github.com/Pure-D/code-d/issues/38");
 version (Windows) version (X86_64) static if (Compiler.name == "Digital Mars D")
