@@ -62,7 +62,7 @@ class DCDComponent : ComponentWrapper
 		supportsFullOutput = rawExec([clientPath, "--help"]).output.canFind("--extended");
 	}
 
-	/// Returns: true if DCD version is less than latestKnownVersion or if server and client mismatch.
+	/// Returns: true if DCD version is less than latestKnownVersion or if server and client mismatch or if it doesn't exist.
 	bool isOutdated()
 	{
 		if (!installedVersion)
@@ -70,9 +70,16 @@ class DCDComponent : ComponentWrapper
 			string clientPath = this.clientPath;
 			string serverPath = this.serverPath;
 
-			installedVersion = clientPath.getVersionAndFixPath;
-			if (serverPath.getVersionAndFixPath != installedVersion)
+			try
+			{
+				installedVersion = clientPath.getVersionAndFixPath;
+				if (serverPath.getVersionAndFixPath != installedVersion)
+					return true;
+			}
+			catch (ProcessException)
+			{
 				return true;
+			}
 		}
 		return !checkVersion(installedVersion, latestKnownVersion);
 	}
