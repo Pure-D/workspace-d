@@ -1,9 +1,10 @@
+/// Component for adding imports to a file, reading imports at a location of code and sorting imports.
 module workspaced.com.importer;
 
 import dparse.ast;
-import dparse.lexer;
 import dparse.parser;
 import dparse.rollback_allocator;
+import dparse.lexer;
 
 import std.algorithm;
 import std.array;
@@ -13,6 +14,7 @@ import std.string;
 
 import workspaced.api;
 
+/// ditto
 @component("importer")
 class ImporterComponent : ComponentWrapper
 {
@@ -20,9 +22,6 @@ class ImporterComponent : ComponentWrapper
 
 	protected void load()
 	{
-		if (!refInstance)
-			throw new Exception("importer requires to be instanced");
-
 		config.stringBehavior = StringBehavior.source;
 	}
 
