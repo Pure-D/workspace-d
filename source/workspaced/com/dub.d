@@ -355,7 +355,7 @@ class DubComponent : ComponentWrapper
 		auto compiler = getCompiler(_compilerBinaryName);
 		BuildSettings buildSettings;
 		compiler.determinePlatform(buildSettings, _compilerBinaryName, _archType);
-		return buildSettings.targetName.length > 0;
+		return true;
 	}
 
 	/// Asynchroniously builds the project WITHOUT OUTPUT. This is intended for linting code and showing build errors quickly inside the IDE.
@@ -371,9 +371,6 @@ class DubComponent : ComponentWrapper
 				BuildSettings buildSettings;
 				auto buildPlatform = compiler.determinePlatform(buildSettings,
 					_compilerBinaryName, _archType);
-
-				if (!buildSettings.targetName.length)
-					throw new Exception("No target name");
 
 				GeneratorSettings settings;
 				settings.platform = buildPlatform;
