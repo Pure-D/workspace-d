@@ -226,7 +226,10 @@ class DCDComponent : ComponentWrapper
 			try
 			{
 				if (!running)
+				{
+					ret.finish(null);
 					return;
+				}
 				auto pipes = doClient(["--search", query]);
 				scope (exit)
 				{
@@ -356,7 +359,10 @@ class DCDComponent : ComponentWrapper
 			try
 			{
 				if (!running)
+				{
+					ret.finish("");
 					return;
+				}
 				auto pipes = doClient(["--doc", "-c", pos.to!string]);
 				scope (exit)
 				{
