@@ -112,7 +112,7 @@ class DCDComponent : ComponentWrapper
 			if (i.length)
 				imports ~= "-I" ~ i;
 		this.runningPort = port;
-		this.socketFile = buildPath(tempDir, "workspace-d-sock" ~ thisProcessID.to!string);
+		this.socketFile = buildPath(tempDir, "workspace-d-sock" ~ thisProcessID.to!string ~ "-" ~ uniform!ulong.to!string(36));
 		serverPipes = raw([serverPath] ~ clientArgs ~ imports,
 				Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
 		while (!serverPipes.stderr.eof)
