@@ -27,14 +27,9 @@ class DCDComponent : ComponentWrapper
 {
 	mixin DefaultComponentWrapper;
 
-	enum latestKnownVersion = [0, 9, 0];
-	/// This will start dcd-server and load all import paths specified by previously loaded modules such as dub if autoStart is true.
-	/// It also checks for the installed DCD version.
-	void start()
+	enum latestKnownVersion = [0, 9, 8];
+	void load()
 	{
-		if (!refInstance)
-			return;
-
 		string clientPath = this.clientPath;
 		string serverPath = this.serverPath;
 
@@ -51,7 +46,7 @@ class DCDComponent : ComponentWrapper
 
 		version (haveUnixSockets)
 			hasUnixDomainSockets = supportsUnixDomainSockets(installedVersion);
-		startServer();
+
 		//dfmt off
 		if (isOutdated)
 			workspaced.broadcast(refInstance, JSONValue([
@@ -84,6 +79,12 @@ class DCDComponent : ComponentWrapper
 		return !checkVersion(installedVersion, latestKnownVersion);
 	}
 
+	/// Returns: the current detected installed version of dcd-client.
+	string clientInstalledVersion() @property const
+	{
+		return installedVersion;
+	}
+
 	~this()
 	{
 		shutdown();
@@ -111,7 +112,7 @@ class DCDComponent : ComponentWrapper
 			if (i.length)
 				imports ~= "-I" ~ i;
 		this.runningPort = port;
-		this.socketFile = buildPath(tempDir, "workspace-d-sock" ~ thisProcessID.to!string(36));
+		this.socketFile = buildPath(tempDir, "workspace-d-sock" ~ thisProcessID.to!string);
 		serverPipes = raw([serverPath] ~ clientArgs ~ imports,
 				Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
 		while (!serverPipes.stderr.eof)
@@ -652,6 +653,7 @@ unittest
 	assert(supportsUnixDomainSockets("0.8.0-beta2+9ec55f40a26f6bb3ca95dc9232a239df6ed25c37"));
 	assert(!supportsUnixDomainSockets("0.7.9-beta3"));
 	assert(!supportsUnixDomainSockets("0.7.0"));
+	assert(supportsUnixDomainSockets("v0.9.8 c7ea7e081ed9ad2d85e9f981fd047d7fcdb2cf51"));
 	assert(supportsUnixDomainSockets("1.0.0"));
 }
 
