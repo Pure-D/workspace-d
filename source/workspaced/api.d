@@ -743,7 +743,7 @@ bool checkVersion(string ver, int[3] target)
 	int patch = match[3].to!int;
 	if (major > target[0])
 		return true;
-	if (major == target[0] && minor >= target[1])
+	if (major == target[0] && minor > target[1])
 		return true;
 	if (major == target[0] && minor == target[1] && patch >= target[2])
 		return true;
