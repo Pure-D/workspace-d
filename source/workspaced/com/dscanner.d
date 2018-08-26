@@ -243,6 +243,8 @@ struct DefinitionElement
 	string type;
 	///
 	string[string] attributes;
+	///
+	int[2] range;
 }
 
 private:
@@ -314,7 +316,8 @@ final class DefinitionFinder : ASTVisitor
 {
 	override void visit(const ClassDeclaration dec)
 	{
-		definitions ~= makeDefinition(dec.name.text, dec.name.line, "c", context);
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "c", context,
+				[cast(int) dec.structBody.startLocation, cast(int) dec.structBody.endLocation]);
 		auto c = context;
 		context = ContextType(["class" : dec.name.text], "public");
 		dec.accept(this);
@@ -328,7 +331,8 @@ final class DefinitionFinder : ASTVisitor
 			dec.accept(this);
 			return;
 		}
-		definitions ~= makeDefinition(dec.name.text, dec.name.line, "s", context);
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "s", context,
+				[cast(int) dec.structBody.startLocation, cast(int) dec.structBody.endLocation]);
 		auto c = context;
 		context = ContextType(["struct" : dec.name.text], "public");
 		dec.accept(this);
@@ -337,7 +341,8 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const InterfaceDeclaration dec)
 	{
-		definitions ~= makeDefinition(dec.name.text, dec.name.line, "i", context);
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "i", context,
+				[cast(int) dec.structBody.startLocation, cast(int) dec.structBody.endLocation]);
 		auto c = context;
 		context = ContextType(["interface:" : dec.name.text], context.access);
 		dec.accept(this);
@@ -346,7 +351,8 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const TemplateDeclaration dec)
 	{
-		auto def = makeDefinition(dec.name.text, dec.name.line, "T", context);
+		auto def = makeDefinition(dec.name.text, dec.name.line, "T", context,
+				[cast(int) dec.startLocation, cast(int) dec.endLocation]);
 		def.attributes["signature"] = paramsToString(dec);
 		definitions ~= def;
 		auto c = context;
@@ -357,7 +363,9 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const FunctionDeclaration dec)
 	{
-		auto def = makeDefinition(dec.name.text, dec.name.line, "f", context);
+		auto def = makeDefinition(dec.name.text, dec.name.line, "f", context,
+				[cast(int) dec.functionBody.blockStatement.startLocation,
+				cast(int) dec.functionBody.blockStatement.endLocation]);
 		def.attributes["signature"] = paramsToString(dec);
 		if (dec.returnType !is null)
 			def.attributes["return"] = astToString(dec.returnType);
@@ -366,19 +374,24 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const Constructor dec)
 	{
-		auto def = makeDefinition("this", dec.line, "f", context);
+		auto def = makeDefinition("this", dec.line, "f", context,
+				[cast(int) dec.functionBody.blockStatement.startLocation,
+				cast(int) dec.functionBody.blockStatement.endLocation]);
 		def.attributes["signature"] = paramsToString(dec);
 		definitions ~= def;
 	}
 
 	override void visit(const Destructor dec)
 	{
-		definitions ~= makeDefinition("~this", dec.line, "f", context);
+		definitions ~= makeDefinition("~this", dec.line, "f", context,
+				[cast(int) dec.functionBody.blockStatement.startLocation,
+				cast(int) dec.functionBody.blockStatement.endLocation]);
 	}
 
 	override void visit(const EnumDeclaration dec)
 	{
-		definitions ~= makeDefinition(dec.name.text, dec.name.line, "g", context);
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "g", context,
+				[cast(int) dec.enumBody.startLocation, cast(int) dec.enumBody.endLocation]);
 		auto c = context;
 		context = ContextType(["enum" : dec.name.text], context.access);
 		dec.accept(this);
@@ -392,7 +405,8 @@ final class DefinitionFinder : ASTVisitor
 			dec.accept(this);
 			return;
 		}
-		definitions ~= makeDefinition(dec.name.text, dec.name.line, "u", context);
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "u", context,
+				[cast(int) dec.structBody.startLocation, cast(int) dec.structBody.endLocation]);
 		auto c = context;
 		context = ContextType(["union" : dec.name.text], context.access);
 		dec.accept(this);
@@ -401,31 +415,36 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const AnonymousEnumMember mem)
 	{
-		definitions ~= makeDefinition(mem.name.text, mem.name.line, "e", context);
+		definitions ~= makeDefinition(mem.name.text, mem.name.line, "e", context,
+				[cast(int) mem.name.index, cast(int) mem.name.index + cast(int) mem.name.text.length]);
 	}
 
 	override void visit(const EnumMember mem)
 	{
-		definitions ~= makeDefinition(mem.name.text, mem.name.line, "e", context);
+		definitions ~= makeDefinition(mem.name.text, mem.name.line, "e", context,
+				[cast(int) mem.name.index, cast(int) mem.name.index + cast(int) mem.name.text.length]);
 	}
 
 	override void visit(const VariableDeclaration dec)
 	{
 		foreach (d; dec.declarators)
-			definitions ~= makeDefinition(d.name.text, d.name.line, "v", context);
+			definitions ~= makeDefinition(d.name.text, d.name.line, "v", context,
+					[cast(int) d.name.index, cast(int) d.name.index + cast(int) d.name.text.length]);
 		dec.accept(this);
 	}
 
 	override void visit(const AutoDeclaration dec)
 	{
 		foreach (i; dec.parts.map!(a => a.identifier))
-			definitions ~= makeDefinition(i.text, i.line, "v", context);
+			definitions ~= makeDefinition(i.text, i.line, "v", context,
+					[cast(int) i.index, cast(int) i.index + cast(int) i.text.length]);
 		dec.accept(this);
 	}
 
 	override void visit(const Invariant dec)
 	{
-		definitions ~= makeDefinition("invariant", dec.line, "v", context);
+		definitions ~= makeDefinition("invariant", dec.line, "v", context,
+				[cast(int) dec.index, cast(int) dec.blockStatement.endLocation]);
 	}
 
 	override void visit(const ModuleDeclaration dec)
@@ -503,13 +522,15 @@ final class DefinitionFinder : ASTVisitor
 		// Old style alias
 		if (dec.declaratorIdentifierList)
 			foreach (i; dec.declaratorIdentifierList.identifiers)
-				definitions ~= makeDefinition(i.text, i.line, "a", context);
+				definitions ~= makeDefinition(i.text, i.line, "a", context,
+						[cast(int) i.index, cast(int) i.index + cast(int) i.text.length]);
 		dec.accept(this);
 	}
 
 	override void visit(const AliasInitializer dec)
 	{
-		definitions ~= makeDefinition(dec.name.text, dec.name.line, "a", context);
+		definitions ~= makeDefinition(dec.name.text, dec.name.line, "a", context,
+				[cast(int) dec.name.index, cast(int) dec.name.index + cast(int) dec.name.text.length]);
 
 		dec.accept(this);
 	}
@@ -517,7 +538,8 @@ final class DefinitionFinder : ASTVisitor
 	override void visit(const AliasThisDeclaration dec)
 	{
 		auto name = dec.identifier;
-		definitions ~= makeDefinition(name.text, name.line, "a", context);
+		definitions ~= makeDefinition(name.text, name.line, "a", context,
+				[cast(int) name.index, cast(int) name.index + cast(int) name.text.length]);
 
 		dec.accept(this);
 	}
@@ -529,12 +551,13 @@ final class DefinitionFinder : ASTVisitor
 	DefinitionElement[] definitions;
 }
 
-DefinitionElement makeDefinition(string name, size_t line, string type, ContextType context)
+DefinitionElement makeDefinition(string name, size_t line, string type,
+		ContextType context, int[2] range)
 {
 	string[string] attr = context.attr;
 	if (context.access.length)
 		attr["access"] = context.access;
-	return DefinitionElement(name, cast(int) line, type, attr);
+	return DefinitionElement(name, cast(int) line, type, attr, range);
 }
 
 enum AccessState
