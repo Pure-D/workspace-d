@@ -316,6 +316,8 @@ final class DefinitionFinder : ASTVisitor
 {
 	override void visit(const ClassDeclaration dec)
 	{
+		if (!dec.structBody)
+			return;
 		definitions ~= makeDefinition(dec.name.text, dec.name.line, "c", context,
 				[cast(int) dec.structBody.startLocation, cast(int) dec.structBody.endLocation]);
 		auto c = context;
@@ -326,6 +328,8 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const StructDeclaration dec)
 	{
+		if (!dec.structBody)
+			return;
 		if (dec.name == tok!"")
 		{
 			dec.accept(this);
@@ -341,6 +345,8 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const InterfaceDeclaration dec)
 	{
+		if (!dec.structBody)
+			return;
 		definitions ~= makeDefinition(dec.name.text, dec.name.line, "i", context,
 				[cast(int) dec.structBody.startLocation, cast(int) dec.structBody.endLocation]);
 		auto c = context;
@@ -363,6 +369,8 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const FunctionDeclaration dec)
 	{
+		if (!dec.functionBody || !dec.functionBody.blockStatement)
+			return;
 		auto def = makeDefinition(dec.name.text, dec.name.line, "f", context,
 				[cast(int) dec.functionBody.blockStatement.startLocation,
 				cast(int) dec.functionBody.blockStatement.endLocation]);
@@ -374,6 +382,8 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const Constructor dec)
 	{
+		if (!dec.functionBody || !dec.functionBody.blockStatement)
+			return;
 		auto def = makeDefinition("this", dec.line, "f", context,
 				[cast(int) dec.functionBody.blockStatement.startLocation,
 				cast(int) dec.functionBody.blockStatement.endLocation]);
@@ -383,6 +393,8 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const Destructor dec)
 	{
+		if (!dec.functionBody || !dec.functionBody.blockStatement)
+			return;
 		definitions ~= makeDefinition("~this", dec.line, "f", context,
 				[cast(int) dec.functionBody.blockStatement.startLocation,
 				cast(int) dec.functionBody.blockStatement.endLocation]);
@@ -390,6 +402,8 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const EnumDeclaration dec)
 	{
+		if (!dec.enumBody)
+			return;
 		definitions ~= makeDefinition(dec.name.text, dec.name.line, "g", context,
 				[cast(int) dec.enumBody.startLocation, cast(int) dec.enumBody.endLocation]);
 		auto c = context;
@@ -400,6 +414,8 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const UnionDeclaration dec)
 	{
+		if (!dec.structBody)
+			return;
 		if (dec.name == tok!"")
 		{
 			dec.accept(this);
@@ -443,6 +459,8 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const Invariant dec)
 	{
+		if (!dec.blockStatement)
+			return;
 		definitions ~= makeDefinition("invariant", dec.line, "v", context,
 				[cast(int) dec.index, cast(int) dec.blockStatement.endLocation]);
 	}
