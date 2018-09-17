@@ -25,6 +25,7 @@ void main()
 	assert(tryDub("sourcelib"));
 	version (Windows)
 		assert(tryDub("empty_windows"));
+	assert(tryDub("missing_dep"));
 	stderr.writeln("Success!");
 }
 
