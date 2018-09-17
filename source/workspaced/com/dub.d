@@ -23,6 +23,7 @@ import dub.package_;
 import dub.project;
 
 import dub.compilers.compiler;
+import dub.generators.build;
 import dub.generators.generator;
 
 import dub.compilers.buildsettings;
@@ -55,14 +56,8 @@ class DubComponent : ComponentWrapper
 		try
 		{
 			start();
-			//upgrade();
 
-			_compilerBinaryName = _dub.defaultCompiler;
-			Compiler compiler = getCompiler(_compilerBinaryName);
-			BuildSettings settings;
-			auto platform = compiler.determinePlatform(settings, _compilerBinaryName);
-
-			_configuration = _dub.project.getDefaultConfiguration(platform);
+			_configuration = _dub.project.getDefaultConfiguration(_platform);
 			if (!_dub.project.configurations.canFind(_configuration))
 			{
 				stderr.writeln("Dub Error: No configuration available");
@@ -78,26 +73,95 @@ class DubComponent : ComponentWrapper
 				throw e;
 			stderr.writeln("Dub Error (ignored): ", e);
 		}
-		catch (AssertError e)
+		/*catch (AssertError e)
 		{
 			if (!_dub || !_dub.project)
 				throw e;
 			stderr.writeln("Dub Error (ignored): ", e);
-		}
+		}*/
 	}
 
 	private void start()
 	{
+		_dubRunning = false;
 		_dub = new Dub(instance.cwd, null, SkipPackageSuppliers.none);
 		_dub.packageManager.getOrLoadPackage(NativePath(instance.cwd));
 		_dub.loadPackage();
 		_dub.project.validate();
+
+		// mark all packages as optional so we don't crash
+		int missingPackages;
+		auto optionalified = optionalifyPackages;
+		foreach (ref pkg; _dub.project.getTopologicalPackageList())
+		{
+			optionalifyRecipe(pkg);
+			foreach (dep; pkg.getAllDependencies().filter!(a => optionalified.canFind(a.name)))
+			{
+				auto d = _dub.project.getDependency(dep.name, true);
+				if (!d)
+					missingPackages++;
+				else
+					optionalifyRecipe(d);
+			}
+		}
+
+		if (!_compilerBinaryName.length)
+			_compilerBinaryName = _dub.defaultCompiler;
+		setCompiler(_compilerBinaryName);
+		if (missingPackages > 0)
+		{
+			upgrade(false);
+			optionalifyPackages();
+		}
+
+		_dubRunning = true;
+	}
+
+	private string[] optionalifyPackages()
+	{
+		bool[Package] visited;
+		string[] optionalified;
+		foreach (pkg; _dub.project.dependencies)
+			optionalified ~= optionalifyRecipe(cast() pkg);
+		return optionalified;
+	}
+
+	private string[] optionalifyRecipe(Package pkg)
+	{
+		string[] optionalified;
+		foreach (key, ref value; pkg.recipe.buildSettings.dependencies)
+		{
+			if (!value.optional)
+			{
+				value.optional = true;
+				value.default_ = true;
+				optionalified ~= key;
+			}
+		}
+		foreach (ref config; pkg.recipe.configurations)
+			foreach (key, ref value; config.buildSettings.dependencies)
+			{
+				if (!value.optional)
+				{
+					value.optional = true;
+					value.default_ = true;
+					optionalified ~= key;
+				}
+			}
+		return optionalified;
 	}
 
 	private void restart()
 	{
 		_dub.destroy();
+		_dubRunning = false;
 		start();
+	}
+
+	bool isRunning()
+	{
+		return _dub !is null && _dub.project !is null && _dub.project.rootPackage !is null
+			&& _dubRunning;
 	}
 
 	/// Reloads the dub.json or dub.sdl file from the cwd
@@ -127,17 +191,13 @@ class DubComponent : ComponentWrapper
 		if (restartDub)
 			restart();
 
-		auto compiler = getCompiler(_compilerBinaryName);
-		BuildSettings buildSettings;
-		auto buildPlatform = compiler.determinePlatform(buildSettings, _compilerBinaryName, _archType);
-
 		GeneratorSettings settings;
-		settings.platform = buildPlatform;
+		settings.platform = _platform;
 		settings.config = _configuration;
 		settings.buildType = _buildType;
-		settings.compiler = compiler;
-		settings.buildSettings = buildSettings;
-		settings.buildSettings.options |= BuildOption.syntaxOnly;
+		settings.compiler = _compiler;
+		settings.buildSettings = _settings;
+		settings.buildSettings.addOptions(BuildOption.syntaxOnly);
 		settings.combined = true;
 		settings.run = false;
 
@@ -162,9 +222,12 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Calls `dub upgrade`
-	void upgrade()
+	void upgrade(bool save = true)
 	{
-		_dub.upgrade(UpgradeOptions.select | UpgradeOptions.upgrade);
+		if (save)
+			_dub.upgrade(UpgradeOptions.select | UpgradeOptions.upgrade);
+		else
+			_dub.upgrade(UpgradeOptions.noSaveSelections);
 	}
 
 	/// Throws if configuration is invalid, otherwise does nothing.
@@ -172,6 +235,17 @@ class DubComponent : ComponentWrapper
 	{
 		if (!_dub.project.configurations.canFind(_configuration))
 			throw new Exception("Cannot use dub with invalid configuration");
+	}
+
+	/// Throws if configuration is invalid or targetType is none or source library, otherwise does nothing.
+	void validateBuildConfiguration()
+	{
+		if (!_dub.project.configurations.canFind(_configuration))
+			throw new Exception("Cannot use dub with invalid configuration");
+		if (_settings.targetType == TargetType.none)
+			throw new Exception("Cannot build with dub with targetType == none");
+		if (_settings.targetType == TargetType.sourceLibrary)
+			throw new Exception("Cannot build with dub with targetType == sourceLibrary");
 	}
 
 	/// Lists all dependencies. This will go through all dependencies and contain the dependencies of dependencies. You need to create a tree structure from this yourself.
@@ -249,7 +323,7 @@ class DubComponent : ComponentWrapper
 	{
 		string[] types = ["x86_64", "x86"];
 
-		string compilerName = getCompiler(_compilerBinaryName).name;
+		string compilerName = _compiler.name;
 
 		version (Windows)
 		{
@@ -326,13 +400,14 @@ class DubComponent : ComponentWrapper
 		try
 		{
 			_compilerBinaryName = compiler;
-			Compiler comp = getCompiler(compiler); // make sure it gets a valid compiler
-			return true;
+			_compiler = getCompiler(compiler); // make sure it gets a valid compiler
 		}
 		catch (Exception e)
 		{
 			return false;
 		}
+		_platform = _compiler.determinePlatform(_settings, _compilerBinaryName, _archType);
+		return true;
 	}
 
 	/// Returns the project name
@@ -350,38 +425,35 @@ class DubComponent : ComponentWrapper
 	/// Returns whether there is a target set to build. If this is false then build will throw an exception.
 	bool canBuild() @property
 	{
-		if (!_dub.project.configurations.canFind(_configuration))
+		if (_settings.targetType == TargetType.none || _settings.targetType == TargetType.sourceLibrary
+				|| !_dub.project.configurations.canFind(_configuration))
 			return false;
-		auto compiler = getCompiler(_compilerBinaryName);
-		BuildSettings buildSettings;
-		compiler.determinePlatform(buildSettings, _compilerBinaryName, _archType);
 		return true;
 	}
 
 	/// Asynchroniously builds the project WITHOUT OUTPUT. This is intended for linting code and showing build errors quickly inside the IDE.
 	Future!(BuildIssue[]) build()
 	{
-		validateConfiguration();
+		validateBuildConfiguration();
+
+		// copy to this thread
+		auto compiler = _compiler;
+		auto buildPlatform = _platform;
+
+		GeneratorSettings settings;
+		settings.platform = buildPlatform;
+		settings.config = _configuration;
+		settings.buildType = _buildType;
+		settings.compiler = compiler;
+		settings.tempBuild = true;
+		settings.buildSettings = _settings;
+		settings.buildSettings.addOptions(BuildOption.syntaxOnly);
+		settings.buildSettings.addDFlags("-o-");
 
 		auto ret = new Future!(BuildIssue[]);
 		new Thread({
 			try
 			{
-				auto compiler = getCompiler(_compilerBinaryName);
-				BuildSettings buildSettings;
-				auto buildPlatform = compiler.determinePlatform(buildSettings,
-					_compilerBinaryName, _archType);
-
-				GeneratorSettings settings;
-				settings.platform = buildPlatform;
-				settings.config = _configuration;
-				settings.buildType = _buildType;
-				settings.compiler = compiler;
-				settings.tempBuild = true;
-				settings.buildSettings = buildSettings;
-				settings.buildSettings.addOptions(BuildOption.syntaxOnly);
-				settings.buildSettings.addDFlags("-o-");
-
 				BuildIssue[] issues;
 
 				settings.compileCallback = (status, output) {
@@ -440,12 +512,13 @@ class DubComponent : ComponentWrapper
 
 private:
 	Dub _dub;
+	bool _dubRunning = false;
 	string _configuration;
 	string _archType = "x86_64";
 	string _buildType = "debug";
 	string _compilerBinaryName;
-	BuildSettings _settings;
 	Compiler _compiler;
+	BuildSettings _settings;
 	BuildPlatform _platform;
 	string[] _importPaths, _stringImportPaths, _importFiles;
 }
