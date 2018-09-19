@@ -1,4 +1,5 @@
 import std.algorithm;
+import std.conv;
 import std.file;
 import std.stdio;
 import std.string;
@@ -7,14 +8,21 @@ import std.process;
 import workspaced.api;
 import workspaced.coms;
 
-void main()
+int main()
 {
 	string dir = getcwd;
 	auto backend = new WorkspaceD();
 	auto instance = backend.addInstance(dir);
 	backend.register!FSWorkspaceComponent;
-	backend.register!DCDComponent;
+	backend.register!DCDComponent(false);
 	backend.register!DCDExtComponent;
+
+	if (!backend.attach(instance, "dcd"))
+	{
+		// dcd not installed
+		stderr.writeln("WARNING: skipping test tc_implement_interface because DCD is not installed");
+		return 0;
+	}
 
 	auto fsworkspace = backend.get!FSWorkspaceComponent(dir);
 	auto dcd = backend.get!DCDComponent(dir);
@@ -22,78 +30,88 @@ void main()
 
 	fsworkspace.addImports(["source"]);
 
-	try
-	{
-		dcd.start();
-	}
-	catch (ProcessException e)
-	{
-		// dcd not installed
-		stderr.writeln("WARNING: skipping test tc_implement_interface because DCD is not installed");
-		stderr.writeln(e);
-		return;
-	}
+	dcd.setupServer();
 
 	scope (exit)
 		dcd.stopServerSync();
 
-	string code = dcdext.implement(q{
-class Bar : Foo
-{
-}
+	int status = 0;
 
-class Foo : Foo0
-{
-	void virtualMethod();
-	abstract int abstractMethod(string s) { return cast(int) s.length; }
-}
+	foreach (test; dirEntries("tests", SpanMode.shallow))
+	{
+		if (!test.name.endsWith(".d"))
+			continue;
+		auto expect = test ~ ".expected";
+		if (!expect.exists)
+		{
+			stderr.writeln("Warning: tests/", expect, " does not exist!");
+			continue;
+		}
+		auto source = test.readText;
+		auto reader = File(expect).byLine;
+		auto cmd = reader.front.splitter;
+		string code, message;
+		bool success;
+		if (cmd.front == "implement")
+		{
+			cmd.popFront;
+			code = dcdext.implement(source, cmd.front.to!uint).getBlocking;
+			reader.popFront;
 
-import std.container.array;
-import std.typecons;
-interface Foo0 : Foo1, Foo2
-{
-	string stringMethod();
-	Tuple!(int, string, Array!bool)[][] advancedMethod(int a, int b, string c);
-	void normalMethod();
-	int attributeSuffixMethod() nothrow @property @nogc;
-	extern(C) @property @nogc ref immutable int attributePrefixMethod() const;
-	final void alreadyImplementedMethod() {}
-	deprecated("foo") void deprecatedMethod() {}
-	static void staticMethod() {}
-	protected void protectedMethod();
-private:
-	void barfoo();
-}
+			success = true;
+			size_t index;
+			foreach (line; reader)
+			{
+				if (line.startsWith("!"))
+				{
+					if (code.indexOf(line[1 .. $], index) != -1)
+					{
+						success = false;
+						message = "Did not expect to find line " ~ line[1 .. $].idup
+							~ " in (after " ~ index.to!string ~ " bytes) code " ~ code[index .. $];
+					}
+				}
+				else
+				{
+					auto pos = code.indexOf(line, index);
+					if (pos == -1)
+					{
+						success = false;
+						message = "Could not find " ~ line.idup ~ " in remaining (after "
+							~ index.to!string ~ " bytes) code " ~ code[index .. $];
+					}
+					else
+					{
+						index = pos + line.length;
+					}
+				}
+			}
+		}
+		else if (cmd.front == "failimplement")
+		{
+			cmd.popFront;
+			code = dcdext.implement(source, cmd.front.to!uint).getBlocking;
+			if (code.length != 0)
+			{
+				message = "Code: " ~ code;
+				success = false;
+			}
+			else
+			{
+				success = true;
+			}
+		}
+		else
+			throw new Exception("Unknown command in " ~ expect ~ ": " ~ reader.front.idup);
 
-interface Foo1
-{
-	void hello();
-	int nothrowMethod() nothrow;
-	int nogcMethod() @nogc;
-	nothrow int prefixNothrowMethod();
-	@nogc int prefixNogcMethod();
-}
+		if (success)
+			writeln("Pass ", expect);
+		else
+		{
+			writeln("Expected fail in ", expect, " but it succeeded. ", message);
+			status = 1;
+		}
+	}
 
-interface Foo2
-{
-	void world();
-}
-	}, 14).getBlocking;
-
-	writeln(code);
-
-	assert(code.canFind("override int abstractMethod"));
-	assert(code.canFind("string stringMethod"));
-	assert(code.canFind("Tuple!(int, string, Array!bool)[][] advancedMethod(int a, int b, string c)"));
-	assert(code.canFind("void normalMethod()"));
-	assert(code.canFind("int attributeSuffixMethod() nothrow @property @nogc"));
-	assert(code.canFind("extern (C) @property @nogc ref immutable int attributePrefixMethod() const"));
-	assert(code.canFind("void deprecatedMethod()"));
-	assert(code.canFind("protected void protectedMethod()"));
-	assert(code.canFind("void hello()"));
-	assert(code.canFind("int nothrowMethod() nothrow"));
-	assert(code.canFind("int nogcMethod() @nogc"));
-	assert(code.canFind("nothrow int prefixNothrowMethod()"));
-	assert(code.canFind("@nogc int prefixNogcMethod()"));
-	assert(code.canFind("void world()"));
+	return status;
 }
