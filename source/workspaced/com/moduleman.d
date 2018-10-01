@@ -21,9 +21,6 @@ class ModulemanComponent : ComponentWrapper
 
 	protected void load()
 	{
-		if (!refInstance)
-			throw new Exception("moduleman requires to be instanced");
-
 		config.stringBehavior = StringBehavior.source;
 	}
 
@@ -33,6 +30,9 @@ class ModulemanComponent : ComponentWrapper
 	/// Returns: all changes that need to happen to rename the module. If no module statement could be found this will return an empty array.
 	FileChanges[] rename(string mod, string rename, bool renameSubmodules = true)
 	{
+		if (!refInstance)
+			throw new Exception("moduleman.rename requires to be instanced");
+
 		FileChanges[] changes;
 		bool foundModule = false;
 		auto from = mod.split('.');
@@ -62,6 +62,9 @@ class ModulemanComponent : ComponentWrapper
 	/// 	code: Current code inside the text buffer
 	CodeReplacement[] normalizeModules(string file, string code)
 	{
+		if (!refInstance)
+			throw new Exception("moduleman.rename requires to be instanced");
+
 		int[string] modulePrefixes;
 		modulePrefixes[""] = 0;
 		string modName = file.replace("\\", "/").stripExtension;
