@@ -88,7 +88,7 @@ class ModulemanComponent : ComponentWrapper
 		modName = modName.stripLeft('/').replace("/", ".");
 		if (!modName.length)
 			return [];
-		auto existing = fetchModule(file, code);
+		auto existing = describeModule(code);
 		if (modName == existing.moduleName)
 		{
 			return [];
@@ -102,49 +102,83 @@ class ModulemanComponent : ComponentWrapper
 		}
 	}
 
-	/// Returns the module name of a D code
+	/// Returns the module name parts of a D code
 	const(string)[] getModule(string code)
 	{
-		return fetchModule("", code).raw;
+		return describeModule(code).raw;
+	}
+
+	/// Returns the normalized module name as string of a D code
+	string moduleName(string code)
+	{
+		return describeModule(code).moduleName;
+	}
+
+	///
+	FileModuleInfo describeModule(string code)
+	{
+		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		ptrdiff_t start = -1;
+		size_t from, to;
+		size_t outerFrom, outerTo;
+
+		foreach (i, Token t; tokens)
+		{
+			if (t.type == tok!"module")
+			{
+				start = i;
+				outerFrom = t.index;
+				break;
+			}
+		}
+
+		if (start == -1)
+			return FileModuleInfo.init;
+
+		const(string)[] raw;
+		string moduleName;
+		foreach (t; tokens[start + 1 .. $])
+		{
+			if (t.type == tok!";")
+			{
+				outerTo = t.index + 1;
+				break;
+			}
+			if (t.type == tok!"identifier")
+			{
+				if (from == 0)
+					from = t.index;
+				moduleName ~= t.text;
+				to = t.index + t.text.length;
+				raw ~= t.text;
+			}
+			if (t.type == tok!".")
+			{
+				moduleName ~= ".";
+			}
+		}
+		return FileModuleInfo(raw, moduleName, from, to, outerFrom, outerTo);
 	}
 
 private:
 	RollbackAllocator rba;
 	LexerConfig config;
+}
 
-	ModuleFetchVisitor fetchModule(string file, string code)
-	{
-		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
-		auto parsed = parseModule(tokens, file, &rba, (&doNothing).toDelegate);
-		auto reader = new ModuleFetchVisitor();
-		reader.visit(parsed);
-		return reader;
-	}
+/// Represents a module statement in a file.
+struct FileModuleInfo
+{
+	/// Parts of the module name as array.
+	const(string)[] raw;
+	/// Whole modulename as normalized string in form a.b.c etc.
+	string moduleName = "";
+	/// Code index of the moduleName
+	size_t from, to;
+	/// Code index of the whole module statement starting right at module and ending right after the semicolon.
+	size_t outerFrom, outerTo;
 }
 
 private:
-
-class ModuleFetchVisitor : ASTVisitor
-{
-	alias visit = ASTVisitor.visit;
-
-	override void visit(const ModuleDeclaration decl)
-	{
-		outerFrom = decl.startLocation;
-		outerTo = decl.endLocation + 1; // + semicolon
-
-		raw = decl.moduleName.identifiers.map!(a => a.text).array;
-		moduleName = raw.join(".");
-		from = decl.moduleName.identifiers[0].index;
-		to = decl.moduleName.identifiers[$ - 1].index + decl.moduleName.identifiers[$ - 1].text.length;
-	}
-
-	const(string)[] raw;
-	string moduleName = "";
-	Token fileName;
-	size_t from, to;
-	size_t outerFrom, outerTo;
-}
 
 class ModuleChangerVisitor : ASTVisitor
 {
@@ -216,8 +250,9 @@ void doNothing(string, size_t, size_t, string, bool)
 {
 }
 
-/*unittest
+unittest
 {
+	auto backend = new WorkspaceD();
 	auto workspace = makeTemporaryTestingWorkspace;
 	workspace.createDir("source/newmod");
 	workspace.createDir("unregistered/source");
@@ -228,12 +263,13 @@ void doNothing(string, size_t, size_t, string, bool)
 	workspace.writeFile("source/newmod/package.d", "");
 	workspace.writeFile("unregistered/source/package.d", "");
 	workspace.writeFile("unregistered/source/app.d", "");
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!ModulemanComponent;
+	auto mod = backend.get!ModulemanComponent(workspace.directory);
 
-	importPathProvider = () => ["source"];
+	instance.importPathProvider = () => ["source"];
 
-	start(workspace.directory);
-
-	FileChanges[] changes = rename("oldmod", "newmod").sort!"a.file < b.file".array;
+	FileChanges[] changes = mod.rename("oldmod", "newmod").sort!"a.file < b.file".array;
 
 	assert(changes.length == 2);
 	assert(changes[0].file.endsWith("color.d"));
@@ -252,20 +288,22 @@ void doNothing(string, size_t, size_t, string, bool)
 		std.file.write(change.file, code);
 	}
 
-	auto nrm = normalizeModules(workspace.getPath("source/newmod/input.d"), "");
+	auto nrm = mod.normalizeModules(workspace.getPath("source/newmod/input.d"), "");
 	assert(nrm == [CodeReplacement([0, 0], "module newmod.input;")]);
 
-	nrm = normalizeModules(workspace.getPath("source/newmod/package.d"), "");
+	nrm = mod.normalizeModules(workspace.getPath("source/newmod/package.d"), "");
 	assert(nrm == [CodeReplacement([0, 0], "module newmod;")]);
 
-	nrm = normalizeModules(workspace.getPath("source/newmod/display.d"), "module oldmod.displaf;");
+	nrm = mod.normalizeModules(workspace.getPath("source/newmod/display.d"),
+			"module oldmod.displaf;");
 	assert(nrm == [CodeReplacement([0, 22], "module newmod.display;")]);
 
-	nrm = normalizeModules(workspace.getPath("unregistered/source/app.d"), "");
+	nrm = mod.normalizeModules(workspace.getPath("unregistered/source/app.d"), "");
 	assert(nrm == [CodeReplacement([0, 0], "module app;")]);
 
-	nrm = normalizeModules(workspace.getPath("unregistered/source/package.d"), "");
+	nrm = mod.normalizeModules(workspace.getPath("unregistered/source/package.d"), "");
 	assert(nrm == []);
 
-	stop();
-}*/
+	auto fetched = mod.describeModule("/* hello world */ module\nfoo . \nbar  ;\n\nvoid foo() {");
+	assert(fetched == FileModuleInfo(["foo", "bar"], "foo.bar", 25, 35, 18, 38));
+}
