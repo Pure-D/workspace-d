@@ -20,7 +20,7 @@ alias ImportPathProvider = string[]delegate();
 ///
 alias BroadcastCallback = void delegate(WorkspaceD, WorkspaceD.Instance, JSONValue);
 ///
-alias ComponentBindFailCallback = void delegate(WorkspaceD.Instance, ComponentFactory);
+alias ComponentBindFailCallback = void delegate(WorkspaceD.Instance, ComponentFactory, Exception);
 
 /// Will never call this function
 enum ignoredFunc;
@@ -260,7 +260,7 @@ interface ComponentWrapper
 
 interface ComponentFactory
 {
-	ComponentWrapper create(WorkspaceD workspaced, WorkspaceD.Instance instance);
+	ComponentWrapper create(WorkspaceD workspaced, WorkspaceD.Instance instance, out Exception error);
 	ComponentInfo info() @property;
 }
 
@@ -562,17 +562,18 @@ class WorkspaceD
 			factory = new DefaultComponentFactory!T;
 		components ~= ComponentFactoryInstance(factory, autoRegister);
 		auto info = factory.info;
-		auto glob = factory.create(this, null);
+		Exception error;
+		auto glob = factory.create(this, null, error);
 		if (glob)
 			globalComponents ~= ComponentWrapperInstance(glob, info);
 		if (autoRegister)
 			foreach (ref instance; instances)
 			{
-				auto inst = factory.create(this, instance);
+				auto inst = factory.create(this, instance, error);
 				if (inst)
 					instance.instanceComponents ~= ComponentWrapperInstance(inst, info);
 				else if (onBindFail)
-					onBindFail(instance, factory);
+					onBindFail(instance, factory, error);
 			}
 		static if (__traits(compiles, T.registered(this)))
 			T.registered(this);
@@ -600,11 +601,12 @@ class WorkspaceD
 			{
 				if (!factory.autoRegister && factory.info.name == name)
 				{
-					auto wrap = factory.create(this, inst);
+					Exception error;
+					auto wrap = factory.create(this, inst, error);
 					if (wrap)
 						inst.instanceComponents ~= ComponentWrapperInstance(wrap, factory.info);
 					else if (onBindFail)
-						onBindFail(inst, factory);
+						onBindFail(inst, factory, error);
 					break;
 				}
 			}
@@ -613,11 +615,12 @@ class WorkspaceD
 		{
 			if (factory.autoRegister)
 			{
-				auto wrap = factory.create(this, inst);
+				Exception error;
+				auto wrap = factory.create(this, inst, error);
 				if (wrap)
 					inst.instanceComponents ~= ComponentWrapperInstance(wrap, factory.info);
 				else if (onBindFail)
-					onBindFail(inst, factory);
+					onBindFail(inst, factory, error);
 			}
 		}
 		return inst;
@@ -638,13 +641,25 @@ class WorkspaceD
 		return false;
 	}
 
-	bool attach(Instance instance, string component)
+	deprecated("Use overload taking an out Exception error or attachSilent instead") bool attach(
+			Instance instance, string component)
+	{
+		return attachSilent(instance, component);
+	}
+
+	bool attachSilent(Instance instance, string component)
+	{
+		Exception error;
+		return attach(instance, component, error);
+	}
+
+	bool attach(Instance instance, string component, out Exception error)
 	{
 		foreach (factory; components)
 		{
 			if (factory.info.name == component)
 			{
-				auto wrap = factory.create(this, instance);
+				auto wrap = factory.create(this, instance, error);
 				if (wrap)
 				{
 					instance.instanceComponents ~= ComponentWrapperInstance(wrap, factory.info);
@@ -660,7 +675,7 @@ class WorkspaceD
 
 class DefaultComponentFactory(T : ComponentWrapper) : ComponentFactory
 {
-	ComponentWrapper create(WorkspaceD workspaced, WorkspaceD.Instance instance)
+	ComponentWrapper create(WorkspaceD workspaced, WorkspaceD.Instance instance, out Exception error)
 	{
 		auto wrapper = new T();
 		try
@@ -670,6 +685,7 @@ class DefaultComponentFactory(T : ComponentWrapper) : ComponentFactory
 		}
 		catch (Exception e)
 		{
+			error = e;
 			return null;
 		}
 	}
