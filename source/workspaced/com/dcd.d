@@ -34,8 +34,14 @@ class DCDComponent : ComponentWrapper
 		string serverPath = this.serverPath;
 
 		installedVersion = clientPath.getVersionAndFixPath;
-		stderr.writeln("Detected dcd-client ", installedVersion);
-		if (serverPath.getVersionAndFixPath != installedVersion)
+		string clientPathInfo = clientPath != "dcd-client" ? "(" ~ clientPath ~ ") " : "";
+		stderr.writeln("Detected dcd-client ", clientPathInfo, installedVersion);
+
+		string serverInstalledVersion = serverPath.getVersionAndFixPath;
+		string serverPathInfo = serverPath != "dcd-server" ? "(" ~ serverPath ~ ") " : "";
+		stderr.writeln("Detected dcd-server ", serverPathInfo, serverInstalledVersion);
+
+		if (serverInstalledVersion != installedVersion)
 			throw new Exception("client & server version mismatch");
 
 		config.set("dcd", "clientPath", clientPath);
