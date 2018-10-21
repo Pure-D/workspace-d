@@ -66,6 +66,14 @@ void broadcast(WorkspaceD workspaced, WorkspaceD.Instance instance, JSONValue me
 			? instance.cwd : null), "data" : message]));
 }
 
+void bindFail(WorkspaceD.Instance instance, ComponentFactory component, Exception error)
+{
+	sendResponse(0x7F000000, JSONValue(["workspace" : JSONValue(instance
+			? instance.cwd : null), "data" : JSONValue(["component" : JSONValue(component.info.name),
+			"type" : JSONValue("bindfail"), "msg" : JSONValue(error.msg), "trace"
+			: JSONValue(error.toString)])]));
+}
+
 WorkspaceD engine;
 
 void handleRequest(int id, JSONValue request)
@@ -291,6 +299,7 @@ int main(string[] args)
 
 		engine = new WorkspaceD();
 		engine.onBroadcast = (&broadcast).toDelegate;
+		engine.onBindFail = (&bindFail).toDelegate;
 		scope (exit)
 			engine.shutdown();
 
