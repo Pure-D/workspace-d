@@ -43,7 +43,7 @@ class ModulemanComponent : ComponentWrapper
 				continue;
 			string code = readText(file);
 			auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
-			auto parsed = parseModule(tokens, file, &rba, (&doNothing).toDelegate);
+			auto parsed = parseModule(tokens, file, &rba);
 			auto reader = new ModuleChangerVisitor(file, from, to, renameSubmodules);
 			reader.visit(parsed);
 			if (reader.changes.replacements.length)
@@ -247,10 +247,6 @@ class ModuleChangerVisitor : ASTVisitor
 	string[] from, to;
 	FileChanges changes;
 	bool renameSubmodules, foundModule;
-}
-
-void doNothing(string, size_t, size_t, string, bool)
-{
 }
 
 unittest

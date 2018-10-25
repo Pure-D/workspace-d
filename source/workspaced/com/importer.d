@@ -29,7 +29,7 @@ class ImporterComponent : ComponentWrapper
 	ImportInfo[] get(string code, int pos)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
-		auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
+		auto mod = parseModule(tokens, "code", &rba);
 		auto reader = new ImporterReaderVisitor(pos);
 		reader.visit(mod);
 		return reader.imports;
@@ -40,7 +40,7 @@ class ImporterComponent : ComponentWrapper
 	ImportModification add(string importName, string code, int pos, bool insertOutermost = true)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
-		auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
+		auto mod = parseModule(tokens, "code", &rba);
 		auto reader = new ImporterReaderVisitor(pos);
 		reader.visit(mod);
 		foreach (i; reader.imports)
@@ -95,7 +95,7 @@ class ImporterComponent : ComponentWrapper
 			return ImportBlock.init;
 		auto part = code[start .. end];
 		auto tokens = getTokensForParser(cast(ubyte[]) part, config, &workspaced.stringCache);
-		auto mod = parseModule(tokens, "code", &rba, (&doNothing).toDelegate);
+		auto mod = parseModule(tokens, "code", &rba);
 		auto reader = new ImporterReaderVisitor(-1);
 		reader.visit(mod);
 		auto imports = reader.imports;
@@ -382,10 +382,6 @@ class ImporterReaderVisitor : ASTVisitor
 	bool isModule;
 	size_t outerImportLocation;
 	size_t innermostBlockStart;
-}
-
-void doNothing(string, size_t, size_t, string, bool)
-{
 }
 
 unittest

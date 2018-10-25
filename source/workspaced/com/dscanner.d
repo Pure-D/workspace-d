@@ -135,11 +135,7 @@ class DscannerComponent : ComponentWrapper
 				LexerConfig config;
 				auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 
-				void doNothing(string, size_t, size_t, string, bool)
-				{
-				}
-
-				auto m = dparse.parser.parseModule(tokens.array, file, &r, &doNothing);
+				auto m = dparse.parser.parseModule(tokens.array, file, &r);
 
 				auto defFinder = new DefinitionFinder();
 				defFinder.visit(m);
