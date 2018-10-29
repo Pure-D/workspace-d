@@ -7,6 +7,10 @@ NORMAL="\033[0m"
 
 COMPILER="$1"
 
+if [ -z $COMPILER ]; then
+	COMPILER="dmd"
+fi
+
 fail_count=0
 pass_count=0
 
