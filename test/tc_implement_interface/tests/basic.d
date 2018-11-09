@@ -12,12 +12,17 @@ class Foo : Foo0
 
 import std.container.array;
 import std.typecons;
-interface Foo0 : Foo1, Foo2
+package interface Foo0 : Foo1, Foo2
 {
 	string stringMethod();
 	Tuple!(int, string, Array!bool)[][] advancedMethod(int a, int b, string c);
 	void normalMethod();
 	int attributeSuffixMethod() nothrow @property @nogc;
+	private
+	{
+		void middleprivate1();
+		void middleprivate2();
+	}
 	extern(C) @property @nogc ref immutable int attributePrefixMethod() const;
 	final void alreadyImplementedMethod() {}
 	deprecated("foo") void deprecatedMethod() {}

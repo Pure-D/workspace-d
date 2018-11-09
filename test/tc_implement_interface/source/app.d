@@ -8,7 +8,7 @@ import std.process;
 import workspaced.api;
 import workspaced.coms;
 
-int main()
+int main(string[] args)
 {
 	string dir = getcwd;
 	auto backend = new WorkspaceD();
@@ -17,7 +17,9 @@ int main()
 	backend.register!DCDComponent(false);
 	backend.register!DCDExtComponent;
 
-	if (!backend.attach(instance, "dcd"))
+	bool verbose = args.length > 1 && (args[1] == "-v" || args[1] == "--v" || args[1] == "--verbose");
+
+	if (!backend.attachSilent(instance, "dcd"))
 	{
 		// dcd not installed
 		stderr.writeln("WARNING: skipping test tc_implement_interface because DCD is not installed");
@@ -30,7 +32,7 @@ int main()
 
 	fsworkspace.addImports(["source"]);
 
-	dcd.setupServer();
+	dcd.setupServer([], true);
 
 	scope (exit)
 		dcd.stopServerSync();
@@ -58,10 +60,16 @@ int main()
 			code = dcdext.implement(source, cmd.front.to!uint).getBlocking;
 			reader.popFront;
 
+			if (verbose)
+				stderr.writeln(test, ": ", code);
+
 			success = true;
 			size_t index;
 			foreach (line; reader)
 			{
+				if (line.startsWith("--- ") || !line.length)
+					continue;
+
 				if (line.startsWith("!"))
 				{
 					if (code.indexOf(line[1 .. $], index) != -1)
@@ -71,8 +79,42 @@ int main()
 							~ " in (after " ~ index.to!string ~ " bytes) code " ~ code[index .. $];
 					}
 				}
+				else if (line.startsWith("#"))
+				{
+					// count occurences
+					line = line[1 .. $];
+					char op = line[0];
+					if (!op.among!('<', '=', '>'))
+						throw new Exception("Malformed count line: " ~ line.idup);
+					line = line[1 .. $];
+					int expected = line.parse!uint;
+					line = line[1 .. $];
+					int actual = countText(code[index .. $], line);
+					bool match;
+					if (op == '<')
+						match = actual < expected;
+					else if (op == '=')
+						match = actual == expected;
+					else if (op == '>')
+						match = actual > expected;
+					else
+						assert(false);
+					if (!match)
+					{
+						success = false;
+						message = "Expected to find the string '" ~ line.idup ~ "' " ~ op ~ " " ~ expected.to!string
+							~ " times but actually found it " ~ actual.to!string
+							~ " times (after " ~ index.to!string ~ " bytes) code " ~ code[index .. $];
+					}
+				}
 				else
 				{
+					bool freeze = false;
+					if (line.startsWith("."))
+					{
+						freeze = true;
+						line = line[1 .. $];
+					}
 					auto pos = code.indexOf(line, index);
 					if (pos == -1)
 					{
@@ -80,7 +122,7 @@ int main()
 						message = "Could not find " ~ line.idup ~ " in remaining (after "
 							~ index.to!string ~ " bytes) code " ~ code[index .. $];
 					}
-					else
+					else if (!freeze)
 					{
 						index = pos + line.length;
 					}
@@ -114,4 +156,16 @@ int main()
 	}
 
 	return status;
+}
+
+int countText(in char[] text, in char[] search)
+{
+	int num = 0;
+	ptrdiff_t index = text.indexOf(search);
+	while (index != -1)
+	{
+		num++;
+		index = text.indexOf(search, index + search.length);
+	}
+	return num;
 }

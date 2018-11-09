@@ -1,10 +1,14 @@
 implement 28
-!void virtualMethod
+void virtualMethod
+// TODO: optional implementation
 override int abstractMethod
+!package string stringMethod
 string stringMethod
 Tuple!(int, string, Array!bool)[][] advancedMethod(int a, int b, string c)
 void normalMethod()
 int attributeSuffixMethod() nothrow @property @nogc
+!middleprivate1
+!middleprivate2
 extern (C) @property @nogc ref immutable int attributePrefixMethod() const
 !alreadyImplementedMethod
 deprecated("foo") void deprecatedMethod()
