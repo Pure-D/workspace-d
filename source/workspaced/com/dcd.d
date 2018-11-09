@@ -103,13 +103,13 @@ class DCDComponent : ComponentWrapper
 	}
 
 	/// This will start the dcd-server and load import paths from the current provider
-	void setupServer(string[] additionalImports = [])
+	void setupServer(string[] additionalImports = [], bool quietServer = false)
 	{
-		startServer(importPaths ~ importFiles ~ additionalImports);
+		startServer(importPaths ~ importFiles ~ additionalImports, quietServer);
 	}
 
 	/// This will start the dcd-server
-	void startServer(string[] additionalImports = [])
+	void startServer(string[] additionalImports = [], bool quietServer = false)
 	{
 		if (isPortRunning(port))
 			throw new Exception("Already running dcd on port " ~ port.to!string);
@@ -118,23 +118,32 @@ class DCDComponent : ComponentWrapper
 			if (i.length)
 				imports ~= "-I" ~ i;
 		this.runningPort = port;
-		this.socketFile = buildPath(tempDir, "workspace-d-sock" ~ thisProcessID.to!string ~ "-" ~ uniform!ulong.to!string(36));
+		this.socketFile = buildPath(tempDir,
+				"workspace-d-sock" ~ thisProcessID.to!string ~ "-" ~ uniform!ulong.to!string(36));
 		serverPipes = raw([serverPath] ~ clientArgs ~ imports,
 				Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
 		while (!serverPipes.stderr.eof)
 		{
 			string line = serverPipes.stderr.readln();
-			stderr.writeln("Server: ", line);
-			stderr.flush();
+			if (!quietServer)
+			{
+				stderr.writeln("Server: ", line);
+				stderr.flush();
+			}
 			if (line.canFind("Startup completed in "))
 				break;
 		}
 		running = true;
 		new Thread({
-			while (!serverPipes.stderr.eof)
-			{
-				stderr.writeln("Server: ", serverPipes.stderr.readln());
-			}
+			if (quietServer)
+				foreach (block; serverPipes.stderr.byChunk(4096))
+				{
+				}
+			else
+				while (!serverPipes.stderr.eof)
+				{
+					stderr.writeln("Server: ", serverPipes.stderr.readln());
+				}
 			auto code = serverPipes.pid.wait();
 			stderr.writeln("DCD-Server stopped with code ", code);
 			if (code != 0)
@@ -193,14 +202,14 @@ class DCDComponent : ComponentWrapper
 
 	/// This will stop the dcd-server safely and restart it again using setup-server asynchronously
 	/// Returns: null
-	Future!void restartServer()
+	Future!void restartServer(bool quiet = false)
 	{
 		auto ret = new Future!void;
 		new Thread({ /**/
 			try
 			{
 				stopServerSync();
-				setupServer();
+				setupServer([], quiet);
 				ret.finish();
 			}
 			catch (Throwable t)
