@@ -13,6 +13,7 @@ import std.ascii;
 import std.file;
 import std.functional;
 import std.json;
+import std.range;
 import std.string;
 import std.traits : EnumMembers;
 
@@ -28,10 +29,14 @@ class DCDExtComponent : ComponentWrapper
 {
 	mixin DefaultComponentWrapper;
 
+	/// Default code order of constructs, defaults to order of enum, with public and default mixed.
+	static immutable ProtectionOrderType[] defaultProtectionOrder = [
+		ProtectionOrderType.public_ | ProtectionOrderType.default_, ProtectionOrderType.package_,
+		ProtectionOrderType.packageIdentifier, ProtectionOrderType.protected_,
+		ProtectionOrderType.private_
+	];
 	/// Default code order of constructs, defaults to order of enum.
 	static immutable CodeOrderType[] defaultCodeOrder = [EnumMembers!CodeOrderType];
-	/// ditto
-	static immutable ProtectionOrderType[] defaultProtectionOrder = [EnumMembers!ProtectionOrderType];
 	/// ditto
 	static immutable StaticOrderType[] defaultStaticOrder = [EnumMembers!StaticOrderType];
 	/// ditto
@@ -61,8 +66,8 @@ class DCDExtComponent : ComponentWrapper
 	/// If it can't find a good spot it will insert the code properly indented at the specified position.
 	/// Omitting orders will mix them at the end. Orders can be mixed by bit-or'ing the flags.
 	// make public once usable
-	private CodeReplacement[] insertCodeInContainer(CodeOrderType type, string insert,
-			string code, int position, in CodeOrderType[] codeOrder = defaultCodeOrder,
+	private CodeReplacement[] insertCodeInContainer(string insert, string code,
+			int position, in CodeOrderType[] codeOrder = defaultCodeOrder,
 			in AttributeOrderType[] attributeOrder = defaultAttributeOrder,
 			in ProtectionOrderType[] protectionOrder = defaultProtectionOrder,
 			in StaticOrderType[] staticOrder = defaultStaticOrder,
@@ -72,17 +77,39 @@ class DCDExtComponent : ComponentWrapper
 
 		string codeBlock = code[container.innerRange[0] .. container.innerRange[1]];
 
-		auto tokens = getTokensForParser(cast(ubyte[]) codeBlock, config, &workspaced.stringCache);
-		auto parsed = parseModule(tokens, "insertCode_input.d", &rba);
+		scope tokensInsert = getTokensForParser(cast(ubyte[]) insert, config, &workspaced.stringCache);
+		scope parsedInsert = parseModule(tokensInsert, "insertCode_insert.d", &rba);
 
-		auto reader = new CodeDefinitionClassifier(codeBlock);
+		scope insertReader = new CodeDefinitionClassifier(insert);
+		insertReader.visit(parsedInsert);
+		scope insertRegions = insertReader.regions.sort!"a.type < b.type".uniq.array;
+
+		scope tokens = getTokensForParser(cast(ubyte[]) codeBlock, config, &workspaced.stringCache);
+		scope parsed = parseModule(tokens, "insertCode_code.d", &rba);
+
+		scope reader = new CodeDefinitionClassifier(codeBlock);
 		reader.visit(parsed);
+		scope regions = reader.regions;
 
-		import std.stdio;
+		CodeReplacement[] ret;
 
-		stderr.writeln(reader.regions);
+		foreach (toInsert; insertRegions)
+		{
+			auto insertCode = insert[toInsert.region[0] .. toInsert.region[1]];
+			scope existing = regions.filter!(a => a.sameBlockAs(toInsert));
+			if (existing.empty)
+			{
+			}
+			else
+			{
+				CodeDefinitionClassifier.Region target = insertInLastBlock ? existing.tail(1).front : existing.front;
 
-		return null;
+				ret ~= CodeReplacement(insertAtEnd ? [target.region[1],
+						target.region[1]] : [target.region[0], target.region[0]], "\n\n" ~ insertCode);
+			}
+		}
+
+		return ret;
 	}
 
 	/// Implements the interfaces or abstract classes of a specified class/interface.
@@ -498,6 +525,9 @@ unittest
 	assert(dcdext.getCodeBlockRange(SimpleClassTestCode, 19) == CodeBlockInfo.init);
 	assert(dcdext.getCodeBlockRange(SimpleClassTestCode, 20) != CodeBlockInfo.init);
 
-	dcdext.insertCodeInContainer(CodeOrderType.methods, "void foo()\n{\n\twriteln();\n}",
+	auto replacements = dcdext.insertCodeInContainer("void foo()\n{\n\twriteln();\n}",
 			SimpleClassTestCode, 123);
+	import std.stdio;
+
+	stderr.writeln(replacements);
 }
