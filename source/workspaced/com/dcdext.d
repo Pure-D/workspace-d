@@ -61,7 +61,7 @@ class DCDExtComponent : ComponentWrapper
 	/// If it can't find a good spot it will insert the code properly indented at the specified position.
 	/// Omitting orders will mix them at the end. Orders can be mixed by bit-or'ing the flags.
 	// make public once usable
-	private CodeReplacement[] insertCode(CodeOrderType type, string insert,
+	private CodeReplacement[] insertCodeInContainer(CodeOrderType type, string insert,
 			string code, int position, in CodeOrderType[] codeOrder = defaultCodeOrder,
 			in AttributeOrderType[] attributeOrder = defaultAttributeOrder,
 			in ProtectionOrderType[] protectionOrder = defaultProtectionOrder,
@@ -498,6 +498,6 @@ unittest
 	assert(dcdext.getCodeBlockRange(SimpleClassTestCode, 19) == CodeBlockInfo.init);
 	assert(dcdext.getCodeBlockRange(SimpleClassTestCode, 20) != CodeBlockInfo.init);
 
-	dcdext.insertCode(CodeOrderType.methods, "void foo()\n{\n\twriteln();\n}",
+	dcdext.insertCodeInContainer(CodeOrderType.methods, "void foo()\n{\n\twriteln();\n}",
 			SimpleClassTestCode, 123);
 }

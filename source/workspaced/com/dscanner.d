@@ -365,11 +365,11 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const FunctionDeclaration dec)
 	{
-		if (!dec.functionBody || !dec.functionBody.blockStatement)
+		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody || !dec.functionBody.specifiedFunctionBody.blockStatement)
 			return;
 		auto def = makeDefinition(dec.name.text, dec.name.line, "f", context,
-				[cast(int) dec.functionBody.blockStatement.startLocation,
-				cast(int) dec.functionBody.blockStatement.endLocation]);
+				[cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
+				cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation]);
 		def.attributes["signature"] = paramsToString(dec);
 		if (dec.returnType !is null)
 			def.attributes["return"] = astToString(dec.returnType);
@@ -378,22 +378,22 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const Constructor dec)
 	{
-		if (!dec.functionBody || !dec.functionBody.blockStatement)
+		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody || !dec.functionBody.specifiedFunctionBody.blockStatement)
 			return;
 		auto def = makeDefinition("this", dec.line, "f", context,
-				[cast(int) dec.functionBody.blockStatement.startLocation,
-				cast(int) dec.functionBody.blockStatement.endLocation]);
+				[cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
+				cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation]);
 		def.attributes["signature"] = paramsToString(dec);
 		definitions ~= def;
 	}
 
 	override void visit(const Destructor dec)
 	{
-		if (!dec.functionBody || !dec.functionBody.blockStatement)
+		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody || !dec.functionBody.specifiedFunctionBody.blockStatement)
 			return;
 		definitions ~= makeDefinition("~this", dec.line, "f", context,
-				[cast(int) dec.functionBody.blockStatement.startLocation,
-				cast(int) dec.functionBody.blockStatement.endLocation]);
+				[cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
+				cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation]);
 	}
 
 	override void visit(const EnumDeclaration dec)

@@ -129,6 +129,8 @@ class CodeDefinitionClassifier : AttributesVisitor
 	override void visit(const Declaration dec)
 	{
 		writtenRegion = false;
+		currentRange = [cast(uint) dec.tokens[0].index,
+			cast(uint)(dec.tokens[$ - 1].index + dec.tokens[$ - 1].text.length + 1)];
 		super.visit(dec);
 		if (writtenRegion && regions.length >= 2 && regions[$ - 2].sameBlockAs(regions[$ - 1]))
 		{
@@ -140,8 +142,11 @@ class CodeDefinitionClassifier : AttributesVisitor
 		}
 	}
 
-	void putRegion(CodeOrderType type)
+	void putRegion(CodeOrderType type, uint[2] range = typeof(uint.init)[2].init)
 	{
+		if (range == typeof(uint.init)[2].init)
+			range = currentRange;
+
 		ProtectionOrderType protection;
 		StaticOrderType staticness;
 
@@ -169,7 +174,8 @@ class CodeDefinitionClassifier : AttributesVisitor
 		Region r = {
 			type: type,
 			protection: protection,
-			staticness: staticness
+			staticness: staticness,
+			region: range
 		};
 		//dfmt on
 		regions ~= r;
@@ -181,6 +187,7 @@ class CodeDefinitionClassifier : AttributesVisitor
 	bool writtenRegion;
 	string code;
 	Region[] regions;
+	uint[2] currentRange;
 }
 
 private int scoreIndent(string indent)
