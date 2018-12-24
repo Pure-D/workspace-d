@@ -11,10 +11,10 @@
 		"dunit": "~>1.0.14",
 		"painlessjson": "~>1.3.9",
 		"standardpaths": "~>0.8.1",
-		"dfmt": {"path": "dfmt"},
-		"dscanner": {"path": "D-Scanner"},
+		"dfmt": "~master",
+		"dscanner": "~master",
 		"inifiled": "~>1.3.1",
-		"libdparse": {"path": "libdparse"}
+		"libdparse": "~>0.10.12"
 	},
 	"subPackages": [
 		"./installer",
