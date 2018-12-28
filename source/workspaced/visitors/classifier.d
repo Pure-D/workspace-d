@@ -191,7 +191,9 @@ class CodeDefinitionClassifier : AttributesVisitor
 			assert(prot);
 			//dfmt off
 			Region pr = {
+				type: cast(CodeRegionType)0,
 				protection: protection,
+				staticness: cast(CodeRegionStatic)0,
 				region: [cast(uint) prot.attributes[0].index, cast(uint) prot.attributes[0].index],
 				affectsFollowing: true
 			};

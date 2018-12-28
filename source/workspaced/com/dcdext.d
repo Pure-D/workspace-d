@@ -87,8 +87,8 @@ class DCDExtComponent : ComponentWrapper
 			scope existing = regions.enumerate.filter!(a => a.value.sameBlockAs(toInsert));
 			if (existing.empty)
 			{
-				auto checkProtection = mixableProtection.filter!(a => (a & toInsert.protection) != 0)
-					.reduce!"a | b";
+				auto checkProtection = CodeRegionProtection.init.reduce!"a | b"(
+						mixableProtection.filter!(a => (a & toInsert.protection) != 0));
 
 				bool inIncompatible = false;
 				bool lastFit = false;
@@ -379,6 +379,8 @@ private:
 ///
 enum CodeRegionType : int
 {
+	/// null region (unset)
+	init,
 	/// Imports inside the block
 	imports = 1 << 0,
 	/// Aliases `alias foo this;`, `alias Type = Other;`
@@ -402,6 +404,8 @@ enum CodeRegionType : int
 ///
 enum CodeRegionProtection : int
 {
+	/// null protection (unset)
+	init,
 	/// default (unmarked) protection
 	default_ = 1 << 0,
 	/// public protection
@@ -419,6 +423,8 @@ enum CodeRegionProtection : int
 ///
 enum CodeRegionStatic : int
 {
+	/// null static (unset)
+	init,
 	/// non-static code
 	instanced = 1 << 0,
 	/// static code
@@ -468,7 +474,9 @@ private:
 
 string indent(string code, string indentation)
 {
-	return code.lineSplitter!(KeepTerminator.yes).map!(a => a.length ? indentation ~ a : a).join;
+	return code.lineSplitter!(KeepTerminator.yes)
+		.map!(a => a.length ? indentation ~ a : a)
+		.join;
 }
 
 bool fieldNameMatches(string field, in char[] expected)
@@ -563,7 +571,7 @@ public:
 	}
 
 protected:
-	int x;
+	int x; // protected instanced field
 
 private:
 	static const int foo() @nogc nothrow pure @system // private static methods
