@@ -258,12 +258,19 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Lists dependencies of the root package. This can be used as a base to create a tree structure.
-	/// Returns: `[string]`
-	auto rootDependencies() @property
+	string[] rootDependencies() @property
 	{
 		validateConfiguration();
 
 		return _dub.project.rootPackage.listDependencies();
+	}
+
+	/// Returns the path to the root package recipe (dub.json/dub.sdl)
+	///
+	/// Note that this can be empty if the package is not in the local file system.
+	string recipePath() @property
+	{
+		return _dub.project.rootPackage.recipePath.toString;
 	}
 
 	/// Lists all import paths
@@ -508,6 +515,19 @@ class DubComponent : ComponentWrapper
 			}
 		}).start();
 		return ret;
+	}
+
+	/// Converts the root package recipe to another format.
+	/// Params:
+	///     format = either "json" or "sdl".
+	string convertRecipe(string format)
+	{
+		import dub.recipe.io : serializePackageRecipe;
+		import std.array : appender;
+
+		auto dst = appender!string;
+		serializePackageRecipe(dst, _dub.project.rootPackage.rawRecipe, "dub." ~ format);
+		return dst.data;
 	}
 
 private:
