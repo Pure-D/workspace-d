@@ -27,7 +27,7 @@ class DCDComponent : ComponentWrapper
 {
 	mixin DefaultComponentWrapper;
 
-	enum latestKnownVersion = [0, 10, 1];
+	enum latestKnownVersion = [0, 10, 2];
 	void load()
 	{
 		string clientPath = this.clientPath;
