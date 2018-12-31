@@ -12,48 +12,56 @@ import std.variant;
 
 class AttributesVisitor : ASTVisitor
 {
+	bool sticky;
+
 	override void visit(const MemberFunctionAttribute attribute)
 	{
 		if (attribute.tokenType != IdType.init)
-			context.attributes ~= ASTContext.AnyAttribute(cast() attribute);
+			context.attributes ~= ASTContext.AnyAttributeInfo(
+					ASTContext.AnyAttribute(cast() attribute), sticky);
 		attribute.accept(this);
 	}
 
 	override void visit(const FunctionAttribute attribute)
 	{
 		if (attribute.token.type != IdType.init)
-			context.attributes ~= ASTContext.AnyAttribute(
-					ASTContext.SimpleAttribute([cast() attribute.token]));
+			context.attributes ~= ASTContext.AnyAttributeInfo(ASTContext.AnyAttribute(
+					ASTContext.SimpleAttribute([cast() attribute.token])), sticky);
 		attribute.accept(this);
 	}
 
 	override void visit(const AtAttribute attribute)
 	{
-		context.attributes ~= ASTContext.AnyAttribute(cast() attribute);
+		context.attributes ~= ASTContext.AnyAttributeInfo(
+				ASTContext.AnyAttribute(cast() attribute), sticky);
 		attribute.accept(this);
 	}
 
 	override void visit(const PragmaExpression attribute)
 	{
-		context.attributes ~= ASTContext.AnyAttribute(cast() attribute);
+		context.attributes ~= ASTContext.AnyAttributeInfo(
+				ASTContext.AnyAttribute(cast() attribute), sticky);
 		attribute.accept(this);
 	}
 
 	override void visit(const Deprecated attribute)
 	{
-		context.attributes ~= ASTContext.AnyAttribute(cast() attribute);
+		context.attributes ~= ASTContext.AnyAttributeInfo(
+				ASTContext.AnyAttribute(cast() attribute), sticky);
 		attribute.accept(this);
 	}
 
 	override void visit(const AlignAttribute attribute)
 	{
-		context.attributes ~= ASTContext.AnyAttribute(cast() attribute);
+		context.attributes ~= ASTContext.AnyAttributeInfo(
+				ASTContext.AnyAttribute(cast() attribute), sticky);
 		attribute.accept(this);
 	}
 
 	override void visit(const LinkageAttribute attribute)
 	{
-		context.attributes ~= ASTContext.AnyAttribute(cast() attribute);
+		context.attributes ~= ASTContext.AnyAttributeInfo(
+				ASTContext.AnyAttribute(cast() attribute), sticky);
 		attribute.accept(this);
 	}
 
@@ -65,21 +73,24 @@ class AttributesVisitor : ASTVisitor
 		if (attribute.identifierChain)
 			tokens ~= attribute.identifierChain.identifiers;
 		if (tokens.length)
-			context.attributes ~= ASTContext.AnyAttribute(ASTContext.SimpleAttribute(tokens));
+			context.attributes ~= ASTContext.AnyAttributeInfo(
+					ASTContext.AnyAttribute(ASTContext.SimpleAttribute(tokens)), sticky);
 		attribute.accept(this);
 	}
 
 	override void visit(const StorageClass storage)
 	{
 		if (storage.token.type != IdType.init)
-			context.attributes ~= ASTContext.AnyAttribute(
-					ASTContext.SimpleAttribute([cast() storage.token]));
+			context.attributes ~= ASTContext.AnyAttributeInfo(ASTContext.AnyAttribute(
+					ASTContext.SimpleAttribute([cast() storage.token])), sticky);
 		storage.accept(this);
 	}
 
 	override void visit(const AttributeDeclaration dec)
 	{
+		sticky = true;
 		dec.accept(this);
+		sticky = false;
 	}
 
 	override void visit(const Declaration dec)
@@ -87,9 +98,17 @@ class AttributesVisitor : ASTVisitor
 		auto c = context.save;
 		// attribute ':' (private:)
 		bool attribDecl = !!dec.attributeDeclaration;
-		processDeclaration(dec);
-		if (!attribDecl)
+		if (attribDecl)
+		{
+			sticky = true;
+			processDeclaration(dec);
+			sticky = false;
+		}
+		else
+		{
+			processDeclaration(dec);
 			context.restore(c);
+		}
 	}
 
 	override void visit(const InterfaceDeclaration dec)
@@ -198,7 +217,44 @@ struct ASTContext
 	alias AnyAttribute = Algebraic!(PragmaExpression, Deprecated, AtAttribute, AlignAttribute, LinkageAttribute,
 			SimpleAttribute, MemberFunctionAttribute, ContainerAttribute, UserdataAttribute);
 
-	AnyAttribute[] attributes;
+	class AttributeWithInfo(T)
+	{
+		T value;
+		bool sticky;
+
+		alias value this;
+
+		this(T value, bool sticky)
+		{
+			this.value = value;
+			this.sticky = sticky;
+		}
+
+		auto opUnary(string op : "*")()
+		{
+			return this;
+		}
+	}
+
+	struct AnyAttributeInfo
+	{
+		AnyAttribute base;
+		// if true then this attribute is applying to all the following statements in the block (attribute ':')
+		bool sticky;
+
+		AttributeWithInfo!T peek(T)()
+		{
+			auto ret = base.peek!T;
+			if (!!ret)
+				return new AttributeWithInfo!T(*ret, sticky);
+			else
+				return null;
+		}
+
+		alias base this;
+	}
+
+	AnyAttributeInfo[] attributes;
 
 	/// Attributes only inside a container
 	auto localAttributes() @property
@@ -216,25 +272,20 @@ struct ASTContext
 			if (auto prag = a.peek!PragmaExpression)
 				return "pragma(" ~ prag.identifier.text ~ ", ...["
 					~ prag.argumentList.items.length.to!string ~ "])";
-			else if (auto depr = a.peek!Deprecated)
-				return "deprecated";
-			else if (auto at = a.peek!AtAttribute)
-				return "@" ~ at.identifier.text;
-			else if (auto align_ = a.peek!AlignAttribute)
-				return "align";
-			else if (auto linkage = a.peek!LinkageAttribute)
-				return "extern (" ~ linkage.identifier.text ~ (linkage.hasPlusPlus ? "++" : "") ~ ")";
-			else if (auto simple = a.peek!SimpleAttribute)
-				return simple.attributes.map!(a => a.text.length ? a.text : str(a.type)).join(".");
-			else if (auto mfunAttr = a.peek!MemberFunctionAttribute)
-				return "mfun<" ~ (mfunAttr.atAttribute
-					? "@" ~ mfunAttr.atAttribute.identifier.text : "???") ~ ">";
-			else if (auto container = a.peek!ContainerAttribute)
-				return container.type.to!string[0 .. $ - 1] ~ " " ~ container.name;
-			else if (auto user = a.peek!UserdataAttribute)
-				return "user " ~ user.name;
+			else if (auto depr = a.peek!Deprecated) return "deprecated";
+			else if (auto at = a.peek!AtAttribute) return "@" ~ at.identifier.text;
+			else if (auto align_ = a.peek!AlignAttribute) return "align";
+			else if (auto linkage = a.peek!LinkageAttribute) return "extern (" ~ linkage.identifier.text ~ (
+						linkage.hasPlusPlus ? "++" : "") ~ ")";
+			else if (auto simple = a.peek!SimpleAttribute) return simple.attributes.map!(a => a.text.length
+						? a.text : str(a.type)).join(".");
+			else if (auto mfunAttr = a.peek!MemberFunctionAttribute) return "mfun<" ~ (mfunAttr.atAttribute
+						? "@" ~ mfunAttr.atAttribute.identifier.text : "???") ~ ">";
+			else if (auto container = a.peek!ContainerAttribute) return container.type.to!string[0 .. $ - 1]
+					~ " " ~ container.name;
+			else if (auto user = a.peek!UserdataAttribute) return "user " ~ user.name;
 			else
-				return "Unknown type?!";
+						return "Unknown type?!";
 		});
 	}
 
@@ -376,14 +427,14 @@ struct ASTContext
 			return 9;
 	}
 
-	Token[] protectionAttribute() @property
+	AttributeWithInfo!SimpleAttribute protectionAttribute() @property
 	{
 		auto prot = simpleAttributes.filter!(a => a.firstAttribute.type.among!(tok!"public",
 				tok!"private", tok!"protected", tok!"package")).tail(1);
 		if (prot.empty)
 			return null;
 		else
-			return prot.front.attributes;
+			return prot.front;
 	}
 
 	IdType protectionType() @property
@@ -392,22 +443,22 @@ struct ASTContext
 		if (attr is null)
 			return IdType.init;
 		else
-			return attr[0].type;
+			return attr.attributes[0].type;
 	}
 
-	void pushData(string name, Variant value)
+	void pushData(string name, Variant value, bool sticky = false)
 	{
-		attributes ~= AnyAttribute(UserdataAttribute(name, value));
+		attributes ~= AnyAttributeInfo(AnyAttribute(UserdataAttribute(name, value)), sticky);
 	}
 
-	void pushData(T)(string name, T value)
+	void pushData(T)(string name, T value, bool sticky = false)
 	{
-		pushData(name, Variant(value));
+		pushData(name, Variant(value), sticky);
 	}
 
 	void pushContainer(ContainerAttribute.Type type, string name)
 	{
-		attributes ~= AnyAttribute(ContainerAttribute(type, name));
+		attributes ~= AnyAttributeInfo(AnyAttribute(ContainerAttribute(type, name)), false);
 	}
 
 	ASTContext save()

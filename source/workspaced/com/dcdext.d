@@ -13,8 +13,8 @@ import std.ascii;
 import std.file;
 import std.functional;
 import std.json;
+import std.range;
 import std.string;
-import std.traits : EnumMembers;
 
 import workspaced.api;
 import workspaced.dparseext;
@@ -28,14 +28,11 @@ class DCDExtComponent : ComponentWrapper
 {
 	mixin DefaultComponentWrapper;
 
-	/// Default code order of constructs, defaults to order of enum.
-	static immutable CodeOrderType[] defaultCodeOrder = [EnumMembers!CodeOrderType];
-	/// ditto
-	static immutable ProtectionOrderType[] defaultProtectionOrder = [EnumMembers!ProtectionOrderType];
-	/// ditto
-	static immutable StaticOrderType[] defaultStaticOrder = [EnumMembers!StaticOrderType];
-	/// ditto
-	static immutable AttributeOrderType[] defaultAttributeOrder = [EnumMembers!AttributeOrderType];
+	static immutable CodeRegionProtection[] mixableProtection = [
+		CodeRegionProtection.public_ | CodeRegionProtection.default_, CodeRegionProtection.package_,
+		CodeRegionProtection.packageIdentifier, CodeRegionProtection.protected_,
+		CodeRegionProtection.private_
+	];
 
 	/// Loads dcd extension methods. Call with `{"cmd": "load", "components": ["dcdext"]}`
 	void load()
@@ -58,31 +55,133 @@ class DCDExtComponent : ComponentWrapper
 	}
 
 	/// Inserts a generic method after the corresponding block inside the scope where position is.
-	/// If it can't find a good spot it will insert the code properly indented at the specified position.
-	/// Omitting orders will mix them at the end. Orders can be mixed by bit-or'ing the flags.
+	/// If it can't find a good spot it will insert the code properly indented ata fitting location.
 	// make public once usable
-	private CodeReplacement[] insertCode(CodeOrderType type, string insert,
-			string code, int position, in CodeOrderType[] codeOrder = defaultCodeOrder,
-			in AttributeOrderType[] attributeOrder = defaultAttributeOrder,
-			in ProtectionOrderType[] protectionOrder = defaultProtectionOrder,
-			in StaticOrderType[] staticOrder = defaultStaticOrder,
-			bool insertInLastBlock = true, bool insertAtEnd = true)
+	private CodeReplacement[] insertCodeInContainer(string insert, string code,
+			int position, bool insertInLastBlock = true, bool insertAtEnd = true)
 	{
 		auto container = getCodeBlockRange(code, position);
 
 		string codeBlock = code[container.innerRange[0] .. container.innerRange[1]];
 
-		auto tokens = getTokensForParser(cast(ubyte[]) codeBlock, config, &workspaced.stringCache);
-		auto parsed = parseModule(tokens, "insertCode_input.d", &rba);
+		scope tokensInsert = getTokensForParser(cast(ubyte[]) insert, config,
+				&workspaced.stringCache);
+		scope parsedInsert = parseModule(tokensInsert, "insertCode_insert.d", &rba);
 
-		auto reader = new CodeDefinitionClassifier(codeBlock);
+		scope insertReader = new CodeDefinitionClassifier(insert);
+		insertReader.visit(parsedInsert);
+		scope insertRegions = insertReader.regions.sort!"a.type < b.type".uniq.array;
+
+		scope tokens = getTokensForParser(cast(ubyte[]) codeBlock, config, &workspaced.stringCache);
+		scope parsed = parseModule(tokens, "insertCode_code.d", &rba);
+
+		scope reader = new CodeDefinitionClassifier(codeBlock);
 		reader.visit(parsed);
+		scope regions = reader.regions;
 
-		import std.stdio;
+		CodeReplacement[] ret;
 
-		stderr.writeln(reader.regions);
+		foreach (CodeDefinitionClassifier.Region toInsert; insertRegions)
+		{
+			auto insertCode = insert[toInsert.region[0] .. toInsert.region[1]];
+			scope existing = regions.enumerate.filter!(a => a.value.sameBlockAs(toInsert));
+			if (existing.empty)
+			{
+				auto checkProtection = CodeRegionProtection.init.reduce!"a | b"(
+						mixableProtection.filter!(a => (a & toInsert.protection) != 0));
 
-		return null;
+				bool inIncompatible = false;
+				bool lastFit = false;
+				int fittingProtection = -1;
+				int firstStickyProtection = -1;
+				int regionAfterFitting = -1;
+				foreach (i, stickyProtection; regions)
+				{
+					if (stickyProtection.affectsFollowing
+							&& stickyProtection.protection != CodeRegionProtection.init)
+					{
+						if (firstStickyProtection == -1)
+							firstStickyProtection = cast(int) i;
+
+						if ((stickyProtection.protection & checkProtection) != 0)
+						{
+							fittingProtection = cast(int) i;
+							lastFit = true;
+							if (!insertInLastBlock)
+								break;
+						}
+						else
+						{
+							if (lastFit)
+							{
+								regionAfterFitting = cast(int) i;
+								lastFit = false;
+							}
+							inIncompatible = true;
+						}
+					}
+				}
+				assert(firstStickyProtection != -1 || !inIncompatible);
+				assert(regionAfterFitting != -1 || fittingProtection == -1 || !inIncompatible);
+
+				if (inIncompatible)
+				{
+					int insertRegion = fittingProtection == -1 ? firstStickyProtection : regionAfterFitting;
+					insertCode = indent(insertCode, regions[insertRegion].minIndentation) ~ "\n\n";
+					auto len = cast(uint) insertCode.length;
+
+					toInsert.region[0] = regions[insertRegion].region[0];
+					toInsert.region[1] = regions[insertRegion].region[0] + len;
+					foreach (ref r; regions[insertRegion .. $])
+					{
+						r.region[0] += len;
+						r.region[1] += len;
+					}
+				}
+				else
+				{
+					auto lastRegion = regions.back;
+					insertCode = indent(insertCode, lastRegion.minIndentation);
+					auto len = cast(uint) insertCode.length;
+					toInsert.region[0] = lastRegion.region[1];
+					toInsert.region[1] = lastRegion.region[1] + len;
+				}
+				regions ~= toInsert;
+				ret ~= CodeReplacement([toInsert.region[0], toInsert.region[0]], insertCode);
+			}
+			else
+			{
+				auto target = insertInLastBlock ? existing.tail(1).front : existing.front;
+
+				insertCode = "\n\n" ~ indent(insertCode, regions[target.index].minIndentation);
+				const codeLength = cast(int) insertCode.length;
+
+				if (insertAtEnd)
+				{
+					ret ~= CodeReplacement([target.value.region[1], target.value.region[1]], insertCode);
+					toInsert.region[0] = target.value.region[1];
+					toInsert.region[1] = target.value.region[1] + codeLength;
+					regions[target.index].region[1] = toInsert.region[1];
+					foreach (ref other; regions[target.index + 1 .. $])
+					{
+						other.region[0] += codeLength;
+						other.region[1] += codeLength;
+					}
+				}
+				else
+				{
+					ret ~= CodeReplacement([target.value.region[0], target.value.region[0]], insertCode);
+					regions[target.index].region[1] += codeLength;
+					foreach (ref other; regions[target.index + 1 .. $])
+					{
+						other.region[0] += codeLength;
+						other.region[1] += codeLength;
+					}
+				}
+			}
+		}
+
+		return ret;
 	}
 
 	/// Implements the interfaces or abstract classes of a specified class/interface.
@@ -277,9 +376,11 @@ private:
 	}
 }
 
-/// Order of code to insert code blocks in code.
-enum CodeOrderType : int
+///
+enum CodeRegionType : int
 {
+	/// null region (unset)
+	init,
 	/// Imports inside the block
 	imports = 1 << 0,
 	/// Aliases `alias foo this;`, `alias Type = Other;`
@@ -301,8 +402,10 @@ enum CodeOrderType : int
 }
 
 ///
-enum ProtectionOrderType : int
+enum CodeRegionProtection : int
 {
+	/// null protection (unset)
+	init,
 	/// default (unmarked) protection
 	default_ = 1 << 0,
 	/// public protection
@@ -318,25 +421,14 @@ enum ProtectionOrderType : int
 }
 
 ///
-enum StaticOrderType : int
+enum CodeRegionStatic : int
 {
+	/// null static (unset)
+	init,
 	/// non-static code
 	instanced = 1 << 0,
 	/// static code
 	static_ = 1 << 1,
-}
-
-/// Attributes to check for order checks.
-/// For example if the order is protection, static, types then the code is first separated by protection (public/private),
-/// then each protection block is separated by static/non-static and then each of those blocks is separated by the code types (ctor, dtor, method, etc).
-enum AttributeOrderType : int
-{
-	/// Separate by CodeOrderType
-	types = 1 << 0,
-	/// Separate by ProtectionOrderType
-	protection = 1 << 1,
-	/// Separate by StaticOrderType
-	static_ = 1 << 2,
 }
 
 /// Represents a class/interface/struct/union/template with body.
@@ -379,6 +471,13 @@ struct CodeBlockInfo
 }
 
 private:
+
+string indent(string code, string indentation)
+{
+	return code.lineSplitter!(KeepTerminator.yes)
+		.map!(a => a.length ? indentation ~ a : a)
+		.join;
+}
 
 bool fieldNameMatches(string field, in char[] expected)
 {
@@ -461,6 +560,7 @@ module foo;
 
 class FooBar
 {
+public:
 	int i; // default instanced fields
 	string s;
 	long l;
@@ -469,6 +569,9 @@ class FooBar
 	{
 		i = 4;
 	}
+
+protected:
+	int x; // protected instanced field
 
 private:
 	static const int foo() @nogc nothrow pure @system // private static methods
@@ -498,6 +601,9 @@ unittest
 	assert(dcdext.getCodeBlockRange(SimpleClassTestCode, 19) == CodeBlockInfo.init);
 	assert(dcdext.getCodeBlockRange(SimpleClassTestCode, 20) != CodeBlockInfo.init);
 
-	dcdext.insertCode(CodeOrderType.methods, "void foo()\n{\n\twriteln();\n}",
+	auto replacements = dcdext.insertCodeInContainer("void foo()\n{\n\twriteln();\n}",
 			SimpleClassTestCode, 123);
+	import std.stdio;
+
+	stderr.writeln(replacements);
 }

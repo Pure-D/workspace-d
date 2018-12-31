@@ -7,8 +7,9 @@ import workspaced.com.dcdext;
 
 import std.algorithm;
 import std.ascii;
-import std.range;
 import std.meta;
+import std.range;
+import std.string;
 
 import dparse.ast;
 import dparse.lexer;
@@ -17,11 +18,12 @@ class CodeDefinitionClassifier : AttributesVisitor
 {
 	struct Region
 	{
-		CodeOrderType type;
-		ProtectionOrderType protection;
-		StaticOrderType staticness;
+		CodeRegionType type;
+		CodeRegionProtection protection;
+		CodeRegionStatic staticness;
 		string minIndentation;
 		uint[2] region;
+		bool affectsFollowing;
 
 		bool sameBlockAs(in Region other)
 		{
@@ -36,99 +38,101 @@ class CodeDefinitionClassifier : AttributesVisitor
 
 	override void visit(const AliasDeclaration aliasDecl)
 	{
-		putRegion(CodeOrderType.aliases);
+		putRegion(CodeRegionType.aliases);
 	}
 
 	override void visit(const AliasThisDeclaration aliasDecl)
 	{
-		putRegion(CodeOrderType.aliases);
+		putRegion(CodeRegionType.aliases);
 	}
 
 	override void visit(const ClassDeclaration typeDecl)
 	{
-		putRegion(CodeOrderType.types);
+		putRegion(CodeRegionType.types);
 	}
 
 	override void visit(const InterfaceDeclaration typeDecl)
 	{
-		putRegion(CodeOrderType.types);
+		putRegion(CodeRegionType.types);
 	}
 
 	override void visit(const StructDeclaration typeDecl)
 	{
-		putRegion(CodeOrderType.types);
+		putRegion(CodeRegionType.types);
 	}
 
 	override void visit(const UnionDeclaration typeDecl)
 	{
-		putRegion(CodeOrderType.types);
+		putRegion(CodeRegionType.types);
 	}
 
 	override void visit(const EnumDeclaration typeDecl)
 	{
-		putRegion(CodeOrderType.types);
+		putRegion(CodeRegionType.types);
 	}
 
 	override void visit(const AnonymousEnumDeclaration typeDecl)
 	{
-		putRegion(CodeOrderType.types);
+		putRegion(CodeRegionType.types);
 	}
 
 	override void visit(const AutoDeclaration field)
 	{
-		putRegion(CodeOrderType.fields);
+		putRegion(CodeRegionType.fields);
 	}
 
 	override void visit(const VariableDeclaration field)
 	{
-		putRegion(CodeOrderType.fields);
+		putRegion(CodeRegionType.fields);
 	}
 
 	override void visit(const Constructor ctor)
 	{
-		putRegion(CodeOrderType.ctor);
+		putRegion(CodeRegionType.ctor);
 	}
 
 	override void visit(const StaticConstructor ctor)
 	{
-		putRegion(CodeOrderType.ctor);
+		putRegion(CodeRegionType.ctor);
 	}
 
 	override void visit(const SharedStaticConstructor ctor)
 	{
-		putRegion(CodeOrderType.ctor);
+		putRegion(CodeRegionType.ctor);
 	}
 
 	override void visit(const Postblit copyctor)
 	{
-		putRegion(CodeOrderType.copyctor);
+		putRegion(CodeRegionType.copyctor);
 	}
 
 	override void visit(const Destructor dtor)
 	{
-		putRegion(CodeOrderType.dtor);
+		putRegion(CodeRegionType.dtor);
 	}
 
 	override void visit(const StaticDestructor dtor)
 	{
-		putRegion(CodeOrderType.dtor);
+		putRegion(CodeRegionType.dtor);
 	}
 
 	override void visit(const SharedStaticDestructor dtor)
 	{
-		putRegion(CodeOrderType.dtor);
+		putRegion(CodeRegionType.dtor);
 	}
 
 	override void visit(const FunctionDeclaration method)
 	{
 		putRegion((method.attributes && method.attributes.any!(a => a.atAttribute
-				&& a.atAttribute.identifier.text == "property")) ? CodeOrderType.properties
-				: CodeOrderType.methods);
+				&& a.atAttribute.identifier.text == "property")) ? CodeRegionType.properties
+				: CodeRegionType.methods);
 	}
 
 	override void visit(const Declaration dec)
 	{
 		writtenRegion = false;
+		currentRange = [cast(uint) dec.tokens[0].index,
+			cast(uint)(dec.tokens[$ - 1].index + dec.tokens[$ - 1].text.length + 1)];
 		super.visit(dec);
 		if (writtenRegion && regions.length >= 2 && regions[$ - 2].sameBlockAs(regions[$ - 1]))
 		{
@@ -140,36 +144,70 @@ class CodeDefinitionClassifier : AttributesVisitor
 		}
 	}
 
-	void putRegion(CodeOrderType type)
+	override void visit(const AttributeDeclaration dec)
 	{
-		ProtectionOrderType protection;
-		StaticOrderType staticness;
+		auto before = context.attributes[];
+		dec.accept(this);
+		auto now = context.attributes;
+		if (now.length > before.length)
+		{
+			auto permaAdded = now[before.length .. $];
+
+		}
+	}
+
+	void putRegion(CodeRegionType type, uint[2] range = typeof(uint.init)[2].init)
+	{
+		if (range == typeof(uint.init)[2].init)
+			range = currentRange;
+
+		CodeRegionProtection protection;
+		CodeRegionStatic staticness;
 
 		auto prot = context.protectionAttribute;
+		bool stickyProtection = false;
 		if (prot)
 		{
-			if (prot[0].type == tok!"private")
-				protection = ProtectionOrderType.private_;
-			else if (prot[0].type == tok!"protected")
-				protection = ProtectionOrderType.protected_;
-			else if (prot[0].type == tok!"package")
+			stickyProtection = prot.sticky;
+			if (prot.attributes[0].type == tok!"private")
+				protection = CodeRegionProtection.private_;
+			else if (prot.attributes[0].type == tok!"protected")
+				protection = CodeRegionProtection.protected_;
+			else if (prot.attributes[0].type == tok!"package")
 			{
-				if (prot.length > 1)
-					protection = ProtectionOrderType.packageIdentifier;
+				if (prot.attributes.length > 1)
+					protection = CodeRegionProtection.packageIdentifier;
 				else
-					protection = ProtectionOrderType.package_;
+					protection = CodeRegionProtection.package_;
 			}
-			else if (prot[0].type == tok!"public")
-				protection = ProtectionOrderType.public_;
+			else if (prot.attributes[0].type == tok!"public")
+				protection = CodeRegionProtection.public_;
 		}
 
-		staticness = context.isStatic ? StaticOrderType.static_ : StaticOrderType.instanced;
+		staticness = context.isStatic ? CodeRegionStatic.static_ : CodeRegionStatic.instanced;
+
+		if (stickyProtection)
+		{
+			assert(prot);
+			//dfmt off
+			Region pr = {
+				type: cast(CodeRegionType)0,
+				protection: protection,
+				staticness: cast(CodeRegionStatic)0,
+				region: [cast(uint) prot.attributes[0].index, cast(uint) prot.attributes[0].index],
+				affectsFollowing: true
+			};
+			//dfmt on
+			regions ~= pr;
+		}
 
 		//dfmt off
 		Region r = {
 			type: type,
 			protection: protection,
-			staticness: staticness
+			staticness: staticness,
+			minIndentation: determineIndentation(code[range[0] .. range[1]]),
+			region: range
 		};
 		//dfmt on
 		regions ~= r;
@@ -181,6 +219,19 @@ class CodeDefinitionClassifier : AttributesVisitor
 	bool writtenRegion;
 	string code;
 	Region[] regions;
+	uint[2] currentRange;
+}
+
+private string determineIndentation(string code)
+{
+	string indent = null;
+	foreach (line; code.lineSplitter)
+	{
+		if (line.strip.length == 0)
+			continue;
+		indent = line[0 .. $ - line.stripLeft.length];
+	}
+	return indent;
 }
 
 private int scoreIndent(string indent)
