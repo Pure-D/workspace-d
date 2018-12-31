@@ -1,17 +1,35 @@
-rem Building & compressing workspace-d for release inside a virtual machine with Windows 8 or above
-rem This will delete the folder C:\build
+rem Building & compressing serve-d for release inside a virtual machine with Windows 8 or above
 
-del /S /Q C:\build
-xcopy /e . C:\build
-pushd C:\build
-dub build --build=release --compiler=ldc2 --combined
-echo Y | del windows
+pushd %~dp0
+
+@if not exist version.txt (
+    echo.
+    echo !-- Error: version.txt is missing :/
+    echo.
+    pause
+    popd
+    goto :eof
+)
+
+rem This will sync this repo with the folder %SystemDrive%\buildwd
+robocopy . %SystemDrive%\buildwd /MIR /XA:SH /XD .* /XF .* /XF *.zip
+pushd %SystemDrive%\buildwd
+
+set /p Version=<version.txt
+dub upgrade
+dub build --compiler=ldc2 --arch=x86
+
+if exist windows del /S /Q windows
 mkdir windows
-echo F | xcopy /f workspace-d.exe windows\workspace-d.exe
-echo F | xcopy /f libcurl.dll windows\libcurl.dll
-echo F | xcopy /f libeay32.dll windows\libeay32.dll
-echo F | xcopy /f ssleay32.dll windows\ssleay32.dll
-del C:\build\windows.zip
+copy workspace-d.exe windows\workspace-d.exe
+copy libcurl.dll windows\libcurl.dll
+copy libeay32.dll windows\libeay32.dll
+copy ssleay32.dll windows\ssleay32.dll
+
+if exist windows.zip del windows.zip
 powershell -nologo -noprofile -command "& { Add-Type -A 'System.IO.Compression.FileSystem'; [IO.Compression.ZipFile]::CreateFromDirectory('windows', 'windows.zip'); }"
 popd
-echo F | xcopy C:\build\windows.zip workspace-d-2.x.x-windows.zip
+
+move %SystemDrive%\buildwd\windows.zip "workspace-d_%Version%-windows.zip"
+popd
+pause
