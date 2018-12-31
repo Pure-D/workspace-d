@@ -1,3 +1,4 @@
+import std.conv : to;
 import std.file;
 import std.path;
 import std.string;
@@ -17,7 +18,7 @@ void main()
 	dub.upgrade();
 	assert(dub.dependencies.length > 2);
 	assert(dub.rootDependencies == ["workspace-d"]);
-	assert(dub.imports.length > 5);
+	assert(dub.imports.length > 5, dub.imports.to!string);
 	assert(dub.stringImports[0].endsWith("views")
 			|| dub.stringImports[0].endsWith("views/") || dub.stringImports[0].endsWith("views\\"));
 	assert(dub.fileImports.length > 10);

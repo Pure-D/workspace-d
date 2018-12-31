@@ -434,6 +434,10 @@ class DubComponent : ComponentWrapper
 	/// Asynchroniously builds the project WITHOUT OUTPUT. This is intended for linting code and showing build errors quickly inside the IDE.
 	Future!(BuildIssue[]) build()
 	{
+		import std.process : thisProcessID;
+		import std.file : tempDir;
+		import std.random : uniform;
+
 		validateBuildConfiguration();
 
 		// copy to this thread
@@ -447,6 +451,9 @@ class DubComponent : ComponentWrapper
 		settings.compiler = compiler;
 		settings.tempBuild = true;
 		settings.buildSettings = _settings;
+		settings.buildSettings.targetPath = tempDir;
+		settings.buildSettings.targetName = "workspace-d-build-"
+			~ thisProcessID.to!string ~ "-" ~ uniform!uint.to!string(36);
 		settings.buildSettings.addOptions(BuildOption.syntaxOnly);
 		settings.buildSettings.addDFlags("-o-");
 
