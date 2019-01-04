@@ -37,12 +37,33 @@ ComponentInfo component(string name)
 	return ComponentInfo(name);
 }
 
-mixin template DefaultComponentWrapper()
+mixin template DefaultComponentWrapper(bool withDtor = true)
 {
 	@ignoredFunc
 	{
+		import core.thread : ThreadGroup;
+
 		WorkspaceD workspaced;
 		WorkspaceD.Instance refInstance;
+
+		ThreadGroup _threads;
+
+		static if (withDtor)
+		{
+			~this()
+			{
+				shutdown();
+			}
+		}
+
+		ThreadGroup threads()
+		{
+			if (!_threads)
+				synchronized (this)
+					if (!_threads)
+						_threads = new ThreadGroup();
+			return _threads;
+		}
 
 		WorkspaceD.Instance instance() const @property
 		{
@@ -114,6 +135,8 @@ mixin template DefaultComponentWrapper()
 
 		override void shutdown()
 		{
+			if (_threads)
+				_threads.joinAll();
 		}
 
 		override void bind(WorkspaceD workspaced, WorkspaceD.Instance instance)
@@ -126,8 +149,7 @@ mixin template DefaultComponentWrapper()
 
 		import std.conv;
 		import std.json : JSONValue;
-		import std.traits : isFunction, hasUDA, ParameterDefaults, Parameters,
-			ReturnType;
+		import std.traits : isFunction, hasUDA, ParameterDefaults, Parameters, ReturnType;
 		import painlessjson;
 
 		override Future!JSONValue run(string method, JSONValue[] args)
@@ -219,16 +241,17 @@ bool checkType(T)(JSONValue value)
 		static if (isStaticArray!T)
 			return T.length == value.array.length
 				&& value.array.all!(checkType!(typeof(T.init[0])));
-		else static if (isDynamicArray!T) return value.array.all!(checkType!(typeof(T.init[0])));
+		else static if (isDynamicArray!T)
+			return value.array.all!(checkType!(typeof(T.init[0])));
 		else static if (is(T : Tuple!Args, Args...))
-				{
-				if (value.array.length != Args.length)
+		{
+			if (value.array.length != Args.length)
+				return false;
+			static foreach (i, Arg; Args)
+				if (!checkType!Arg(value.array[i]))
 					return false;
-				static foreach (i, Arg; Args)
-					if (!checkType!Arg(value.array[i]))
-						return false;
-				return true;
-			}
+			return true;
+		}
 		else
 			return false;
 	case JSON_TYPE.FALSE:

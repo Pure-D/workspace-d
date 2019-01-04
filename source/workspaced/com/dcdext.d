@@ -188,7 +188,7 @@ class DCDExtComponent : ComponentWrapper
 	Future!string implement(string code, int position)
 	{
 		auto ret = new Future!string;
-		new Thread({
+		threads.create({
 			try
 			{
 				struct InterfaceTree
@@ -342,7 +342,7 @@ class DCDExtComponent : ComponentWrapper
 			{
 				ret.error(t);
 			}
-		}).start();
+		});
 		return ret;
 	}
 

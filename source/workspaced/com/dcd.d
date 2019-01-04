@@ -91,15 +91,11 @@ class DCDComponent : ComponentWrapper
 		return installedVersion;
 	}
 
-	~this()
-	{
-		shutdown();
-	}
-
 	/// This stops the dcd-server instance safely and waits for it to exit
 	override void shutdown()
 	{
 		stopServerSync();
+		threads.joinAll();
 	}
 
 	/// This will start the dcd-server and load import paths from the current provider
@@ -134,7 +130,7 @@ class DCDComponent : ComponentWrapper
 				break;
 		}
 		running = true;
-		new Thread({
+		threads.create({
 			if (quietServer)
 				foreach (block; serverPipes.stderr.byChunk(4096))
 				{
@@ -153,7 +149,7 @@ class DCDComponent : ComponentWrapper
 					: JSONValue("crash"), "component" : JSONValue("dcd")]));
 				running = false;
 			}
-		}).start();
+		});
 	}
 
 	void stopServerSync()
@@ -179,7 +175,7 @@ class DCDComponent : ComponentWrapper
 	Future!void stopServer()
 	{
 		auto ret = new Future!void();
-		new Thread({ /**/
+		threads.create({ /**/
 			try
 			{
 				stopServerSync();
@@ -189,7 +185,7 @@ class DCDComponent : ComponentWrapper
 			{
 				ret.error(t);
 			}
-		}).start();
+		});
 		return ret;
 	}
 
@@ -205,7 +201,7 @@ class DCDComponent : ComponentWrapper
 	Future!void restartServer(bool quiet = false)
 	{
 		auto ret = new Future!void;
-		new Thread({ /**/
+		threads.create({ /**/
 			try
 			{
 				stopServerSync();
@@ -216,7 +212,7 @@ class DCDComponent : ComponentWrapper
 			{
 				ret.error(t);
 			}
-		}).start();
+		});
 		return ret;
 	}
 
@@ -238,7 +234,7 @@ class DCDComponent : ComponentWrapper
 	Future!(DCDSearchResult[]) searchSymbol(string query)
 	{
 		auto ret = new Future!(DCDSearchResult[]);
-		new Thread({
+		threads.create({
 			try
 			{
 				if (!running)
@@ -269,7 +265,7 @@ class DCDComponent : ComponentWrapper
 			{
 				ret.error(t);
 			}
-		}).start();
+		});
 		return ret;
 	}
 
@@ -310,7 +306,7 @@ class DCDComponent : ComponentWrapper
 			return Future!ushort.fromResult(0);
 		}
 		auto ret = new Future!ushort;
-		new Thread({ /**/
+		threads.create({ /**/
 			try
 			{
 				auto newPort = findOpen(port);
@@ -321,7 +317,7 @@ class DCDComponent : ComponentWrapper
 			{
 				ret.error(t);
 			}
-		}).start();
+		});
 		return ret;
 	}
 
@@ -329,7 +325,7 @@ class DCDComponent : ComponentWrapper
 	Future!DCDDeclaration findDeclaration(string code, int pos)
 	{
 		auto ret = new Future!DCDDeclaration;
-		new Thread({
+		threads.create({
 			try
 			{
 				if (!running)
@@ -363,7 +359,7 @@ class DCDComponent : ComponentWrapper
 			{
 				ret.error(t);
 			}
-		}).start();
+		});
 		return ret;
 	}
 
@@ -371,7 +367,7 @@ class DCDComponent : ComponentWrapper
 	Future!string getDocumentation(string code, int pos)
 	{
 		auto ret = new Future!string;
-		new Thread({
+		threads.create({
 			try
 			{
 				if (!running)
@@ -400,7 +396,7 @@ class DCDComponent : ComponentWrapper
 			{
 				ret.error(t);
 			}
-		}).start();
+		});
 		return ret;
 	}
 
@@ -427,7 +423,7 @@ class DCDComponent : ComponentWrapper
 	Future!DCDCompletions listCompletion(string code, int pos)
 	{
 		auto ret = new Future!DCDCompletions;
-		new Thread({
+		threads.create({
 			try
 			{
 				DCDCompletions completions;
@@ -546,7 +542,7 @@ class DCDComponent : ComponentWrapper
 			{
 				ret.error(e);
 			}
-		}).start();
+		});
 		return ret;
 	}
 

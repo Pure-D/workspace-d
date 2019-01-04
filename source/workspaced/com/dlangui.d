@@ -23,7 +23,7 @@ class DlanguiComponent : ComponentWrapper
 	Future!(CompletionItem[]) complete(string code, int pos)
 	{
 		auto ret = new Future!(CompletionItem[]);
-		new Thread({
+		threads.create({
 			try
 			{
 				LocationInfo info = getLocationInfo(code, pos);
@@ -111,7 +111,7 @@ class DlanguiComponent : ComponentWrapper
 			{
 				ret.error(e);
 			}
-		}).start();
+		});
 		return ret;
 	}
 }

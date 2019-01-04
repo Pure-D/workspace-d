@@ -170,7 +170,7 @@ class DubComponent : ComponentWrapper
 	{
 		restart();
 		auto ret = new Future!bool;
-		new Thread({ /**/
+		threads.create({ /**/
 			try
 			{
 				auto result = updateImportPaths(false);
@@ -180,7 +180,7 @@ class DubComponent : ComponentWrapper
 			{
 				ret.error(t);
 			}
-		}).start();
+		});
 		return ret;
 	}
 

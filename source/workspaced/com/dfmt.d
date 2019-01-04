@@ -27,7 +27,7 @@ class DfmtComponent : ComponentWrapper
 	Future!string format(string code, string[] arguments = [])
 	{
 		auto ret = new Future!string;
-		new Thread({
+		threads.create({
 			try
 			{
 				Config config;
@@ -128,7 +128,7 @@ class DfmtComponent : ComponentWrapper
 			{
 				ret.error(e);
 			}
-		}).start();
+		});
 		return ret;
 	}
 }
