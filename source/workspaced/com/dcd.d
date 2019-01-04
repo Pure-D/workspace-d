@@ -154,6 +154,7 @@ class DCDComponent : ComponentWrapper
 
 	void stopServerSync()
 	{
+		assert(this, "The object has been destroyed, but stopServer is still called");
 		if (!running || serverPipes.pid.tryWait().terminated)
 			return;
 		int i = 0;
