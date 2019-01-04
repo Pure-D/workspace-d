@@ -154,13 +154,12 @@ class DCDComponent : ComponentWrapper
 
 	void stopServerSync()
 	{
-		assert(this, "The object has been destroyed, but stopServer is still called");
-		if (!running || serverPipes.pid.tryWait().terminated)
+		if (!running)
 			return;
 		int i = 0;
 		running = false;
 		doClient(["--shutdown"]).pid.wait;
-		while (!serverPipes.pid.tryWait().terminated)
+		while (serverPipes.pid && !serverPipes.pid.tryWait().terminated)
 		{
 			Thread.sleep(10.msecs);
 			if (++i > 200) // Kill after 2 seconds
@@ -193,7 +192,7 @@ class DCDComponent : ComponentWrapper
 	/// This will kill the process associated with the dcd-server instance
 	void killServer()
 	{
-		if (!serverPipes.pid.tryWait().terminated)
+		if (serverPipes.pid && !serverPipes.pid.tryWait().terminated)
 			serverPipes.pid.kill();
 	}
 
