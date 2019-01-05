@@ -2,17 +2,19 @@
 module workspaced.com.importer;
 
 import dparse.ast;
+import dparse.lexer;
 import dparse.parser;
 import dparse.rollback_allocator;
-import dparse.lexer;
 
 import std.algorithm;
 import std.array;
 import std.functional;
 import std.stdio;
 import std.string;
+import std.uni : sicmp;
 
 import workspaced.api;
+import workspaced.helpers : determineIndentation, indexOfKeyword, stripLineEndingLength;
 
 /// ditto
 @component("importer")
@@ -78,6 +80,7 @@ class ImporterComponent : ComponentWrapper
 	ImportBlock sortImports(string code, int pos)
 	{
 		bool startBlock = true;
+		string indentation;
 		size_t start, end;
 		// find block of code separated by empty lines
 		foreach (line; code.lineSplitter!(KeepTerminator.yes))
@@ -89,22 +92,86 @@ class ImporterComponent : ComponentWrapper
 				break;
 			end += line.length;
 		}
-		if (end > start && end + 1 < code.length)
-			end--;
-		if (start >= end || end >= code.length)
+		if (start >= end || end > code.length)
 			return ImportBlock.init;
 		auto part = code[start .. end];
+
+		// then filter out the proper indentation
+		bool inCorrectIndentationBlock;
+		size_t acc;
+		bool midImport;
+		foreach (line; part.lineSplitter!(KeepTerminator.yes))
+		{
+			const indent = line.determineIndentation;
+			bool marksNewRegion;
+			bool leavingMidImport;
+
+			const importStart = line.indexOfKeyword("import");
+			const importEnd = line.indexOf(';');
+			if (importStart != -1)
+			{
+				acc += importStart;
+				line = line[importStart .. $];
+
+				if (importEnd == -1)
+					midImport = true;
+				else
+					midImport = importEnd < importStart;
+			}
+			else if (importEnd != -1 && midImport)
+				leavingMidImport = true;
+			else if (!midImport)
+			{
+				// got no "import" and wasn't in an import here
+				marksNewRegion = true;
+			}
+
+			if ((marksNewRegion || indent != indentation) && !midImport)
+			{
+				if (inCorrectIndentationBlock)
+				{
+					end = start + acc - line.stripLineEndingLength;
+					break;
+				}
+				start += acc;
+				acc = 0;
+				indentation = indent;
+			}
+
+			if (leavingMidImport)
+				midImport = false;
+
+			if (start + acc <= pos && start + acc + line.length - 1 >= pos)
+				inCorrectIndentationBlock = true;
+			acc += line.length;
+		}
+
+		part = code[start .. end];
+
 		auto tokens = getTokensForParser(cast(ubyte[]) part, config, &workspaced.stringCache);
 		auto mod = parseModule(tokens, "code", &rba);
 		auto reader = new ImporterReaderVisitor(-1);
 		reader.visit(mod);
+
 		auto imports = reader.imports;
+		if (!imports.length)
+			return ImportBlock.init;
+
+		foreach (ref imp; imports)
+			imp.start += start;
+
+		start = imports.front.start;
+		end = code.indexOf(';', imports.back.start) + 1;
+
 		auto sorted = imports.map!(a => ImportInfo(a.name, a.rename,
-				a.selectives.dup.sort!((c, d) => icmp(c.effectiveName, d.effectiveName) < 0).array)).array.sort!((a,
-				b) => icmp(a.effectiveName, b.effectiveName) < 0).array;
+				a.selectives.dup.sort!((c, d) => sicmp(c.effectiveName, d.effectiveName) < 0).array,
+				a.start))
+			.array
+			.sort!((a, b) => sicmp(a.effectiveName, b.effectiveName) < 0)
+			.array;
 		if (sorted == imports)
 			return ImportBlock.init;
-		return ImportBlock(cast(int) start, cast(int) end, sorted);
+		return ImportBlock(cast(int) start, cast(int) end, sorted, indentation);
 	}
 
 private:
@@ -116,9 +183,9 @@ unittest
 {
 	import std.conv : to;
 
-	void assertEqual(A, B)(A a, B b)
+	void assertEqual(ImportBlock a, ImportBlock b)
 	{
-		assert(a == b, a.to!string ~ " is not equal to " ~ b.to!string);
+		assert(a.sameEffectAs(b), a.to!string ~ " is not equal to " ~ b.to!string);
 	}
 
 	auto backend = new WorkspaceD();
@@ -148,7 +215,37 @@ import sorted;
 
 import std.stdio : writeln, File, stdout, err = stderr;
 
-void main() {}`;
+version(unittest)
+	import std.traits;
+import std.stdio;
+import std.algorithm;
+
+void main()
+{
+	import std.stdio;
+	import std.algorithm;
+
+	writeln("foo");
+}
+
+void main()
+{
+	import std.stdio;
+	import std.algorithm;
+}
+
+void main()
+{
+	import std.stdio;
+	import std.algorithm;
+	string midImport;
+	import std.string;
+	import std.array;
+}
+
+import workspaced.api;
+import workspaced.helpers : determineIndentation, stripLineEndingLength, indexOfKeyword;
+`;
 
 	//dfmt off
 	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 0), ImportBlock(0, 164, [
@@ -198,6 +295,35 @@ void main() {}`;
 			SelectiveImport("writeln"),
 		])
 	]));
+
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 593), ImportBlock(586, 625, [
+		ImportInfo(["std", "algorithm"]),
+		ImportInfo(["std", "stdio"])
+	]));
+
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 650), ImportBlock(642, 682, [
+		ImportInfo(["std", "algorithm"]),
+		ImportInfo(["std", "stdio"])
+	], "\t"));
+
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 730), ImportBlock(719, 759, [
+		ImportInfo(["std", "algorithm"]),
+		ImportInfo(["std", "stdio"])
+	], "\t"));
+
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 850), ImportBlock(839, 876, [
+		ImportInfo(["std", "array"]),
+		ImportInfo(["std", "string"])
+	], "\t"));
+
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 897), ImportBlock(880, 991, [
+		ImportInfo(["workspaced", "api"]),
+		ImportInfo(["workspaced", "helpers"], "", [
+			SelectiveImport("determineIndentation"),
+			SelectiveImport("indexOfKeyword"),
+			SelectiveImport("stripLineEndingLength")
+		])
+	]));
 	//dfmt on
 }
 
@@ -240,6 +366,8 @@ struct ImportInfo
 	string rename;
 	/// Array of selective imports or empty if the entire module has been imported
 	SelectiveImport[] selectives;
+	/// Index where the import starts in code
+	size_t start;
 
 	/// Returns the rename if available, otherwise the name joined with dots
 	string effectiveName() const
@@ -256,6 +384,11 @@ struct ImportInfo
 				: "") ~ name.join('.') ~ (selectives.length
 				? " : " ~ selectives.to!(string[]).join(", ") : "") ~ ';';
 	}
+
+	bool sameEffectAs(in ImportInfo other) const
+	{
+		return name == other.name && rename == other.rename && selectives == other.selectives;
+	}
 }
 
 /// A block of imports generated by the sort-imports command
@@ -265,6 +398,23 @@ struct ImportBlock
 	int start, end;
 	///
 	ImportInfo[] imports;
+	///
+	string indentation;
+
+	bool sameEffectAs(in ImportBlock other) const
+	{
+		if (!(start == other.start && end == other.end && indentation == other.indentation))
+			return false;
+
+		if (imports.length != other.imports.length)
+			return false;
+
+		foreach (i; 0 .. imports.length)
+			if (!imports[i].sameEffectAs(other.imports[i]))
+				return false;
+
+		return true;
+	}
 }
 
 private:
@@ -344,7 +494,7 @@ class ImporterReaderVisitor : ASTVisitor
 			outerImportLocation = decl.endIndex;
 		foreach (i; decl.singleImports)
 			imports ~= ImportInfo(i.identifierChain.identifiers.map!(tok => tok.text.idup)
-					.array, i.rename.text);
+					.array, i.rename.text, null, decl.tokens[0].index);
 		if (decl.importBindings)
 		{
 			ImportInfo info;
@@ -360,6 +510,7 @@ class ImporterReaderVisitor : ASTVisitor
 				else
 					info.selectives ~= SelectiveImport(bind.left.text);
 			}
+			info.start = decl.tokens[0].index;
 			if (info.selectives.length)
 				imports ~= info;
 		}

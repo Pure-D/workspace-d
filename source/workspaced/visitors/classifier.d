@@ -3,6 +3,8 @@ module workspaced.visitors.classifier;
 
 import workspaced.visitors.attributes;
 
+import workspaced.helpers : determineIndentation;
+
 import workspaced.com.dcdext;
 
 import std.algorithm;
@@ -220,18 +222,6 @@ class CodeDefinitionClassifier : AttributesVisitor
 	string code;
 	Region[] regions;
 	uint[2] currentRange;
-}
-
-private string determineIndentation(string code)
-{
-	string indent = null;
-	foreach (line; code.lineSplitter)
-	{
-		if (line.strip.length == 0)
-			continue;
-		indent = line[0 .. $ - line.stripLeft.length];
-	}
-	return indent;
 }
 
 private int scoreIndent(string indent)
