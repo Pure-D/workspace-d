@@ -63,7 +63,7 @@ class ModulemanComponent : ComponentWrapper
 	CodeReplacement[] normalizeModules(string file, string code)
 	{
 		if (!refInstance)
-			throw new Exception("moduleman.rename requires to be instanced");
+			throw new Exception("moduleman.normalizeModules requires to be instanced");
 
 		int[string] modulePrefixes;
 		modulePrefixes[""] = 0;
@@ -73,16 +73,18 @@ class ModulemanComponent : ComponentWrapper
 		if (modName.startsWith(instance.cwd.replace("\\", "/")))
 			modName = modName[instance.cwd.length .. $];
 		modName = modName.stripLeft('/');
+		string longest = modName;
 		foreach (imp; importPaths)
 		{
 			imp = imp.replace("\\", "/");
 			if (imp.startsWith(instance.cwd.replace("\\", "/")))
 				imp = imp[instance.cwd.length .. $];
 			imp = imp.stripLeft('/');
-			if (modName.startsWith(imp))
+			if (longest.startsWith(imp))
 			{
-				modName = modName[imp.length .. $];
-				break;
+				auto shortened = longest[imp.length .. $];
+				if (shortened.length < modName.length)
+					modName = shortened;
 			}
 		}
 		auto sourcePos = (modName ~ '/').indexOf("/source/");
@@ -101,7 +103,8 @@ class ModulemanComponent : ComponentWrapper
 			if (modName == "")
 				return [CodeReplacement([existing.outerFrom, existing.outerTo], "")];
 			else
-				return [CodeReplacement([existing.outerFrom, existing.outerTo], "module " ~ modName ~ ";")];
+				return [CodeReplacement([existing.outerFrom, existing.outerTo],
+						"module " ~ modName ~ (existing.outerTo == existing.outerFrom ? ";\n\n" : ";"))];
 		}
 	}
 
@@ -266,7 +269,7 @@ unittest
 	backend.register!ModulemanComponent;
 	auto mod = backend.get!ModulemanComponent(workspace.directory);
 
-	instance.importPathProvider = () => ["source"];
+	instance.importPathProvider = () => ["source", "source/deeply/nested/source"];
 
 	FileChanges[] changes = mod.rename("oldmod", "newmod").sort!"a.file < b.file".array;
 
@@ -288,20 +291,23 @@ unittest
 	}
 
 	auto nrm = mod.normalizeModules(workspace.getPath("source/newmod/input.d"), "");
-	assert(nrm == [CodeReplacement([0, 0], "module newmod.input;")]);
+	assert(nrm == [CodeReplacement([0, 0], "module newmod.input;\n\n")]);
 
 	nrm = mod.normalizeModules(workspace.getPath("source/newmod/package.d"), "");
-	assert(nrm == [CodeReplacement([0, 0], "module newmod;")]);
+	assert(nrm == [CodeReplacement([0, 0], "module newmod;\n\n")]);
 
 	nrm = mod.normalizeModules(workspace.getPath("source/newmod/display.d"),
 			"module oldmod.displaf;");
 	assert(nrm == [CodeReplacement([0, 22], "module newmod.display;")]);
 
 	nrm = mod.normalizeModules(workspace.getPath("unregistered/source/app.d"), "");
-	assert(nrm == [CodeReplacement([0, 0], "module app;")]);
+	assert(nrm == [CodeReplacement([0, 0], "module app;\n\n")]);
 
 	nrm = mod.normalizeModules(workspace.getPath("unregistered/source/package.d"), "");
 	assert(nrm == []);
+
+	nrm = mod.normalizeModules(workspace.getPath("source/deeply/nested/source/pkg/test.d"), "");
+	assert(nrm == [CodeReplacement([0, 0], "module pkg.test;\n\n")]);
 
 	auto fetched = mod.describeModule("/* hello world */ module\nfoo . \nbar  ;\n\nvoid foo() {");
 	assert(fetched == FileModuleInfo(["foo", "bar"], "foo.bar", 25, 35, 18, 38));
