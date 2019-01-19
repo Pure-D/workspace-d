@@ -29,9 +29,9 @@ class DCDExtComponent : ComponentWrapper
 	mixin DefaultComponentWrapper;
 
 	static immutable CodeRegionProtection[] mixableProtection = [
-		CodeRegionProtection.public_ | CodeRegionProtection.default_, CodeRegionProtection.package_,
-		CodeRegionProtection.packageIdentifier, CodeRegionProtection.protected_,
-		CodeRegionProtection.private_
+		CodeRegionProtection.public_ | CodeRegionProtection.default_,
+		CodeRegionProtection.package_, CodeRegionProtection.packageIdentifier,
+		CodeRegionProtection.protected_, CodeRegionProtection.private_
 	];
 
 	/// Loads dcd extension methods. Call with `{"cmd": "load", "components": ["dcdext"]}`
@@ -87,7 +87,7 @@ class DCDExtComponent : ComponentWrapper
 			scope existing = regions.enumerate.filter!(a => a.value.sameBlockAs(toInsert));
 			if (existing.empty)
 			{
-				auto checkProtection = CodeRegionProtection.init.reduce!"a | b"(
+				const checkProtection = CodeRegionProtection.init.reduce!"a | b"(
 						mixableProtection.filter!(a => (a & toInsert.protection) != 0));
 
 				bool inIncompatible = false;
@@ -158,7 +158,9 @@ class DCDExtComponent : ComponentWrapper
 
 				if (insertAtEnd)
 				{
-					ret ~= CodeReplacement([target.value.region[1], target.value.region[1]], insertCode);
+					ret ~= CodeReplacement([
+							target.value.region[1], target.value.region[1]
+							], insertCode);
 					toInsert.region[0] = target.value.region[1];
 					toInsert.region[1] = target.value.region[1] + codeLength;
 					regions[target.index].region[1] = toInsert.region[1];
@@ -170,7 +172,9 @@ class DCDExtComponent : ComponentWrapper
 				}
 				else
 				{
-					ret ~= CodeReplacement([target.value.region[0], target.value.region[0]], insertCode);
+					ret ~= CodeReplacement([
+							target.value.region[0], target.value.region[0]
+							], insertCode);
 					regions[target.index].region[1] += codeLength;
 					foreach (ref other; regions[target.index + 1 .. $])
 					{
@@ -527,8 +531,12 @@ final class CodeBlockInfoFinder : ASTVisitor
 			block = CodeBlockInfo.init;
 			block.type = CodeBlockInfo.Type.template_;
 			block.name = dec.name.text;
-			block.outerRange = [cast(uint) dec.name.index, cast(uint) dec.endLocation + 1];
-			block.innerRange = [cast(uint) dec.startLocation + 1, cast(uint) dec.endLocation];
+			block.outerRange = [
+				cast(uint) dec.name.index, cast(uint) dec.endLocation + 1
+			];
+			block.innerRange = [
+				cast(uint) dec.startLocation + 1, cast(uint) dec.endLocation
+			];
 			dec.accept(this);
 		}
 	}
@@ -542,9 +550,12 @@ final class CodeBlockInfoFinder : ASTVisitor
 			block = CodeBlockInfo.init;
 			block.type = type;
 			block.name = name.text;
-			block.outerRange = [cast(uint) name.index, cast(uint) structBody.endLocation + 1];
-			block.innerRange = [cast(uint) structBody.startLocation + 1, cast(uint) structBody
-				.endLocation];
+			block.outerRange = [
+				cast(uint) name.index, cast(uint) structBody.endLocation + 1
+			];
+			block.innerRange = [
+				cast(uint) structBody.startLocation + 1, cast(uint) structBody.endLocation
+			];
 			structBody.accept(this);
 		}
 	}
@@ -597,7 +608,9 @@ unittest
 	DCDExtComponent dcdext = instance.get!DCDExtComponent;
 
 	assert(dcdext.getCodeBlockRange(SimpleClassTestCode, 123) == CodeBlockInfo(CodeBlockInfo.Type.class_,
-			"FooBar", [20, SimpleClassTestCode.length], [28, SimpleClassTestCode.length - 1]));
+			"FooBar", [20, SimpleClassTestCode.length], [
+				28, SimpleClassTestCode.length - 1
+			]));
 	assert(dcdext.getCodeBlockRange(SimpleClassTestCode, 19) == CodeBlockInfo.init);
 	assert(dcdext.getCodeBlockRange(SimpleClassTestCode, 20) != CodeBlockInfo.init);
 

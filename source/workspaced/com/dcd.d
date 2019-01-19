@@ -145,8 +145,10 @@ class DCDComponent : ComponentWrapper
 			if (code != 0)
 			{
 				stderr.writeln("Broadcasting dcd server crash.");
-				workspaced.broadcast(refInstance, JSONValue(["type"
-					: JSONValue("crash"), "component" : JSONValue("dcd")]));
+				workspaced.broadcast(refInstance, JSONValue([
+						"type": JSONValue("crash"),
+						"component": JSONValue("dcd")
+					]));
 				running = false;
 			}
 		});
@@ -433,7 +435,9 @@ class DCDComponent : ComponentWrapper
 					ret.finish(completions);
 					return;
 				}
-				auto pipes = doClient((supportsFullOutput ? ["--extended"] : []) ~ ["-c", pos.to!string]);
+				auto pipes = doClient((supportsFullOutput ? ["--extended"] : []) ~ [
+						"-c", pos.to!string
+					]);
 				scope (exit)
 				{
 					pipes.pid.wait();

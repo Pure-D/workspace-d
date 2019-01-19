@@ -460,7 +460,7 @@ class WorkspaceD
 
 		/// Loads a registered component which didn't have auto register on just for this instance.
 		/// Returns: false instead of using the onBindFail callback on failure.
-		/// Throws: Exception if component was not regsitered in workspaced.
+		/// Throws: Exception if component was not registered in workspaced.
 		bool attach(T)(WorkspaceD workspaced)
 		{
 			string name = getUDAs!(T, ComponentInfo)[0].name;
