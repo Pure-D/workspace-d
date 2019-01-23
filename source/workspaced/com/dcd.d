@@ -335,7 +335,8 @@ class DCDComponent : ComponentWrapper
 					ret.finish(DCDDeclaration.init);
 					return;
 				}
-				auto pipes = doClient(["-c", pos.to!string, "--symbolLocation"]);
+				// Declarations should be returned for character *in front of* the cursor.
+				auto pipes = doClient(["-c", (pos+1).to!string, "--symbolLocation"]);
 				scope (exit)
 				{
 					pipes.pid.wait();
