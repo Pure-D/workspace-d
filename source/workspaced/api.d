@@ -4,6 +4,7 @@ import core.time;
 import dparse.lexer;
 import painlessjson;
 import standardpaths;
+
 import std.algorithm;
 import std.conv;
 import std.exception;
@@ -11,6 +12,7 @@ import std.file;
 import std.json;
 import std.meta;
 import std.path;
+import std.range;
 import std.regex;
 import std.traits;
 import std.typecons;
@@ -523,6 +525,92 @@ class WorkspaceD
 		return null;
 	}
 
+	Instance getBestInstanceByDependency(WithComponent)(string file) nothrow
+	{
+		Instance best;
+		size_t bestLength;
+		foreach (instance; instances)
+		{
+			foreach (folder; chain(instance.importPaths, instance.importFiles,
+					instance.stringImportPaths))
+			{
+				if (folder.length > bestLength && file.startsWith(folder) && instance.has!WithComponent)
+				{
+					best = instance;
+					bestLength = folder.length;
+				}
+			}
+		}
+		return best;
+	}
+
+	Instance getBestInstanceByDependency(string file) nothrow
+	{
+		Instance best;
+		size_t bestLength;
+		foreach (instance; instances)
+		{
+			foreach (folder; chain(instance.importPaths, instance.importFiles,
+					instance.stringImportPaths))
+			{
+				if (folder.length > bestLength && file.startsWith(folder))
+				{
+					best = instance;
+					bestLength = folder.length;
+				}
+			}
+		}
+		return best;
+	}
+
+	Instance getBestInstance(WithComponent)(string file, bool fallback = true) nothrow
+	{
+		file = buildNormalizedPath(file);
+		Instance ret = null;
+		size_t best;
+		foreach (instance; instances)
+		{
+			if (instance.cwd.length > best && file.startsWith(instance.cwd) && instance
+					.has!WithComponent)
+			{
+				ret = instance;
+				best = instance.cwd.length;
+			}
+		}
+		if (!ret && fallback)
+		{
+			ret = getBestInstanceByDependency!WithComponent(file);
+			if (ret)
+				return ret;
+			foreach (instance; instances)
+				if (instance.has!WithComponent)
+					return instance;
+		}
+		return ret;
+	}
+
+	Instance getBestInstance(string file, bool fallback = true) nothrow
+	{
+		file = buildNormalizedPath(file);
+		Instance ret = null;
+		size_t best;
+		foreach (instance; instances)
+		{
+			if (instance.cwd.length > best && file.startsWith(instance.cwd))
+			{
+				ret = instance;
+				best = instance.cwd.length;
+			}
+		}
+		if (!ret && fallback && instances.length)
+		{
+			ret = getBestInstanceByDependency(file);
+			if (!ret)
+				ret = instances[0];
+		}
+		return ret;
+	}
+
 	T get(T)()
 	{
 		auto name = getUDAs!(T, ComponentInfo)[0].name;
@@ -554,6 +642,24 @@ class WorkspaceD
 	bool has(T)(string cwd)
 	{
 		auto inst = getInstance(cwd);
+		if (inst is null)
+			return false;
+		return inst.has!T;
+	}
+
+	T best(T)(string file, bool fallback = true)
+	{
+		if (!file.length)
+			return this.get!T;
+		auto inst = getBestInstance!T(file);
+		if (inst is null)
+			throw new Exception("cwd for '" ~ file ~ "' not found");
+		return inst.get!T;
+	}
+
+	bool hasBest(T)(string cwd, bool fallback = true)
+	{
+		auto inst = getBestInstance!T(cwd);
 		if (inst is null)
 			return false;
 		return inst.has!T;
