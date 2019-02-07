@@ -26,7 +26,7 @@ class FSWorkspaceComponent : ComponentWrapper
 	}
 
 	/// Lists all import-, string import- & file import paths
-	string[] imports()
+	string[] imports() nothrow
 	{
 		return paths;
 	}

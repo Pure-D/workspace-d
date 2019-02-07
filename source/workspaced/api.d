@@ -16,7 +16,7 @@ import std.traits;
 import std.typecons;
 
 ///
-alias ImportPathProvider = string[]delegate();
+alias ImportPathProvider = string[] delegate() nothrow;
 ///
 alias BroadcastCallback = void delegate(WorkspaceD, WorkspaceD.Instance, JSONValue);
 ///
@@ -405,17 +405,17 @@ class WorkspaceD
 		ComponentWrapperInstance[] instanceComponents;
 		Configuration config;
 
-		string[] importPaths() const @property
+		string[] importPaths() const @property nothrow
 		{
 			return importPathProvider ? importPathProvider() : [];
 		}
 
-		string[] stringImportPaths() const @property
+		string[] stringImportPaths() const @property nothrow
 		{
 			return stringImportPathProvider ? stringImportPathProvider() : [];
 		}
 
-		string[] importFiles() const @property
+		string[] importFiles() const @property nothrow
 		{
 			return importFilesProvider ? importFilesProvider() : [];
 		}

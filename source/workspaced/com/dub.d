@@ -274,19 +274,19 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Lists all import paths
-	string[] imports() @property
+	string[] imports() @property nothrow
 	{
 		return _importPaths;
 	}
 
 	/// Lists all string import paths
-	string[] stringImports() @property
+	string[] stringImports() @property nothrow
 	{
 		return _stringImportPaths;
 	}
 
 	/// Lists all import paths to files
-	string[] fileImports() @property
+	string[] fileImports() @property nothrow
 	{
 		return _importFiles;
 	}
