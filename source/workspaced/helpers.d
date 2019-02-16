@@ -50,3 +50,9 @@ ptrdiff_t indexOfKeyword(string code, string keyword, ptrdiff_t start = 0)
 	}
 	return index;
 }
+
+bool isIdentifierSeparatingChar(dchar c)
+{
+	return c < 48 || (c > 57 && c < 65) || c == '[' || c == '\\' || c == ']'
+		|| c == '`' || (c > 122 && c < 128) || c == '\u2028' || c == '\u2029'; // line separators
+}

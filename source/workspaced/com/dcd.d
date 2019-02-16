@@ -16,6 +16,7 @@ import std.string;
 import painlessjson;
 
 import workspaced.api;
+import workspaced.helpers;
 
 version (OSX) version = haveUnixSockets;
 version (linux) version = haveUnixSockets;
@@ -330,13 +331,17 @@ class DCDComponent : ComponentWrapper
 		threads.create({
 			try
 			{
-				if (!running)
+				if (!running || pos >= code.length)
 				{
 					ret.finish(DCDDeclaration.init);
 					return;
 				}
-				// Declarations should be returned for character *in front of* the cursor.
-				auto pipes = doClient(["-c", (pos+1).to!string, "--symbolLocation"]);
+
+				// We need to move by one character on identifier characters to ensure the start character fits.
+				if (!isIdentifierSeparatingChar(code[pos]))
+					pos++;
+
+				auto pipes = doClient(["-c", pos.to!string, "--symbolLocation"]);
 				scope (exit)
 				{
 					pipes.pid.wait();
