@@ -101,10 +101,8 @@ class DMDComponent : ComponentWrapper
 }
 
 ///
-unittest
+version (DigitalMars) unittest
 {
-	import std.stdio;
-
 	scope backend = new WorkspaceD();
 	auto workspace = makeTemporaryTestingWorkspace;
 	auto instance = backend.addInstance(workspace.directory);
