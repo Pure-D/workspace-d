@@ -11,6 +11,7 @@ import std.exception;
 import std.file;
 import std.json;
 import std.meta;
+import std.parallelism;
 import std.path;
 import std.range;
 import std.regex;
@@ -43,12 +44,13 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 {
 	@ignoredFunc
 	{
-		import core.thread : ThreadGroup;
+		import std.algorithm : max;
+		import std.parallelism : TaskPool, Task, task, defaultPoolThreads;
 
 		WorkspaceD workspaced;
 		WorkspaceD.Instance refInstance;
 
-		ThreadGroup _threads;
+		TaskPool _threads;
 
 		static if (withDtor)
 		{
@@ -58,12 +60,12 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 			}
 		}
 
-		ThreadGroup threads()
+		TaskPool threads()
 		{
 			if (!_threads)
 				synchronized (this)
 					if (!_threads)
-						_threads = new ThreadGroup();
+						_threads = new TaskPool(max(2, defaultPoolThreads));
 			return _threads;
 		}
 
@@ -138,7 +140,7 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 		override void shutdown()
 		{
 			if (_threads)
-				_threads.joinAll();
+				_threads.finish(true);
 		}
 
 		override void bind(WorkspaceD workspaced, WorkspaceD.Instance instance)
@@ -1085,4 +1087,9 @@ version (unittest)
 		return TestingWorkspace(buildPath(tempDir, "workspace-d-test-" ~ uniform(0,
 				int.max).to!string(36)));
 	}
+}
+
+void create(T)(TaskPool pool, T fun) if (isCallable!T)
+{
+	pool.put(task(fun));
 }

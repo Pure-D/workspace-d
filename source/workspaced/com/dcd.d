@@ -96,7 +96,7 @@ class DCDComponent : ComponentWrapper
 	override void shutdown()
 	{
 		stopServerSync();
-		threads.joinAll();
+		threads.finish(true);
 	}
 
 	/// This will start the dcd-server and load import paths from the current provider
