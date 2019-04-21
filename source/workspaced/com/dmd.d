@@ -28,14 +28,14 @@ class DMDComponent : ComponentWrapper
 	///   count = how often to compile (duration is divided by either this or less in case timeout is reached)
 	///   timeoutMsecs = when to abort compilation after, note that this will not abort mid-compilation but not do another iteration if this timeout has been reached.
 	/// Returns: [DMDMeasureReturn] containing logs from only the first compilation pass
-	Future!DMDMeasureReturn measure(string code, string[] dmdArguments = [],
+	Future!DMDMeasureReturn measure(scope const(char)[] code, string[] dmdArguments = [],
 			int count = 1, int timeoutMsecs = 5000)
 	{
 		return Future!DMDMeasureReturn.async(() => measureSync(code, dmdArguments, count, timeoutMsecs));
 	}
 
 	/// ditto
-	DMDMeasureReturn measureSync(string code, string[] dmdArguments = [],
+	DMDMeasureReturn measureSync(scope const(char)[] code, string[] dmdArguments = [],
 			int count = 1, int timeoutMsecs = 5000)
 	{
 		dmdArguments ~= ["-c", "-o-"];

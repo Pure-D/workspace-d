@@ -200,7 +200,12 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 		{
 			string call = "fun(";
 			static foreach (i, T; Parameters!fun)
-				call ~= "args[" ~ i.to!string ~ "].fromJSON!(" ~ T.stringof ~ "), ";
+			{
+				static if (is(T : const(char)[]))
+					call ~= "args[" ~ i.to!string ~ "].str, ";
+				else
+					call ~= "args[" ~ i.to!string ~ "].fromJSON!(" ~ T.stringof ~ "), ";
+			}
 			call ~= ")";
 			static if (is(ReturnType!fun : Future!T, T))
 			{

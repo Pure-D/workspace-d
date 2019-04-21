@@ -33,7 +33,7 @@ class CodeDefinitionClassifier : AttributesVisitor
 		}
 	}
 
-	this(string code)
+	this(const(char)[] code)
 	{
 		this.code = code;
 	}
@@ -219,7 +219,7 @@ class CodeDefinitionClassifier : AttributesVisitor
 	alias visit = AttributesVisitor.visit;
 
 	bool writtenRegion;
-	string code;
+	const(char)[] code;
 	Region[] regions;
 	uint[2] currentRange;
 }

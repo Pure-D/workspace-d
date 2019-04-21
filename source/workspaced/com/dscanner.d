@@ -2,6 +2,7 @@ module workspaced.com.dscanner;
 
 import std.algorithm;
 import std.array;
+import std.conv;
 import std.file;
 import std.json;
 import std.stdio;
@@ -36,7 +37,7 @@ class DscannerComponent : ComponentWrapper
 
 	/// Asynchronously lints the file passed.
 	/// If you provide code then the code will be used and file will be ignored.
-	Future!(DScannerIssue[]) lint(string file = "", string ini = "dscanner.ini", string code = "")
+	Future!(DScannerIssue[]) lint(string file = "", string ini = "dscanner.ini", scope const(char)[] code = "")
 	{
 		auto ret = new Future!(DScannerIssue[]);
 		threads.create({
@@ -62,8 +63,8 @@ class DscannerComponent : ComponentWrapper
 				StringCache cache = StringCache(StringCache.defaultBucketCount);
 				const Module m = parseModule(file, cast(ubyte[]) code, &r, cache, tokens, issues);
 				if (!m)
-					throw new Exception(
-						"parseModule returned null?! - file: '" ~ file ~ "', code: '" ~ code ~ "'");
+					throw new Exception(text("parseModule returned null?! - file: '",
+						file, "', code: '", code, "'"));
 				MessageSet results;
 				auto alloc = scoped!ASTAllocator();
 				auto moduleCache = ModuleCache(alloc);
@@ -114,7 +115,7 @@ class DscannerComponent : ComponentWrapper
 
 	/// Asynchronously lists all definitions in the specified file.
 	/// If you provide code the file wont be manually read.
-	Future!(DefinitionElement[]) listDefinitions(string file, string code = "")
+	Future!(DefinitionElement[]) listDefinitions(string file, scope const(char)[] code = "")
 	{
 		auto ret = new Future!(DefinitionElement[]);
 		threads.create({

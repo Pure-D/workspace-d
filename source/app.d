@@ -383,8 +383,9 @@ int main(string[] args)
 				gcSpeed.stop();
 				auto after = GC.stats();
 				if (before != after)
-					stderr.writefln("GC run in %s. Freed %s bytes (%s bytes available)", gcSpeed.peek,
-							cast(long) before.usedSize - cast(long) after.usedSize, after.freeSize);
+					stderr.writefln("GC run in %s. Freed %s bytes (%s bytes allocated, %s bytes available)", gcSpeed.peek,
+							cast(long) before.usedSize - cast(long) after.usedSize,
+							after.usedSize, after.freeSize);
 				else
 					stderr.writeln("GC run in ", gcSpeed.peek);
 				gcInterval.reset();

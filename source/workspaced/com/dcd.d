@@ -325,7 +325,7 @@ class DCDComponent : ComponentWrapper
 	}
 
 	/// Finds the declaration of the symbol at position `pos` in the code
-	Future!DCDDeclaration findDeclaration(string code, int pos)
+	Future!DCDDeclaration findDeclaration(scope const(char)[] code, int pos)
 	{
 		auto ret = new Future!DCDDeclaration;
 		threads.create({
@@ -372,7 +372,7 @@ class DCDComponent : ComponentWrapper
 	}
 
 	/// Finds the documentation of the symbol at position `pos` in the code
-	Future!string getDocumentation(string code, int pos)
+	Future!string getDocumentation(scope const(char)[] code, int pos)
 	{
 		auto ret = new Future!string;
 		threads.create({
@@ -428,7 +428,7 @@ class DCDComponent : ComponentWrapper
 	/// Queries for code completion at position `pos` in code
 	/// Raw is anything else than identifiers and calltips which might not be implemented by this point.
 	/// calltips.symbols and identifiers.definition, identifiers.file, identifiers.location and identifiers.documentation are only available with dcd ~master as of now.
-	Future!DCDCompletions listCompletion(string code, int pos)
+	Future!DCDCompletions listCompletion(scope const(char)[] code, int pos)
 	{
 		auto ret = new Future!DCDCompletions;
 		threads.create({

@@ -28,7 +28,7 @@ class ImporterComponent : ComponentWrapper
 	}
 
 	/// Returns all imports available at some code position.
-	ImportInfo[] get(string code, int pos)
+	ImportInfo[] get(scope const(char)[] code, int pos)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto mod = parseModule(tokens, "code", &rba);
@@ -39,7 +39,7 @@ class ImporterComponent : ComponentWrapper
 
 	/// Returns a list of code patches for adding an import.
 	/// If `insertOutermost` is false, the import will get added to the innermost block.
-	ImportModification add(string importName, string code, int pos, bool insertOutermost = true)
+	ImportModification add(string importName, scope const(char)[] code, int pos, bool insertOutermost = true)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto mod = parseModule(tokens, "code", &rba);
@@ -77,7 +77,7 @@ class ImporterComponent : ComponentWrapper
 
 	/// Sorts the imports in a whitespace separated group of code
 	/// Returns `ImportBlock.init` if no changes would be done.
-	ImportBlock sortImports(string code, int pos)
+	ImportBlock sortImports(scope const(char)[] code, int pos)
 	{
 		bool startBlock = true;
 		string indentation;

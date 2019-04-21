@@ -7,6 +7,7 @@ import dparse.rollback_allocator;
 
 import std.algorithm;
 import std.array;
+import std.conv;
 import std.file;
 import std.functional;
 import std.path;
@@ -60,20 +61,20 @@ class ModulemanComponent : ComponentWrapper
 	/// Params:
 	/// 	file: File path to the file to normalize
 	/// 	code: Current code inside the text buffer
-	CodeReplacement[] normalizeModules(string file, string code)
+	CodeReplacement[] normalizeModules(scope const(char)[] file, scope const(char)[] code)
 	{
 		if (!refInstance)
 			throw new Exception("moduleman.normalizeModules requires to be instanced");
 
 		int[string] modulePrefixes;
 		modulePrefixes[""] = 0;
-		string modName = file.replace("\\", "/").stripExtension;
+		auto modName = file.replace("\\", "/").stripExtension;
 		if (modName.baseName == "package")
 			modName = modName.dirName;
 		if (modName.startsWith(instance.cwd.replace("\\", "/")))
 			modName = modName[instance.cwd.length .. $];
 		modName = modName.stripLeft('/');
-		string longest = modName;
+		auto longest = modName;
 		foreach (imp; importPaths)
 		{
 			imp = imp.replace("\\", "/");
@@ -103,25 +104,27 @@ class ModulemanComponent : ComponentWrapper
 			if (modName == "")
 				return [CodeReplacement([existing.outerFrom, existing.outerTo], "")];
 			else
-				return [CodeReplacement([existing.outerFrom, existing.outerTo],
-						"module " ~ modName ~ (existing.outerTo == existing.outerFrom ? ";\n\n" : ";"))];
+				return [
+					CodeReplacement([existing.outerFrom, existing.outerTo], text("module ",
+							modName, (existing.outerTo == existing.outerFrom ? ";\n\n" : ";")))
+				];
 		}
 	}
 
 	/// Returns the module name parts of a D code
-	const(string)[] getModule(string code)
+	const(string)[] getModule(scope const(char)[] code)
 	{
 		return describeModule(code).raw;
 	}
 
 	/// Returns the normalized module name as string of a D code
-	string moduleName(string code)
+	string moduleName(scope const(char)[] code)
 	{
 		return describeModule(code).moduleName;
 	}
 
 	///
-	FileModuleInfo describeModule(string code)
+	FileModuleInfo describeModule(scope const(char)[] code)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		ptrdiff_t start = -1;
@@ -209,9 +212,10 @@ class ModuleChangerVisitor : ASTVisitor
 		if (mod != orig)
 		{
 			foundModule = true;
-			changes.replacements ~= CodeReplacement([decl.moduleName.identifiers[0].index,
-					decl.moduleName.identifiers[$ - 1].index + decl.moduleName.identifiers[$ - 1].text.length],
-					mod.join('.'));
+			changes.replacements ~= CodeReplacement([
+					decl.moduleName.identifiers[0].index,
+					decl.moduleName.identifiers[$ - 1].index + decl.moduleName.identifiers[$ - 1].text.length
+					], mod.join('.'));
 		}
 	}
 
@@ -225,9 +229,11 @@ class ModuleChangerVisitor : ASTVisitor
 			mod = to;
 		if (mod != orig)
 		{
-			changes.replacements ~= CodeReplacement([imp.identifierChain.identifiers[0].index,
+			changes.replacements ~= CodeReplacement([
+					imp.identifierChain.identifiers[0].index,
 					imp.identifierChain.identifiers[$ - 1].index
-					+ imp.identifierChain.identifiers[$ - 1].text.length], mod.join('.'));
+					+ imp.identifierChain.identifiers[$ - 1].text.length
+					], mod.join('.'));
 		}
 	}
 
@@ -278,9 +284,12 @@ unittest
 	assert(changes[1].file.endsWith("render.d"));
 
 	assert(changes[0].replacements == [CodeReplacement([7, 19], "newmod.color")]);
-	assert(changes[1].replacements == [CodeReplacement([7, 20], "newmod.render"),
-			CodeReplacement([38, 50], "newmod.color"), CodeReplacement([58, 77],
-				"newmod.color.oldmod"), CodeReplacement([94, 102], "newmod.a")]);
+	assert(changes[1].replacements == [
+			CodeReplacement([7, 20], "newmod.render"),
+			CodeReplacement([38, 50], "newmod.color"),
+			CodeReplacement([58, 77], "newmod.color.oldmod"),
+			CodeReplacement([94, 102], "newmod.a")
+			]);
 
 	foreach (change; changes)
 	{

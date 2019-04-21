@@ -10,6 +10,7 @@ import core.thread;
 import std.algorithm;
 import std.array;
 import std.ascii;
+import std.conv;
 import std.file;
 import std.functional;
 import std.json;
@@ -53,7 +54,7 @@ class DCDExtComponent : ComponentWrapper
 	///   code = code to analyze
 	///   position = byte offset where to check for function arguments
 	///   definition = true if this hints is a function definition (templates don't have an exclamation point '!')
-	CalltipsSupport extractCallParameters(string code, int position, bool definition = false)
+	CalltipsSupport extractCallParameters(scope const(char)[] code, int position, bool definition = false)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto queuedToken = tokens.countUntil!(a => a.index >= position) - 1;
@@ -278,7 +279,7 @@ class DCDExtComponent : ComponentWrapper
 
 	/// Finds the immediate surrounding code block at a position or returns CodeBlockInfo.init for none/module block.
 	/// See_Also: CodeBlockInfo
-	CodeBlockInfo getCodeBlockRange(string code, int position)
+	CodeBlockInfo getCodeBlockRange(scope const(char)[] code, int position)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto parsed = parseModule(tokens, "getCodeBlockRange_input.d", &rba);
@@ -290,12 +291,12 @@ class DCDExtComponent : ComponentWrapper
 	/// Inserts a generic method after the corresponding block inside the scope where position is.
 	/// If it can't find a good spot it will insert the code properly indented ata fitting location.
 	// make public once usable
-	private CodeReplacement[] insertCodeInContainer(string insert, string code,
+	private CodeReplacement[] insertCodeInContainer(string insert, scope const(char)[] code,
 			int position, bool insertInLastBlock = true, bool insertAtEnd = true)
 	{
 		auto container = getCodeBlockRange(code, position);
 
-		string codeBlock = code[container.innerRange[0] .. container.innerRange[1]];
+		scope const(char)[] codeBlock = code[container.innerRange[0] .. container.innerRange[1]];
 
 		scope tokensInsert = getTokensForParser(cast(ubyte[]) insert, config,
 				&workspaced.stringCache);
@@ -360,7 +361,7 @@ class DCDExtComponent : ComponentWrapper
 				if (inIncompatible)
 				{
 					int insertRegion = fittingProtection == -1 ? firstStickyProtection : regionAfterFitting;
-					insertCode = indent(insertCode, regions[insertRegion].minIndentation) ~ "\n\n";
+					insertCode = text(indent(insertCode, regions[insertRegion].minIndentation), "\n\n");
 					auto len = cast(uint) insertCode.length;
 
 					toInsert.region[0] = regions[insertRegion].region[0];
@@ -374,7 +375,7 @@ class DCDExtComponent : ComponentWrapper
 				else
 				{
 					auto lastRegion = regions.back;
-					insertCode = indent(insertCode, lastRegion.minIndentation);
+					insertCode = indent(insertCode, lastRegion.minIndentation).idup;
 					auto len = cast(uint) insertCode.length;
 					toInsert.region[0] = lastRegion.region[1];
 					toInsert.region[1] = lastRegion.region[1] + len;
@@ -386,7 +387,7 @@ class DCDExtComponent : ComponentWrapper
 			{
 				auto target = insertInLastBlock ? existing.tail(1).front : existing.front;
 
-				insertCode = "\n\n" ~ indent(insertCode, regions[target.index].minIndentation);
+				insertCode = text("\n\n", indent(insertCode, regions[target.index].minIndentation));
 				const codeLength = cast(int) insertCode.length;
 
 				if (insertAtEnd)
@@ -422,7 +423,7 @@ class DCDExtComponent : ComponentWrapper
 	}
 
 	/// Implements the interfaces or abstract classes of a specified class/interface.
-	Future!string implement(string code, int position)
+	Future!string implement(scope const(char)[] code, int position)
 	{
 		auto ret = new Future!string;
 		threads.create({
@@ -587,7 +588,7 @@ private:
 	RollbackAllocator rba;
 	LexerConfig config;
 
-	InterfaceDetails lookupInterface(string code, int position)
+	InterfaceDetails lookupInterface(scope const(char)[] code, int position)
 	{
 		auto data = get!DCDComponent.findDeclaration(code, position).getBlocking;
 		string file = data.file;
@@ -596,14 +597,14 @@ private:
 		if (!file.length)
 			return InterfaceDetails.init;
 
-		string newCode = code;
+		auto newCode = code;
 		if (file != "stdin")
 			newCode = readText(file);
 
 		return getInterfaceDetails(file, newCode, newPosition);
 	}
 
-	InterfaceDetails getInterfaceDetails(string file, string code, int position)
+	InterfaceDetails getInterfaceDetails(string file, scope const(char)[] code, int position)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto parsed = parseModule(tokens, file, &rba);
@@ -928,7 +929,7 @@ CalltipsSupport.Argument[] splitArgs(const(Token)[] tokens)
 	return ret.data;
 }
 
-string indent(string code, string indentation)
+auto indent(scope const(char)[] code, string indentation)
 {
 	return code.lineSplitter!(KeepTerminator.yes)
 		.map!(a => a.length ? indentation ~ a : a)

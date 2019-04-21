@@ -20,7 +20,7 @@ class DlanguiComponent : ComponentWrapper
 	/// Queries for code completion at position `pos` in DML code
 	/// Returns: `[{type: CompletionType, value: string, documentation: string, enumName: string}]`
 	/// Where type is an integer
-	Future!(CompletionItem[]) complete(string code, int pos)
+	Future!(CompletionItem[]) complete(scope const(char)[] code, int pos)
 	{
 		auto ret = new Future!(CompletionItem[]);
 		threads.create({
@@ -197,7 +197,7 @@ struct LocationInfo
 	string propertyName;
 }
 
-LocationInfo getLocationInfo(in string code, int pos)
+LocationInfo getLocationInfo(scope const(char)[] code, int pos)
 {
 	LocationInfo current;
 	current.type = LocationType.RootMember;

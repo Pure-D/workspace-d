@@ -24,7 +24,7 @@ class DfmtComponent : ComponentWrapper
 
 	/// Will format the code passed in asynchronously.
 	/// Returns: the formatted code as string
-	Future!string format(string code, string[] arguments = [])
+	Future!string format(scope const(char)[] code, string[] arguments = [])
 	{
 		auto ret = new Future!string;
 		threads.create({
@@ -122,7 +122,7 @@ class DfmtComponent : ComponentWrapper
 				if (output.data.length)
 					ret.finish(output.data);
 				else
-					ret.finish(code);
+					ret.finish(code.idup);
 			}
 			catch (Throwable e)
 			{

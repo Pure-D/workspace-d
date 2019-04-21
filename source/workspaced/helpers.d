@@ -3,19 +3,19 @@ module workspaced.helpers;
 import std.ascii;
 import std.string;
 
-string determineIndentation(string code)
+string determineIndentation(scope const(char)[] code)
 {
-	string indent = null;
+	const(char)[] indent = null;
 	foreach (line; code.lineSplitter)
 	{
 		if (line.strip.length == 0)
 			continue;
 		indent = line[0 .. $ - line.stripLeft.length];
 	}
-	return indent;
+	return indent.idup;
 }
 
-int stripLineEndingLength(string code)
+int stripLineEndingLength(scope const(char)[] code)
 {
 	if (code.endsWith("\r\n"))
 		return 2;
@@ -30,7 +30,7 @@ bool isIdentifierChar(dchar c)
 	return c.isAlphaNum || c == '_';
 }
 
-ptrdiff_t indexOfKeyword(string code, string keyword, ptrdiff_t start = 0)
+ptrdiff_t indexOfKeyword(scope const(char)[] code, string keyword, ptrdiff_t start = 0)
 {
 	ptrdiff_t index = start;
 	while (true)

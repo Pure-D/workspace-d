@@ -48,7 +48,7 @@ struct FieldDetails
 struct InterfaceDetails
 {
 	/// Entire code of the file
-	string code;
+	const(char)[] code;
 	bool needsOverride;
 	string name;
 	FieldDetails[] fields;
@@ -60,7 +60,7 @@ struct InterfaceDetails
 
 class InterfaceMethodFinder : AttributesVisitor
 {
-	this(string code, int targetPosition)
+	this(const(char)[] code, int targetPosition)
 	{
 		this.code = code;
 		details.code = code;
@@ -159,7 +159,7 @@ class InterfaceMethodFinder : AttributesVisitor
 
 	alias visit = AttributesVisitor.visit;
 
-	string code;
+	const(char)[] code;
 	bool inTarget;
 	int targetPosition;
 	InterfaceDetails details;
