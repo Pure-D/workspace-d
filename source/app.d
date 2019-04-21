@@ -2,6 +2,7 @@ module app;
 
 import core.sync.mutex;
 import core.exception;
+import core.time;
 
 import painlessjson;
 import standardpaths;
@@ -11,17 +12,18 @@ import workspaced.coms;
 
 import std.algorithm;
 import std.bitmanip;
+import std.datetime.stopwatch : StopWatch;
 import std.exception;
 import std.functional;
 import std.process;
 import std.stdio : File, stderr;
 import std.traits;
 
-static import std.stdio;
-import std.string;
+static import std.conv;
 import std.json;
 import std.meta;
-import std.conv;
+import std.stdio;
+import std.string;
 
 import source.workspaced.info;
 
@@ -62,16 +64,23 @@ void sendException(int id, Throwable t)
 
 void broadcast(WorkspaceD workspaced, WorkspaceD.Instance instance, JSONValue message)
 {
-	sendResponse(0x7F000000, JSONValue(["workspace" : JSONValue(instance
-			? instance.cwd : null), "data" : message]));
+	sendResponse(0x7F000000, JSONValue([
+				"workspace": JSONValue(instance ? instance.cwd : null),
+				"data": message
+			]));
 }
 
 void bindFail(WorkspaceD.Instance instance, ComponentFactory component, Exception error)
 {
-	sendResponse(0x7F000000, JSONValue(["workspace" : JSONValue(instance
-			? instance.cwd : null), "data" : JSONValue(["component" : JSONValue(component.info.name),
-			"type" : JSONValue("bindfail"), "msg" : JSONValue(error.msg), "trace"
-			: JSONValue(error.toString)])]));
+	sendResponse(0x7F000000, JSONValue([
+				"workspace": JSONValue(instance ? instance.cwd : null),
+				"data": JSONValue([
+					"component": JSONValue(component.info.name),
+					"type": JSONValue("bindfail"),
+					"msg": JSONValue(error.msg),
+					"trace": JSONValue(error.toString)
+				])
+			]));
 }
 
 WorkspaceD engine;
@@ -312,8 +321,11 @@ int main(string[] args)
 		ubyte[] dataBuffer;
 		JSONValue data;
 
+		StopWatch gcInterval;
+		gcInterval.start();
+
 		scope (exit)
-			handleRequest(int.min, JSONValue(["cmd" : "unload", "components" : "*"]));
+			handleRequest(int.min, JSONValue(["cmd": "unload", "components": "*"]));
 
 		stderr.writeln("Config files stored in ", standardPaths(StandardPath.config, "workspace-d"));
 
@@ -358,6 +370,24 @@ int main(string[] args)
 				processException(id, data, e);
 			}
 			stdout.flush();
+
+			if (gcInterval.peek > 10.minutes)
+			{
+				import core.memory : GC;
+
+				auto before = GC.stats();
+				StopWatch gcSpeed;
+				gcSpeed.start();
+				GC.collect();
+				gcSpeed.stop();
+				auto after = GC.stats();
+				if (before != after)
+					stderr.writefln("GC run in %s. Freed %s bytes (%s bytes available)", gcSpeed.peek,
+							cast(long) before.usedSize - cast(long) after.usedSize, after.freeSize);
+				else
+					stderr.writeln("GC run in ", gcSpeed.peek);
+				gcInterval.reset();
+			}
 		}
 	}
 	return 0;
