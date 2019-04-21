@@ -61,8 +61,11 @@ class DubComponent : ComponentWrapper
 			if (!_dub.project.configurations.canFind(_configuration))
 			{
 				stderr.writeln("Dub Error: No configuration available");
-				workspaced.broadcast(refInstance, JSONValue(["type" : JSONValue("warning"),
-						"component" : JSONValue("dub"), "detail" : JSONValue("invalid-default-config")]));
+				workspaced.broadcast(refInstance, JSONValue([
+							"type": JSONValue("warning"),
+							"component": JSONValue("dub"),
+							"detail": JSONValue("invalid-default-config")
+						]));
 			}
 			else
 				updateImportPaths(false);
@@ -108,6 +111,9 @@ class DubComponent : ComponentWrapper
 		if (!_compilerBinaryName.length)
 			_compilerBinaryName = _dub.defaultCompiler;
 		setCompiler(_compilerBinaryName);
+
+		_settingsTemplate = cast() _dub.project.rootPackage.getBuildSettings();
+
 		if (missingPackages > 0)
 		{
 			upgrade(false);
@@ -323,6 +329,7 @@ class DubComponent : ComponentWrapper
 		if (!_dub.project.configurations.canFind(configuration))
 			return false;
 		_configuration = configuration;
+		_settingsTemplate = cast() _dub.project.rootPackage.getBuildSettings(configuration);
 		return updateImportPaths(false);
 	}
 
@@ -415,7 +422,8 @@ class DubComponent : ComponentWrapper
 			return false;
 		}
 		_platform = _compiler.determinePlatform(_settings, _compilerBinaryName, _archType);
-		return true;
+		_settingsTemplate.getPlatformSettings(_settings, _platform, _dub.project.rootPackage.path);
+		return _compiler !is null;
 	}
 
 	/// Returns the project name
@@ -546,6 +554,7 @@ private:
 	string _buildType = "debug";
 	string _compilerBinaryName;
 	Compiler _compiler;
+	BuildSettingsTemplate _settingsTemplate;
 	BuildSettings _settings;
 	BuildPlatform _platform;
 	string[] _importPaths, _stringImportPaths, _importFiles;

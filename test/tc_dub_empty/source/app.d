@@ -93,7 +93,7 @@ bool tryDub(string path)
 		static if (Compiler.vendor == Compiler.Vendor.gnu)
 			tryRun!"setCompiler"(path, "gdc");
 		else static if (Compiler.vendor == Compiler.Vendor.llvm)
-			tryRun!"setCompiler"(path, "ldc");
+			tryRun!"setCompiler"(path, "ldc2");
 		else
 			tryRun!"setCompiler"(path, "dmd");
 		tryRun!"name"(path);
