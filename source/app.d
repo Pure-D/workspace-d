@@ -321,6 +321,7 @@ int main(string[] args)
 		ubyte[] dataBuffer;
 		JSONValue data;
 
+		int gcCollects;
 		StopWatch gcInterval;
 		gcInterval.start();
 
@@ -371,7 +372,7 @@ int main(string[] args)
 			}
 			stdout.flush();
 
-			if (gcInterval.peek > 10.minutes)
+			if (gcInterval.peek >= 1.minutes)
 			{
 				import core.memory : GC;
 
@@ -387,6 +388,17 @@ int main(string[] args)
 				else
 					stderr.writeln("GC run in ", gcSpeed.peek);
 				gcInterval.reset();
+
+				gcCollects++;
+				if (gcCollects > 5)
+				{
+					gcSpeed.reset();
+					gcSpeed.start();
+					GC.minimize();
+					gcSpeed.stop();
+					stderr.writeln("GC minimized in ", gcSpeed.peek);
+					gcCollects = 0;
+				}
 			}
 		}
 	}
