@@ -40,11 +40,27 @@ ComponentInfo component(string name)
 	return ComponentInfo(name);
 }
 
+__gshared TaskPool g_threads;
+shared static ~this()
+{
+	if (g_threads)
+		g_threads.finish(true);
+}
+
+TaskPool gthreads()
+{
+	if (!g_threads)
+		synchronized
+			if (!g_threads)
+				g_threads = new TaskPool(max(2, min(6, defaultPoolThreads)));
+	return g_threads;
+}
+
 mixin template DefaultComponentWrapper(bool withDtor = true)
 {
 	@ignoredFunc
 	{
-		import std.algorithm : max;
+		import std.algorithm : min, max;
 		import std.parallelism : TaskPool, Task, task, defaultPoolThreads;
 
 		WorkspaceD workspaced;
@@ -60,12 +76,12 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 			}
 		}
 
-		TaskPool threads()
+		TaskPool threads(int minSize, int maxSize)
 		{
 			if (!_threads)
 				synchronized (this)
 					if (!_threads)
-						_threads = new TaskPool(max(2, defaultPoolThreads));
+						_threads = new TaskPool(max(minSize, min(maxSize, defaultPoolThreads)));
 			return _threads;
 		}
 

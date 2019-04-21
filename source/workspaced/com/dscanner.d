@@ -40,7 +40,7 @@ class DscannerComponent : ComponentWrapper
 	Future!(DScannerIssue[]) lint(string file = "", string ini = "dscanner.ini", scope const(char)[] code = "")
 	{
 		auto ret = new Future!(DScannerIssue[]);
-		threads.create({
+		gthreads.create({
 			try
 			{
 				if (code.length && !file.length)
@@ -118,7 +118,7 @@ class DscannerComponent : ComponentWrapper
 	Future!(DefinitionElement[]) listDefinitions(string file, scope const(char)[] code = "")
 	{
 		auto ret = new Future!(DefinitionElement[]);
-		threads.create({
+		gthreads.create({
 			try
 			{
 				if (code.length && !file.length)
@@ -155,7 +155,7 @@ class DscannerComponent : ComponentWrapper
 	Future!(FileLocation[]) findSymbol(string symbol)
 	{
 		auto ret = new Future!(FileLocation[]);
-		threads.create({
+		gthreads.create({
 			try
 			{
 				import dscanner.utils : expandArgs;

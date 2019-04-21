@@ -92,11 +92,16 @@ class DCDComponent : ComponentWrapper
 		return installedVersion;
 	}
 
+	private auto serverThreads()
+	{
+		return threads(1, 2);
+	}
+
 	/// This stops the dcd-server instance safely and waits for it to exit
 	override void shutdown()
 	{
 		stopServerSync();
-		threads.finish(true);
+		serverThreads.finish(true);
 	}
 
 	/// This will start the dcd-server and load import paths from the current provider
@@ -131,7 +136,7 @@ class DCDComponent : ComponentWrapper
 				break;
 		}
 		running = true;
-		threads.create({
+		serverThreads.create({
 			if (quietServer)
 				foreach (block; serverPipes.stderr.byChunk(4096))
 				{
@@ -178,7 +183,7 @@ class DCDComponent : ComponentWrapper
 	Future!void stopServer()
 	{
 		auto ret = new Future!void();
-		threads.create({ /**/
+		gthreads.create({ /**/
 			try
 			{
 				stopServerSync();
@@ -204,7 +209,7 @@ class DCDComponent : ComponentWrapper
 	Future!void restartServer(bool quiet = false)
 	{
 		auto ret = new Future!void;
-		threads.create({ /**/
+		gthreads.create({ /**/
 			try
 			{
 				stopServerSync();
@@ -237,7 +242,7 @@ class DCDComponent : ComponentWrapper
 	Future!(DCDSearchResult[]) searchSymbol(string query)
 	{
 		auto ret = new Future!(DCDSearchResult[]);
-		threads.create({
+		gthreads.create({
 			try
 			{
 				if (!running)
@@ -309,7 +314,7 @@ class DCDComponent : ComponentWrapper
 			return Future!ushort.fromResult(0);
 		}
 		auto ret = new Future!ushort;
-		threads.create({ /**/
+		gthreads.create({ /**/
 			try
 			{
 				auto newPort = findOpen(port);
@@ -328,7 +333,7 @@ class DCDComponent : ComponentWrapper
 	Future!DCDDeclaration findDeclaration(scope const(char)[] code, int pos)
 	{
 		auto ret = new Future!DCDDeclaration;
-		threads.create({
+		gthreads.create({
 			try
 			{
 				if (!running || pos >= code.length)
@@ -375,7 +380,7 @@ class DCDComponent : ComponentWrapper
 	Future!string getDocumentation(scope const(char)[] code, int pos)
 	{
 		auto ret = new Future!string;
-		threads.create({
+		gthreads.create({
 			try
 			{
 				if (!running)
@@ -431,7 +436,7 @@ class DCDComponent : ComponentWrapper
 	Future!DCDCompletions listCompletion(scope const(char)[] code, int pos)
 	{
 		auto ret = new Future!DCDCompletions;
-		threads.create({
+		gthreads.create({
 			try
 			{
 				DCDCompletions completions;

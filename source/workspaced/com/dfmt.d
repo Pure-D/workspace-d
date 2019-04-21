@@ -27,7 +27,7 @@ class DfmtComponent : ComponentWrapper
 	Future!string format(scope const(char)[] code, string[] arguments = [])
 	{
 		auto ret = new Future!string;
-		threads.create({
+		gthreads.create({
 			try
 			{
 				Config config;

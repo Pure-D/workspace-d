@@ -426,7 +426,7 @@ class DCDExtComponent : ComponentWrapper
 	Future!string implement(scope const(char)[] code, int position)
 	{
 		auto ret = new Future!string;
-		threads.create({
+		gthreads.create({
 			try
 			{
 				struct InterfaceTree

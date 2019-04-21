@@ -23,7 +23,7 @@ class DlanguiComponent : ComponentWrapper
 	Future!(CompletionItem[]) complete(scope const(char)[] code, int pos)
 	{
 		auto ret = new Future!(CompletionItem[]);
-		threads.create({
+		gthreads.create({
 			try
 			{
 				LocationInfo info = getLocationInfo(code, pos);
