@@ -12,7 +12,7 @@ enum mainLine = __LINE__ + 1;
 void main()
 {
 	string dir = getcwd;
-	auto backend = new WorkspaceD();
+	scope backend = new WorkspaceD();
 	auto instance = backend.addInstance(dir);
 
 	backend.register!DscannerComponent;

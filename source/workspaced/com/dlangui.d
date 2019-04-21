@@ -24,6 +24,7 @@ class DlanguiComponent : ComponentWrapper
 	{
 		auto ret = new Future!(CompletionItem[]);
 		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				LocationInfo info = getLocationInfo(code, pos);

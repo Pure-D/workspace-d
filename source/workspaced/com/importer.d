@@ -188,7 +188,7 @@ unittest
 		assert(a.sameEffectAs(b), a.to!string ~ " is not equal to " ~ b.to!string);
 	}
 
-	auto backend = new WorkspaceD();
+	scope backend = new WorkspaceD();
 	auto workspace = makeTemporaryTestingWorkspace;
 	auto instance = backend.addInstance(workspace.directory);
 	backend.register!ImporterComponent;
@@ -539,7 +539,7 @@ unittest
 {
 	import std.conv;
 
-	auto backend = new WorkspaceD();
+	scope backend = new WorkspaceD();
 	auto workspace = makeTemporaryTestingWorkspace;
 	auto instance = backend.addInstance(workspace.directory);
 	backend.register!ImporterComponent;

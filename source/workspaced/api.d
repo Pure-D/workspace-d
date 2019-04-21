@@ -1,5 +1,7 @@
 module workspaced.api;
 
+// debug = Tasks;
+
 import core.time;
 import dparse.lexer;
 import painlessjson;
@@ -40,21 +42,15 @@ ComponentInfo component(string name)
 	return ComponentInfo(name);
 }
 
-__gshared TaskPool g_threads;
-shared static ~this()
+void traceTaskLog(lazy string msg)
 {
-	if (g_threads)
-		g_threads.finish(true);
+	import std.stdio : stderr;
+
+	debug (Tasks)
+		stderr.writeln(msg);
 }
 
-TaskPool gthreads()
-{
-	if (!g_threads)
-		synchronized
-			if (!g_threads)
-				g_threads = new TaskPool(max(2, min(6, defaultPoolThreads)));
-	return g_threads;
-}
+static immutable traceTask = `traceTaskLog("new task in " ~ __PRETTY_FUNCTION__); scope (exit) traceTaskLog(__PRETTY_FUNCTION__ ~ " exited");`;
 
 mixin template DefaultComponentWrapper(bool withDtor = true)
 {
@@ -74,6 +70,11 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 			{
 				shutdown();
 			}
+		}
+
+		TaskPool gthreads()
+		{
+			return workspaced.gthreads;
 		}
 
 		TaskPool threads(int minSize, int maxSize)
@@ -156,7 +157,7 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 		override void shutdown()
 		{
 			if (_threads)
-				_threads.finish(true);
+				_threads.finish();
 		}
 
 		override void bind(WorkspaceD workspaced, WorkspaceD.Instance instance)
@@ -517,9 +518,16 @@ class WorkspaceD
 	ComponentFactoryInstance[] components;
 	StringCache stringCache;
 
+	TaskPool _gthreads;
+
 	this()
 	{
 		stringCache = StringCache(StringCache.defaultBucketCount * 4);
+	}
+
+	~this()
+	{
+		shutdown();
 	}
 
 	void shutdown()
@@ -531,6 +539,9 @@ class WorkspaceD
 			com.wrapper.shutdown();
 		globalComponents = null;
 		components = null;
+		if (_gthreads)
+			_gthreads.finish(true);
+		_gthreads = null;
 	}
 
 	void broadcast(WorkspaceD.Instance instance, JSONValue value)
@@ -822,6 +833,15 @@ class WorkspaceD
 			}
 		}
 		return false;
+	}
+
+	TaskPool gthreads()
+	{
+		if (!_gthreads)
+			synchronized (this)
+				if (!_gthreads)
+					_gthreads = new TaskPool(max(2, min(6, defaultPoolThreads)));
+		return _gthreads;
 	}
 }
 

@@ -9,7 +9,7 @@ import workspaced.com.dub;
 void main()
 {
 	string dir = buildNormalizedPath(getcwd, "..", "tc_fsworkspace");
-	auto backend = new WorkspaceD();
+	scope backend = new WorkspaceD();
 	auto instance = backend.addInstance(dir);
 	backend.register!DubComponent;
 

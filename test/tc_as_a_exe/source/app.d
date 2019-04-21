@@ -17,7 +17,7 @@ void main()
 	string dir = getcwd;
 	JSONValue response;
 
-	//auto backend = new WorkspaceD();
+	//scope backend = new WorkspaceD();
 	auto backend = pipeProcess(["../../workspace-d"], Redirect.stdout | Redirect.stdin);
 
 	//auto instance = backend.addInstance(dir);

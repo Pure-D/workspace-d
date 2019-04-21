@@ -41,6 +41,7 @@ class DscannerComponent : ComponentWrapper
 	{
 		auto ret = new Future!(DScannerIssue[]);
 		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				if (code.length && !file.length)
@@ -119,6 +120,7 @@ class DscannerComponent : ComponentWrapper
 	{
 		auto ret = new Future!(DefinitionElement[]);
 		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				if (code.length && !file.length)
@@ -156,6 +158,7 @@ class DscannerComponent : ComponentWrapper
 	{
 		auto ret = new Future!(FileLocation[]);
 		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				import dscanner.utils : expandArgs;

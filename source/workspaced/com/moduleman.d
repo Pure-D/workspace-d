@@ -260,7 +260,7 @@ class ModuleChangerVisitor : ASTVisitor
 
 unittest
 {
-	auto backend = new WorkspaceD();
+	scope backend = new WorkspaceD();
 	auto workspace = makeTemporaryTestingWorkspace;
 	workspace.createDir("source/newmod");
 	workspace.createDir("unregistered/source");

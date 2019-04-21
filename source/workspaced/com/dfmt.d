@@ -28,6 +28,7 @@ class DfmtComponent : ComponentWrapper
 	{
 		auto ret = new Future!string;
 		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				Config config;

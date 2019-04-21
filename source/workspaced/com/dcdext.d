@@ -427,6 +427,7 @@ class DCDExtComponent : ComponentWrapper
 	{
 		auto ret = new Future!string;
 		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				struct InterfaceTree
@@ -1054,7 +1055,7 @@ private:
 
 unittest
 {
-	auto backend = new WorkspaceD();
+	scope backend = new WorkspaceD();
 	auto workspace = makeTemporaryTestingWorkspace;
 	auto instance = backend.addInstance(workspace.directory);
 	backend.register!DCDExtComponent;
@@ -1078,7 +1079,7 @@ unittest
 {
 	import std.conv;
 
-	auto backend = new WorkspaceD();
+	scope backend = new WorkspaceD();
 	auto workspace = makeTemporaryTestingWorkspace;
 	auto instance = backend.addInstance(workspace.directory);
 	backend.register!DCDExtComponent;

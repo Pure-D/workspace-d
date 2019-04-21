@@ -16,6 +16,8 @@ void main()
 	string dir = buildNormalizedPath(getcwd, "..", "tc_fsworkspace");
 	backend = new WorkspaceD();
 	backend.register!DubComponent;
+	scope (exit)
+		backend.shutdown();
 
 	assert(tryDub("valid"));
 	assert(!tryDub("empty1"));

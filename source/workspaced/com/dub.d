@@ -170,7 +170,8 @@ class DubComponent : ComponentWrapper
 	{
 		restart();
 		auto ret = new Future!bool;
-		gthreads.create({ /**/
+		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				auto result = updateImportPaths(false);

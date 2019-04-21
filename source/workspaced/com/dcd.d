@@ -101,7 +101,8 @@ class DCDComponent : ComponentWrapper
 	override void shutdown()
 	{
 		stopServerSync();
-		serverThreads.finish(true);
+		if (_threads)
+			serverThreads.finish();
 	}
 
 	/// This will start the dcd-server and load import paths from the current provider
@@ -137,6 +138,7 @@ class DCDComponent : ComponentWrapper
 		}
 		running = true;
 		serverThreads.create({
+			mixin(traceTask);
 			if (quietServer)
 				foreach (block; serverPipes.stderr.byChunk(4096))
 				{
@@ -183,7 +185,8 @@ class DCDComponent : ComponentWrapper
 	Future!void stopServer()
 	{
 		auto ret = new Future!void();
-		gthreads.create({ /**/
+		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				stopServerSync();
@@ -209,7 +212,8 @@ class DCDComponent : ComponentWrapper
 	Future!void restartServer(bool quiet = false)
 	{
 		auto ret = new Future!void;
-		gthreads.create({ /**/
+		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				stopServerSync();
@@ -243,6 +247,7 @@ class DCDComponent : ComponentWrapper
 	{
 		auto ret = new Future!(DCDSearchResult[]);
 		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				if (!running)
@@ -314,7 +319,8 @@ class DCDComponent : ComponentWrapper
 			return Future!ushort.fromResult(0);
 		}
 		auto ret = new Future!ushort;
-		gthreads.create({ /**/
+		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				auto newPort = findOpen(port);
@@ -334,6 +340,7 @@ class DCDComponent : ComponentWrapper
 	{
 		auto ret = new Future!DCDDeclaration;
 		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				if (!running || pos >= code.length)
@@ -381,6 +388,7 @@ class DCDComponent : ComponentWrapper
 	{
 		auto ret = new Future!string;
 		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				if (!running)
@@ -437,6 +445,7 @@ class DCDComponent : ComponentWrapper
 	{
 		auto ret = new Future!DCDCompletions;
 		gthreads.create({
+			mixin(traceTask);
 			try
 			{
 				DCDCompletions completions;

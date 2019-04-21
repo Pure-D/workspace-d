@@ -7,7 +7,7 @@ import workspaced.coms;
 void main()
 {
 	string dir = getcwd;
-	auto backend = new WorkspaceD();
+	scope backend = new WorkspaceD();
 	backend.register!DfmtComponent;
 
 	auto dfmt = backend.get!DfmtComponent;

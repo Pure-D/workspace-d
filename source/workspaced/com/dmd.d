@@ -105,7 +105,7 @@ unittest
 {
 	import std.stdio;
 
-	auto backend = new WorkspaceD();
+	scope backend = new WorkspaceD();
 	auto workspace = makeTemporaryTestingWorkspace;
 	auto instance = backend.addInstance(workspace.directory);
 	backend.register!DMDComponent;

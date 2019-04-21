@@ -7,7 +7,7 @@ import workspaced.coms;
 void main()
 {
 	string dir = getcwd;
-	auto backend = new WorkspaceD();
+	scope backend = new WorkspaceD();
 	auto instance = backend.addInstance(dir);
 	backend.register!FSWorkspaceComponent;
 
