@@ -18,7 +18,11 @@ void main()
 	dub.upgrade();
 	assert(dub.dependencies.length > 2);
 	assert(dub.rootDependencies == ["workspace-d"]);
-	assert(dub.imports.length > 5, dub.imports.to!string);
+	// this can be
+	// tc_fsworkspace/source, workspace-d/source
+	// if no dependencies are fetched
+	// or with all dependencies there a lot more
+	assert(dub.imports.length >= 2, dub.imports.to!string);
 	assert(dub.stringImports[0].endsWith("views")
 			|| dub.stringImports[0].endsWith("views/") || dub.stringImports[0].endsWith("views\\"));
 	assert(dub.fileImports.length > 10);
