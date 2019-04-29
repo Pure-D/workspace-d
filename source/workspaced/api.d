@@ -68,7 +68,7 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 		{
 			~this()
 			{
-				shutdown();
+				shutdown(true);
 			}
 		}
 
@@ -154,9 +154,9 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 			return instance.cwd;
 		}
 
-		override void shutdown()
+		override void shutdown(bool dtor = false)
 		{
-			if (_threads)
+			if (!dtor && _threads)
 				_threads.finish();
 		}
 
@@ -304,7 +304,7 @@ interface ComponentWrapper
 {
 	void bind(WorkspaceD workspaced, WorkspaceD.Instance instance);
 	Future!JSONValue run(string method, JSONValue[] args);
-	void shutdown();
+	void shutdown(bool dtor = false);
 }
 
 interface ComponentFactory
@@ -446,10 +446,10 @@ class WorkspaceD
 			return importFilesProvider ? importFilesProvider() : [];
 		}
 
-		void shutdown()
+		void shutdown(bool dtor = false)
 		{
 			foreach (ref com; instanceComponents)
-				com.wrapper.shutdown();
+				com.wrapper.shutdown(dtor);
 			instanceComponents = null;
 		}
 
@@ -527,16 +527,16 @@ class WorkspaceD
 
 	~this()
 	{
-		shutdown();
+		shutdown(true);
 	}
 
-	void shutdown()
+	void shutdown(bool dtor = false)
 	{
 		foreach (ref instance; instances)
-			instance.shutdown();
+			instance.shutdown(dtor);
 		instances = null;
 		foreach (ref com; globalComponents)
-			com.wrapper.shutdown();
+			com.wrapper.shutdown(dtor);
 		globalComponents = null;
 		components = null;
 		if (_gthreads)

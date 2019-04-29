@@ -98,10 +98,10 @@ class DCDComponent : ComponentWrapper
 	}
 
 	/// This stops the dcd-server instance safely and waits for it to exit
-	override void shutdown()
+	override void shutdown(bool dtor = false)
 	{
 		stopServerSync();
-		if (_threads)
+		if (!dtor && _threads)
 			serverThreads.finish();
 	}
 
