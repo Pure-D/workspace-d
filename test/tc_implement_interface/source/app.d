@@ -44,6 +44,7 @@ int main(string[] args)
 		if (!test.name.endsWith(".d"))
 			continue;
 		auto expect = test ~ ".expected";
+		auto actualFile = test ~ ".actual";
 		if (!expect.exists)
 		{
 			stderr.writeln("Warning: tests/", expect, " does not exist!");
@@ -51,14 +52,22 @@ int main(string[] args)
 		}
 		auto source = test.readText;
 		auto reader = File(expect).byLine;
+		auto writer = File(actualFile, "w");
 		auto cmd = reader.front.splitter;
 		string code, message;
 		bool success;
 		if (cmd.front == "implement")
 		{
+			writer.writeln("# ", reader.front);
+
 			cmd.popFront;
-			code = dcdext.implement(source, cmd.front.to!uint).getBlocking;
+			auto cmdLine = cmd.front;
+			code = dcdext.implement(source, cmdLine.parse!uint).getBlocking;
 			reader.popFront;
+
+			writer.writeln(code);
+			writer.writeln();
+			writer.writeln();
 
 			if (verbose)
 				stderr.writeln(test, ": ", code);
@@ -74,6 +83,7 @@ int main(string[] args)
 				{
 					if (code.indexOf(line[1 .. $], index) != -1)
 					{
+						writer.writeln(line, " - FAIL");
 						success = false;
 						message = "Did not expect to find line " ~ line[1 .. $].idup
 							~ " in (after " ~ index.to!string ~ " bytes) code " ~ code[index .. $];
@@ -101,6 +111,7 @@ int main(string[] args)
 						assert(false);
 					if (!match)
 					{
+						writer.writeln(line, " - FAIL");
 						success = false;
 						message = "Expected to find the string '" ~ line.idup ~ "' " ~ op ~ " " ~ expected.to!string
 							~ " times but actually found it " ~ actual.to!string
@@ -118,6 +129,7 @@ int main(string[] args)
 					auto pos = code.indexOf(line, index);
 					if (pos == -1)
 					{
+						writer.writeln(line, " - FAIL");
 						success = false;
 						message = "Could not find " ~ line.idup ~ " in remaining (after "
 							~ index.to!string ~ " bytes) code " ~ code[index .. $];
@@ -131,15 +143,21 @@ int main(string[] args)
 		}
 		else if (cmd.front == "failimplement")
 		{
+			writer.writeln("# ", reader.front);
+
 			cmd.popFront;
-			code = dcdext.implement(source, cmd.front.to!uint).getBlocking;
+			auto cmdLine = cmd.front;
+			code = dcdext.implement(source, cmdLine.parse!uint).getBlocking;
 			if (code.length != 0)
 			{
+				writer.writeln("unexpected: ", code);
+				writer.writeln();
 				message = "Code: " ~ code;
 				success = false;
 			}
 			else
 			{
+				writer.write("ok\n\n");
 				success = true;
 			}
 		}
@@ -147,9 +165,15 @@ int main(string[] args)
 			throw new Exception("Unknown command in " ~ expect ~ ": " ~ reader.front.idup);
 
 		if (success)
+		{
+			writer.close();
+			std.file.remove(actualFile);
 			writeln("Pass ", expect);
+		}
 		else
 		{
+			writer.writeln("-----------------\n\nTest failed\n\n-----------------\n\n");
+			writer.writeln(message);
 			writeln("Expected fail in ", expect, " but it succeeded. ", message);
 			status = 1;
 		}

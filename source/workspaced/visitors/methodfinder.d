@@ -115,9 +115,10 @@ class InterfaceMethodFinder : AttributesVisitor
 		if (!inTarget)
 			return;
 		auto origBody = (cast() dec).functionBody;
+		const hasBody = !!origBody && origBody.missingFunctionBody is null;
 		auto origComment = (cast() dec).comment;
 		const implLevel = context.requiredImplementationLevel;
-		const optionalImplementation = implLevel == 1 && origBody is null;
+		const optionalImplementation = implLevel == 1 && !hasBody;
 		const needsImplementation = implLevel == 9 || optionalImplementation;
 		(cast() dec).functionBody = null;
 		(cast() dec).comment = null;
@@ -130,7 +131,6 @@ class InterfaceMethodFinder : AttributesVisitor
 		format(t, dec);
 		string method = context.localFormattedAttributes.chain([t.data.strip])
 			.filter!(a => a.length > 0 && !a.among!("abstract", "final")).join(" ");
-		const hasBody = !!origBody;
 		ArgumentInfo[] arguments;
 		if (dec.parameters)
 			foreach (arg; dec.parameters.parameters)
