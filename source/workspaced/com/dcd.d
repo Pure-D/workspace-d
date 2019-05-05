@@ -144,7 +144,8 @@ class DCDComponent : ComponentWrapper
 			else
 				while (!serverPipes.stderr.eof)
 				{
-					trace("Server: ", serverPipes.stderr.readln());
+					auto line = serverPipes.stderr.readln();
+					trace("Server: ", line); // evaluates lazily, so read before
 				}
 			auto code = serverPipes.pid.wait();
 			info("DCD-Server stopped with code ", code);
