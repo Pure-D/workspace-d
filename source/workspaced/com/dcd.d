@@ -142,7 +142,7 @@ class DCDComponent : ComponentWrapper
 				{
 				}
 			else
-				while (!serverPipes.stderr.eof)
+				while (serverPipes.stderr.isOpen && !serverPipes.stderr.eof)
 				{
 					auto line = serverPipes.stderr.readln();
 					trace("Server: ", line); // evaluates lazily, so read before
