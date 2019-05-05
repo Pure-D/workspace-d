@@ -6,6 +6,7 @@ import core.thread;
 import std.algorithm;
 import std.conv;
 import std.datetime;
+import std.experimental.logger;
 import std.json;
 import std.path;
 import std.process;
@@ -36,11 +37,11 @@ class DCDComponent : ComponentWrapper
 
 		installedVersion = clientPath.getVersionAndFixPath;
 		string clientPathInfo = clientPath != "dcd-client" ? "(" ~ clientPath ~ ") " : "";
-		stderr.writeln("Detected dcd-client ", clientPathInfo, installedVersion);
+		trace("Detected dcd-client ", clientPathInfo, installedVersion);
 
 		string serverInstalledVersion = serverPath.getVersionAndFixPath;
 		string serverPathInfo = serverPath != "dcd-server" ? "(" ~ serverPath ~ ") " : "";
-		stderr.writeln("Detected dcd-server ", serverPathInfo, serverInstalledVersion);
+		trace("Detected dcd-server ", serverPathInfo, serverInstalledVersion);
 
 		if (serverInstalledVersion != installedVersion)
 			throw new Exception("client & server version mismatch");
@@ -129,10 +130,7 @@ class DCDComponent : ComponentWrapper
 		{
 			string line = serverPipes.stderr.readln();
 			if (!quietServer)
-			{
-				stderr.writeln("Server: ", line);
-				stderr.flush();
-			}
+				trace("Server: ", line);
 			if (line.canFind("Startup completed in "))
 				break;
 		}
@@ -146,13 +144,13 @@ class DCDComponent : ComponentWrapper
 			else
 				while (!serverPipes.stderr.eof)
 				{
-					stderr.writeln("Server: ", serverPipes.stderr.readln());
+					trace("Server: ", serverPipes.stderr.readln());
 				}
 			auto code = serverPipes.pid.wait();
-			stderr.writeln("DCD-Server stopped with code ", code);
+			info("DCD-Server stopped with code ", code);
 			if (code != 0)
 			{
-				stderr.writeln("Broadcasting dcd server crash.");
+				info("Broadcasting dcd server crash.");
 				workspaced.broadcast(refInstance, JSONValue([
 						"type": JSONValue("crash"),
 						"component": JSONValue("dcd")
@@ -451,7 +449,7 @@ class DCDComponent : ComponentWrapper
 				DCDCompletions completions;
 				if (!running)
 				{
-					stderr.writeln("DCD not running!");
+					info("DCD not running!");
 					ret.finish(completions);
 					return;
 				}
@@ -469,7 +467,7 @@ class DCDComponent : ComponentWrapper
 				while (pipes.stdout.isOpen && !pipes.stdout.eof)
 				{
 					string line = pipes.stdout.readln();
-					stderr.writeln("DCD Client: ", line);
+					trace("DCD Client: ", line);
 					if (line.length == 0)
 						continue;
 					data ~= line.chomp;
