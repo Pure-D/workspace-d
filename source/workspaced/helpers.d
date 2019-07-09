@@ -51,6 +51,12 @@ ptrdiff_t indexOfKeyword(scope const(char)[] code, string keyword, ptrdiff_t sta
 	return index;
 }
 
+bool endsWithKeyword(scope const(char)[] code, string keyword)
+{
+	return code == keyword || (code.endsWith(keyword) && code[$ - 1 - keyword.length]
+			.isIdentifierChar);
+}
+
 bool isIdentifierSeparatingChar(dchar c)
 {
 	return c < 48 || (c > 57 && c < 65) || c == '[' || c == '\\' || c == ']'

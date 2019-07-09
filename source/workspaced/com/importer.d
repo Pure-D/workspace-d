@@ -14,7 +14,7 @@ import std.string;
 import std.uni : sicmp;
 
 import workspaced.api;
-import workspaced.helpers : determineIndentation, indexOfKeyword, stripLineEndingLength;
+import workspaced.helpers : determineIndentation, endsWithKeyword, indexOfKeyword, stripLineEndingLength;
 
 /// ditto
 @component("importer")
@@ -106,10 +106,23 @@ class ImporterComponent : ComponentWrapper
 			bool marksNewRegion;
 			bool leavingMidImport;
 
-			const importStart = line.indexOfKeyword("import");
+			auto importStart = line.indexOfKeyword("import");
 			const importEnd = line.indexOf(';');
 			if (importStart != -1)
 			{
+				while (true)
+				{
+					auto rest = line[0 .. importStart].stripRight;
+					if (!rest.endsWithKeyword("public") && !rest.endsWithKeyword("static"))
+						break;
+
+					// both public and static end with c, so search for c
+					// do this to remove whitespaces
+					importStart = line[0 .. importStart].lastIndexOf('c');
+					// both public and static have same length so subtract by "publi".length (without c)
+					importStart -= 5;
+				}
+
 				acc += importStart;
 				line = line[importStart .. $];
 
@@ -164,11 +177,10 @@ class ImporterComponent : ComponentWrapper
 		end = code.indexOf(';', imports.back.start) + 1;
 
 		auto sorted = imports.map!(a => ImportInfo(a.name, a.rename,
-				a.selectives.dup.sort!((c, d) => sicmp(c.effectiveName, d.effectiveName) < 0).array,
-				a.start))
-			.array
-			.sort!((a, b) => sicmp(a.effectiveName, b.effectiveName) < 0)
+				a.selectives.dup.sort!((c, d) => sicmp(c.effectiveName,
+				d.effectiveName) < 0).array, a.isPublic, a.isStatic, a.start))
 			.array;
+		sorted.sort!((a, b) => ImportInfo.cmp(a, b) < 0);
 		if (sorted == imports)
 			return ImportBlock.init;
 		return ImportBlock(cast(int) start, cast(int) end, sorted, indentation);
@@ -245,6 +257,11 @@ void main()
 
 import workspaced.api;
 import workspaced.helpers : determineIndentation, stripLineEndingLength, indexOfKeyword;
+
+public import std.string;
+public import std.stdio;
+import std.traits;
+import std.algorithm;
 `;
 
 	//dfmt off
@@ -324,6 +341,13 @@ import workspaced.helpers : determineIndentation, stripLineEndingLength, indexOf
 			SelectiveImport("stripLineEndingLength")
 		])
 	]));
+
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 1010), ImportBlock(993, 1084, [
+		ImportInfo(["std", "stdio"], null, null, true),
+		ImportInfo(["std", "string"], null, null, true),
+		ImportInfo(["std", "algorithm"]),
+		ImportInfo(["std", "traits"])
+	]));
 	//dfmt on
 }
 
@@ -366,7 +390,11 @@ struct ImportInfo
 	string rename;
 	/// Array of selective imports or empty if the entire module has been imported
 	SelectiveImport[] selectives;
-	/// Index where the import starts in code
+	/// If this is an explicitly `public import` (not checking potential attributes spanning this)
+	bool isPublic;
+	/// If this is an explicityl `static import` (not checking potential attributes spanning this)
+	bool isStatic;
+	/// Index where the first token of the import declaration starts, possibly including attributes.
 	size_t start;
 
 	/// Returns the rename if available, otherwise the name joined with dots
@@ -380,14 +408,37 @@ struct ImportInfo
 	{
 		import std.conv : to;
 
-		return "import " ~ (rename.length ? rename ~ " = "
-				: "") ~ name.join('.') ~ (selectives.length
-				? " : " ~ selectives.to!(string[]).join(", ") : "") ~ ';';
+		auto ret = appender!string;
+		if (isPublic)
+			ret.put("public ");
+		if (isStatic)
+			ret.put("static ");
+		ret.put("import ");
+		if (rename.length)
+			ret.put(rename ~ " = ");
+		ret.put(name.join('.'));
+		if (selectives.length)
+			ret.put(" : " ~ selectives.to!(string[]).join(", "));
+		ret.put(';');
+		return ret.data;
 	}
 
+	/// Returns: true if this ImportInfo is the same as another one except for definition location
 	bool sameEffectAs(in ImportInfo other) const
 	{
-		return name == other.name && rename == other.rename && selectives == other.selectives;
+		return name == other.name && rename == other.rename && selectives == other.selectives
+			&& isPublic == other.isPublic && isStatic == other.isStatic;
+	}
+
+	static int cmp(ImportInfo a, ImportInfo b)
+	{
+		const ax = (a.isPublic ? 2 : 0) | (a.isStatic ? 1 : 0);
+		const bx = (b.isPublic ? 2 : 0) | (b.isStatic ? 1 : 0);
+		const x = ax - bx;
+		if (x != 0)
+			return -x;
+
+		return sicmp(a.effectiveName, b.effectiveName);
 	}
 }
 
@@ -494,7 +545,7 @@ class ImporterReaderVisitor : ASTVisitor
 			outerImportLocation = decl.endIndex;
 		foreach (i; decl.singleImports)
 			imports ~= ImportInfo(i.identifierChain.identifiers.map!(tok => tok.text.idup)
-					.array, i.rename.text, null, decl.tokens[0].index);
+					.array, i.rename.text, null, publicStack > 0, staticStack > 0, declStart);
 		if (decl.importBindings)
 		{
 			ImportInfo info;
@@ -510,15 +561,47 @@ class ImporterReaderVisitor : ASTVisitor
 				else
 					info.selectives ~= SelectiveImport(bind.left.text);
 			}
-			info.start = decl.tokens[0].index;
+			info.start = declStart;
+			info.isPublic = publicStack > 0;
+			info.isStatic = staticStack > 0;
 			if (info.selectives.length)
 				imports ~= info;
 		}
 	}
 
+	override void visit(const Declaration decl)
+	{
+		if (decl)
+		{
+			bool hasPublic, hasStatic;
+			foreach (attr; decl.attributes)
+			{
+				if (attr.attribute == tok!"public")
+					hasPublic = true;
+				else if (attr.attribute == tok!"static")
+					hasStatic = true;
+			}
+			if (hasPublic)
+				publicStack++;
+			if (hasStatic)
+				staticStack++;
+			declStart = decl.tokens[0].index;
+
+			scope (exit)
+			{
+				if (hasStatic)
+					staticStack--;
+				if (hasPublic)
+					publicStack--;
+				declStart = -1;
+			}
+			return decl.accept(this);
+		}
+	}
+
 	override void visit(const BlockStatement content)
 	{
-		if (pos == -1 || content && pos >= content.startLocation && pos < content.endLocation)
+		if (pos == -1 || (content && pos >= content.startLocation && pos < content.endLocation))
 		{
 			if (content.startLocation + 1 >= innermostBlockStart)
 				innermostBlockStart = content.startLocation + 1;
@@ -529,6 +612,9 @@ class ImporterReaderVisitor : ASTVisitor
 
 	private int pos;
 	private bool inBlock;
+	private int publicStack, staticStack;
+	private size_t declStart;
+
 	ImportInfo[] imports;
 	bool isModule;
 	size_t outerImportLocation;
