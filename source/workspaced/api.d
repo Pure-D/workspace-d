@@ -263,7 +263,7 @@ bool checkType(T)(JSONValue value)
 {
 	final switch (value.type)
 	{
-	case JSON_TYPE.ARRAY:
+	case JSONType.array:
 		static if (isStaticArray!T)
 			return T.length == value.array.length
 				&& value.array.all!(checkType!(typeof(T.init[0])));
@@ -280,22 +280,22 @@ bool checkType(T)(JSONValue value)
 		}
 		else
 			return false;
-	case JSON_TYPE.FALSE:
-	case JSON_TYPE.TRUE:
+	case JSONType.false_:
+	case JSONType.true_:
 		return is(T : bool);
-	case JSON_TYPE.FLOAT:
+	case JSONType.float_:
 		return isNumeric!T;
-	case JSON_TYPE.INTEGER:
-	case JSON_TYPE.UINTEGER:
+	case JSONType.integer:
+	case JSONType.uinteger:
 		return isIntegral!T;
-	case JSON_TYPE.NULL:
+	case JSONType.null_:
 		static if (is(T == class) || isArray!T || isPointer!T || is(T : Nullable!U, U))
 			return true;
 		else
 			return false;
-	case JSON_TYPE.OBJECT:
+	case JSONType.object:
 		return is(T == class) || is(T == struct);
-	case JSON_TYPE.STRING:
+	case JSONType.string:
 		return isSomeString!T;
 	}
 }
@@ -333,7 +333,7 @@ struct Configuration
 
 	bool get(string component, string key, out JSONValue val)
 	{
-		if (base.type != JSON_TYPE.OBJECT)
+		if (base.type != JSONType.object)
 		{
 			JSONValue[string] tmp;
 			base = JSONValue(tmp);
@@ -358,7 +358,7 @@ struct Configuration
 
 	bool set(T)(string component, string key, T value)
 	{
-		if (base.type != JSON_TYPE.OBJECT)
+		if (base.type != JSONType.object)
 		{
 			JSONValue[string] tmp;
 			base = JSONValue(tmp);
@@ -383,17 +383,17 @@ struct Configuration
 	/// Loads unset keys from global, keeps existing keys
 	void loadBase(Configuration global)
 	{
-		if (global.base.type != JSON_TYPE.OBJECT)
+		if (global.base.type != JSONType.object)
 			return;
 
-		if (base.type != JSON_TYPE.OBJECT)
+		if (base.type != JSONType.object)
 			base = global.base.dupJson;
 		else
 		{
 			foreach (component, config; global.base.object)
 			{
 				auto existing = component in base.object;
-				if (!existing || config.type != JSON_TYPE.OBJECT)
+				if (!existing || config.type != JSONType.object)
 					base.object[component] = config.dupJson;
 				else
 				{
@@ -413,9 +413,9 @@ private JSONValue dupJson(JSONValue v)
 {
 	switch (v.type)
 	{
-	case JSON_TYPE.OBJECT:
+	case JSONType.object:
 		return JSONValue(v.object.dup);
-	case JSON_TYPE.ARRAY:
+	case JSONType.array:
 		return JSONValue(v.array.dup);
 	default:
 		return v;

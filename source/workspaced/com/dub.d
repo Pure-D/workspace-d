@@ -1,13 +1,13 @@
 module workspaced.com.dub;
 
-import core.sync.mutex;
 import core.exception;
+import core.sync.mutex;
 import core.thread;
 
 import std.algorithm;
 import std.conv;
 import std.exception;
-import std.json : JSONValue, JSON_TYPE;
+import std.json : JSONType, JSONValue;
 import std.parallelism;
 import std.regex;
 import std.stdio;
@@ -210,8 +210,9 @@ class DubComponent : ComponentWrapper
 
 		try
 		{
-			auto paths = _dub.project.listBuildSettings(settings, ["import-paths",
-					"string-import-paths", "source-files"], ListBuildSettingsFormat.listNul);
+			auto paths = _dub.project.listBuildSettings(settings, [
+					"import-paths", "string-import-paths", "source-files"
+					], ListBuildSettingsFormat.listNul);
 			_importPaths = paths[0].split('\0');
 			_stringImportPaths = paths[1].split('\0');
 			_importFiles = paths[2].split('\0');
@@ -219,9 +220,11 @@ class DubComponent : ComponentWrapper
 		}
 		catch (Exception e)
 		{
-			workspaced.broadcast(refInstance, JSONValue(["type" : JSONValue("error"), "component"
-					: JSONValue("dub"), "detail"
-					: JSONValue("Error while listing import paths: " ~ e.toString)]));
+			workspaced.broadcast(refInstance, JSONValue([
+						"type": JSONValue("error"),
+						"component": JSONValue("dub"),
+						"detail": JSONValue("Error while listing import paths: " ~ e.toString)
+					]));
 			_importPaths = [];
 			_stringImportPaths = [];
 			return false;
@@ -365,7 +368,7 @@ class DubComponent : ComponentWrapper
 	/// Returns: `false` if there are no import paths in the new arch type
 	bool setArchType(JSONValue request)
 	{
-		enforce(request.type == JSON_TYPE.OBJECT && "arch-type" in request, "arch-type not in request");
+		enforce(request.type == JSONType.object && "arch-type" in request, "arch-type not in request");
 		auto type = request["arch-type"].fromJSON!string;
 		if (archTypes.canFind(type))
 		{
@@ -388,8 +391,7 @@ class DubComponent : ComponentWrapper
 	/// Returns: `false` if there are no import paths in the new build type
 	bool setBuildType(JSONValue request)
 	{
-		enforce(request.type == JSON_TYPE.OBJECT && "build-type" in request,
-				"build-type not in request");
+		enforce(request.type == JSONType.object && "build-type" in request, "build-type not in request");
 		auto type = request["build-type"].fromJSON!string;
 		if (buildTypes.canFind(type))
 		{

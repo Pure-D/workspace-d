@@ -2,8 +2,8 @@ module source.workspaced.info;
 
 import Compiler = std.compiler;
 import OS = std.system;
-import std.json;
 import std.conv;
+import std.json;
 
 static immutable Version = [3, 3, 0];
 

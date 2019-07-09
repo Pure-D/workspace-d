@@ -37,7 +37,8 @@ class DscannerComponent : ComponentWrapper
 
 	/// Asynchronously lints the file passed.
 	/// If you provide code then the code will be used and file will be ignored.
-	Future!(DScannerIssue[]) lint(string file = "", string ini = "dscanner.ini", scope const(char)[] code = "")
+	Future!(DScannerIssue[]) lint(string file = "", string ini = "dscanner.ini",
+			scope const(char)[] code = "")
 	{
 		auto ret = new Future!(DScannerIssue[]);
 		gthreads.create({
@@ -319,9 +320,12 @@ final class DefinitionFinder : ASTVisitor
 		if (!dec.structBody)
 			return;
 		definitions ~= makeDefinition(dec.name.text, dec.name.line, "c", context,
-				[cast(int) dec.structBody.startLocation, cast(int) dec.structBody.endLocation]);
+				[
+					cast(int) dec.structBody.startLocation,
+					cast(int) dec.structBody.endLocation
+				]);
 		auto c = context;
-		context = ContextType(["class" : dec.name.text], "public");
+		context = ContextType(["class": dec.name.text], "public");
 		dec.accept(this);
 		context = c;
 	}
@@ -336,9 +340,12 @@ final class DefinitionFinder : ASTVisitor
 			return;
 		}
 		definitions ~= makeDefinition(dec.name.text, dec.name.line, "s", context,
-				[cast(int) dec.structBody.startLocation, cast(int) dec.structBody.endLocation]);
+				[
+					cast(int) dec.structBody.startLocation,
+					cast(int) dec.structBody.endLocation
+				]);
 		auto c = context;
-		context = ContextType(["struct" : dec.name.text], "public");
+		context = ContextType(["struct": dec.name.text], "public");
 		dec.accept(this);
 		context = c;
 	}
@@ -348,9 +355,12 @@ final class DefinitionFinder : ASTVisitor
 		if (!dec.structBody)
 			return;
 		definitions ~= makeDefinition(dec.name.text, dec.name.line, "i", context,
-				[cast(int) dec.structBody.startLocation, cast(int) dec.structBody.endLocation]);
+				[
+					cast(int) dec.structBody.startLocation,
+					cast(int) dec.structBody.endLocation
+				]);
 		auto c = context;
-		context = ContextType(["interface:" : dec.name.text], context.access);
+		context = ContextType(["interface:": dec.name.text], context.access);
 		dec.accept(this);
 		context = c;
 	}
@@ -362,18 +372,21 @@ final class DefinitionFinder : ASTVisitor
 		def.attributes["signature"] = paramsToString(dec);
 		definitions ~= def;
 		auto c = context;
-		context = ContextType(["template" : dec.name.text], context.access);
+		context = ContextType(["template": dec.name.text], context.access);
 		dec.accept(this);
 		context = c;
 	}
 
 	override void visit(const FunctionDeclaration dec)
 	{
-		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody || !dec.functionBody.specifiedFunctionBody.blockStatement)
+		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody
+				|| !dec.functionBody.specifiedFunctionBody.blockStatement)
 			return;
 		auto def = makeDefinition(dec.name.text, dec.name.line, "f", context,
-				[cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
-				cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation]);
+				[
+					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
+					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
+				]);
 		def.attributes["signature"] = paramsToString(dec);
 		if (dec.returnType !is null)
 			def.attributes["return"] = astToString(dec.returnType);
@@ -382,22 +395,28 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const Constructor dec)
 	{
-		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody || !dec.functionBody.specifiedFunctionBody.blockStatement)
+		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody
+				|| !dec.functionBody.specifiedFunctionBody.blockStatement)
 			return;
 		auto def = makeDefinition("this", dec.line, "f", context,
-				[cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
-				cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation]);
+				[
+					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
+					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
+				]);
 		def.attributes["signature"] = paramsToString(dec);
 		definitions ~= def;
 	}
 
 	override void visit(const Destructor dec)
 	{
-		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody || !dec.functionBody.specifiedFunctionBody.blockStatement)
+		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody
+				|| !dec.functionBody.specifiedFunctionBody.blockStatement)
 			return;
 		definitions ~= makeDefinition("~this", dec.line, "f", context,
-				[cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
-				cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation]);
+				[
+					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
+					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
+				]);
 	}
 
 	override void visit(const EnumDeclaration dec)
@@ -407,7 +426,7 @@ final class DefinitionFinder : ASTVisitor
 		definitions ~= makeDefinition(dec.name.text, dec.name.line, "g", context,
 				[cast(int) dec.enumBody.startLocation, cast(int) dec.enumBody.endLocation]);
 		auto c = context;
-		context = ContextType(["enum" : dec.name.text], context.access);
+		context = ContextType(["enum": dec.name.text], context.access);
 		dec.accept(this);
 		context = c;
 	}
@@ -422,9 +441,12 @@ final class DefinitionFinder : ASTVisitor
 			return;
 		}
 		definitions ~= makeDefinition(dec.name.text, dec.name.line, "u", context,
-				[cast(int) dec.structBody.startLocation, cast(int) dec.structBody.endLocation]);
+				[
+					cast(int) dec.structBody.startLocation,
+					cast(int) dec.structBody.endLocation
+				]);
 		auto c = context;
-		context = ContextType(["union" : dec.name.text], context.access);
+		context = ContextType(["union": dec.name.text], context.access);
 		dec.accept(this);
 		context = c;
 	}
@@ -432,20 +454,29 @@ final class DefinitionFinder : ASTVisitor
 	override void visit(const AnonymousEnumMember mem)
 	{
 		definitions ~= makeDefinition(mem.name.text, mem.name.line, "e", context,
-				[cast(int) mem.name.index, cast(int) mem.name.index + cast(int) mem.name.text.length]);
+				[
+					cast(int) mem.name.index,
+					cast(int) mem.name.index + cast(int) mem.name.text.length
+				]);
 	}
 
 	override void visit(const EnumMember mem)
 	{
 		definitions ~= makeDefinition(mem.name.text, mem.name.line, "e", context,
-				[cast(int) mem.name.index, cast(int) mem.name.index + cast(int) mem.name.text.length]);
+				[
+					cast(int) mem.name.index,
+					cast(int) mem.name.index + cast(int) mem.name.text.length
+				]);
 	}
 
 	override void visit(const VariableDeclaration dec)
 	{
 		foreach (d; dec.declarators)
 			definitions ~= makeDefinition(d.name.text, d.name.line, "v", context,
-					[cast(int) d.name.index, cast(int) d.name.index + cast(int) d.name.text.length]);
+					[
+						cast(int) d.name.index,
+						cast(int) d.name.index + cast(int) d.name.text.length
+					]);
 		dec.accept(this);
 	}
 
@@ -548,7 +579,10 @@ final class DefinitionFinder : ASTVisitor
 	override void visit(const AliasInitializer dec)
 	{
 		definitions ~= makeDefinition(dec.name.text, dec.name.line, "a", context,
-				[cast(int) dec.name.index, cast(int) dec.name.index + cast(int) dec.name.text.length]);
+				[
+					cast(int) dec.name.index,
+					cast(int) dec.name.index + cast(int) dec.name.text.length
+				]);
 
 		dec.accept(this);
 	}

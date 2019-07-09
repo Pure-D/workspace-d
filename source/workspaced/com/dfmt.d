@@ -144,7 +144,7 @@ void tryFetchProperty(T = string)(ref JSONValue json, ref T ret, string name)
 		auto val = *ptr;
 		static if (is(T == string) || is(T == enum))
 		{
-			if (val.type != JSON_TYPE.STRING)
+			if (val.type != JSONType.string)
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a string");
 			static if (is(T == enum))
 				ret = val.str.to!T;
@@ -153,7 +153,7 @@ void tryFetchProperty(T = string)(ref JSONValue json, ref T ret, string name)
 		}
 		else static if (is(T == uint))
 		{
-			if (val.type != JSON_TYPE.INTEGER)
+			if (val.type != JSONType.integer)
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a number");
 			if (val.integer < 0)
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a positive number");
@@ -161,15 +161,15 @@ void tryFetchProperty(T = string)(ref JSONValue json, ref T ret, string name)
 		}
 		else static if (is(T == int))
 		{
-			if (val.type != JSON_TYPE.INTEGER)
+			if (val.type != JSONType.integer)
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a number");
 			ret = cast(T) val.integer;
 		}
 		else static if (is(T == OptionalBoolean))
 		{
-			if (val.type != JSON_TYPE.TRUE && val.type != JSON_TYPE.FALSE)
+			if (val.type != JSONType.true_ && val.type != JSONType.false_)
 				throw new Exception("dfmt config value '" ~ name ~ "' must be a boolean");
-			ret = val.type == JSON_TYPE.TRUE ? OptionalBoolean.t : OptionalBoolean.f;
+			ret = val.type == JSONType.true_ ? OptionalBoolean.t : OptionalBoolean.f;
 		}
 		else
 			static assert(false);

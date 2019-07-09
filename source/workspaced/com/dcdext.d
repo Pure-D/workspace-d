@@ -18,8 +18,8 @@ import std.range;
 import std.string;
 
 import workspaced.api;
-import workspaced.dparseext;
 import workspaced.com.dcd;
+import workspaced.dparseext;
 
 import workspaced.visitors.classifier;
 import workspaced.visitors.methodfinder;
@@ -54,7 +54,8 @@ class DCDExtComponent : ComponentWrapper
 	///   code = code to analyze
 	///   position = byte offset where to check for function arguments
 	///   definition = true if this hints is a function definition (templates don't have an exclamation point '!')
-	CalltipsSupport extractCallParameters(scope const(char)[] code, int position, bool definition = false)
+	CalltipsSupport extractCallParameters(scope const(char)[] code, int position,
+			bool definition = false)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto queuedToken = tokens.countUntil!(a => a.index >= position) - 1;

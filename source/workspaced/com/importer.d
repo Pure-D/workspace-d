@@ -14,7 +14,8 @@ import std.string;
 import std.uni : sicmp;
 
 import workspaced.api;
-import workspaced.helpers : determineIndentation, endsWithKeyword, indexOfKeyword, stripLineEndingLength;
+import workspaced.helpers : determineIndentation, endsWithKeyword,
+	indexOfKeyword, stripLineEndingLength;
 
 /// ditto
 @component("importer")
@@ -39,7 +40,8 @@ class ImporterComponent : ComponentWrapper
 
 	/// Returns a list of code patches for adding an import.
 	/// If `insertOutermost` is false, the import will get added to the innermost block.
-	ImportModification add(string importName, scope const(char)[] code, int pos, bool insertOutermost = true)
+	ImportModification add(string importName, scope const(char)[] code, int pos,
+			bool insertOutermost = true)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto mod = parseModule(tokens, "code", &rba);
@@ -62,16 +64,23 @@ class ImporterComponent : ComponentWrapper
 				.getIndentation(reader.outerImportLocation);
 			if (reader.isModule)
 				indentation = '\n' ~ indentation;
-			return ImportModification("", [CodeReplacement([reader.outerImportLocation, reader.outerImportLocation],
-					indentation ~ "import " ~ importName ~ ";" ~ (reader.outerImportLocation == 0 ? "\n" : ""))]);
+			return ImportModification("", [
+					CodeReplacement([
+							reader.outerImportLocation, reader.outerImportLocation
+						], indentation ~ "import " ~ importName ~ ";" ~ (reader.outerImportLocation == 0
+						? "\n" : ""))
+					]);
 		}
 		else
 		{
 			indentation = (cast(ubyte[]) code).getIndentation(reader.innermostBlockStart);
 			if (reader.isModule)
 				indentation = '\n' ~ indentation;
-			return ImportModification("", [CodeReplacement([reader.innermostBlockStart,
-					reader.innermostBlockStart], indentation ~ "import " ~ importName ~ ";")]);
+			return ImportModification("", [
+					CodeReplacement([
+							reader.innermostBlockStart, reader.innermostBlockStart
+						], indentation ~ "import " ~ importName ~ ";")
+					]);
 		}
 	}
 
@@ -178,8 +187,7 @@ class ImporterComponent : ComponentWrapper
 
 		auto sorted = imports.map!(a => ImportInfo(a.name, a.rename,
 				a.selectives.dup.sort!((c, d) => sicmp(c.effectiveName,
-				d.effectiveName) < 0).array, a.isPublic, a.isStatic, a.start))
-			.array;
+				d.effectiveName) < 0).array, a.isPublic, a.isStatic, a.start)).array;
 		sorted.sort!((a, b) => ImportInfo.cmp(a, b) < 0);
 		if (sorted == imports)
 			return ImportBlock.init;

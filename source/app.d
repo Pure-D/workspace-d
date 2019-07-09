@@ -1,7 +1,7 @@
 module app;
 
-import core.sync.mutex;
 import core.exception;
+import core.sync.mutex;
 import core.time;
 
 import painlessjson;
@@ -87,8 +87,8 @@ WorkspaceD engine;
 
 void handleRequest(int id, JSONValue request)
 {
-	if (request.type != JSON_TYPE.OBJECT || "cmd" !in request
-			|| request["cmd"].type != JSON_TYPE.STRING)
+	if (request.type != JSONType.object || "cmd" !in request
+			|| request["cmd"].type != JSONType.string)
 	{
 		goto printUsage;
 	}
@@ -98,7 +98,7 @@ void handleRequest(int id, JSONValue request)
 	}
 	else if (request["cmd"].str == "load")
 	{
-		if ("component" !in request || request["component"].type != JSON_TYPE.STRING)
+		if ("component" !in request || request["component"].type != JSONType.string)
 		{
 			sendException(id,
 					new Exception(
@@ -108,7 +108,7 @@ void handleRequest(int id, JSONValue request)
 		{
 			bool autoRegister = true;
 			if (auto v = "autoregister" in request)
-				autoRegister = v.type != JSON_TYPE.FALSE;
+				autoRegister = v.type != JSONType.false_;
 			string[] allComponents;
 			static foreach (Component; AllComponents)
 				allComponents ~= getUDAs!(Component, ComponentInfo)[0].name;
@@ -133,7 +133,7 @@ void handleRequest(int id, JSONValue request)
 	}
 	else if (request["cmd"].str == "new")
 	{
-		if ("cwd" !in request || request["cwd"].type != JSON_TYPE.STRING)
+		if ("cwd" !in request || request["cwd"].type != JSONType.string)
 		{
 			sendException(id,
 					new Exception(
@@ -151,7 +151,7 @@ void handleRequest(int id, JSONValue request)
 	}
 	else if (request["cmd"].str == "config-set")
 	{
-		if ("config" !in request || request["config"].type != JSON_TYPE.OBJECT)
+		if ("config" !in request || request["config"].type != JSONType.object)
 		{
 		configSetFail:
 			sendException(id,
@@ -162,7 +162,7 @@ void handleRequest(int id, JSONValue request)
 		{
 			if ("cwd" in request)
 			{
-				if (request["cwd"].type != JSON_TYPE.STRING)
+				if (request["cwd"].type != JSONType.string)
 					goto configSetFail;
 				else
 					engine.getInstance(request["cwd"].str).config.base = request["config"];
@@ -176,7 +176,7 @@ void handleRequest(int id, JSONValue request)
 	{
 		if ("cwd" in request)
 		{
-			if (request["cwd"].type != JSON_TYPE.STRING)
+			if (request["cwd"].type != JSONType.string)
 				sendException(id,
 						new Exception(
 							`Expected new message to be in format {"cmd":"config-get", ("cwd":string)}`));
@@ -191,12 +191,12 @@ void handleRequest(int id, JSONValue request)
 		JSONValue[] params;
 		if ("params" in request)
 		{
-			if (request["params"].type != JSON_TYPE.ARRAY)
+			if (request["params"].type != JSONType.array)
 				goto callFail;
 			params = request["params"].array;
 		}
-		if ("method" !in request || request["method"].type != JSON_TYPE.STRING
-				|| "component" !in request || request["component"].type != JSON_TYPE.STRING)
+		if ("method" !in request || request["method"].type != JSONType.string
+				|| "component" !in request || request["component"].type != JSONType.string)
 		{
 		callFail:
 			sendException(id, new Exception(`Expected call message to be in format {"cmd":"call", "component":string, "method":string, ("cwd":string), ("params":object[])}`));
@@ -208,7 +208,7 @@ void handleRequest(int id, JSONValue request)
 			string method = request["method"].str;
 			if ("cwd" in request)
 			{
-				if (request["cwd"].type != JSON_TYPE.STRING)
+				if (request["cwd"].type != JSONType.string)
 				{
 					goto callFail;
 				}
@@ -231,7 +231,7 @@ void handleRequest(int id, JSONValue request)
 	}
 	else if (request["cmd"].str == "import-paths")
 	{
-		if ("cwd" !in request || request["cwd"].type != JSON_TYPE.STRING)
+		if ("cwd" !in request || request["cwd"].type != JSONType.string)
 			sendException(id,
 					new Exception(`Expected new message to be in format {"cmd":"import-paths", "cwd":string}`));
 		else
@@ -239,7 +239,7 @@ void handleRequest(int id, JSONValue request)
 	}
 	else if (request["cmd"].str == "import-files")
 	{
-		if ("cwd" !in request || request["cwd"].type != JSON_TYPE.STRING)
+		if ("cwd" !in request || request["cwd"].type != JSONType.string)
 			sendException(id,
 					new Exception(`Expected new message to be in format {"cmd":"import-files", "cwd":string}`));
 		else
@@ -247,7 +247,7 @@ void handleRequest(int id, JSONValue request)
 	}
 	else if (request["cmd"].str == "string-import-paths")
 	{
-		if ("cwd" !in request || request["cwd"].type != JSON_TYPE.STRING)
+		if ("cwd" !in request || request["cwd"].type != JSONType.string)
 			sendException(id,
 					new Exception(
 						`Expected new message to be in format {"cmd":"string-import-paths", "cwd":string}`));

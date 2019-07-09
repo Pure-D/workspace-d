@@ -133,8 +133,10 @@ class CodeDefinitionClassifier : AttributesVisitor
 	override void visit(const Declaration dec)
 	{
 		writtenRegion = false;
-		currentRange = [cast(uint) dec.tokens[0].index,
-			cast(uint)(dec.tokens[$ - 1].index + dec.tokens[$ - 1].text.length + 1)];
+		currentRange = [
+			cast(uint) dec.tokens[0].index,
+			cast(uint)(dec.tokens[$ - 1].index + dec.tokens[$ - 1].text.length + 1)
+		];
 		super.visit(dec);
 		if (writtenRegion && regions.length >= 2 && regions[$ - 2].sameBlockAs(regions[$ - 1]))
 		{

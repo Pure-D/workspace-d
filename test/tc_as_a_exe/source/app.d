@@ -22,20 +22,20 @@ void main()
 
 	//auto instance = backend.addInstance(dir);
 	backend.stdin.writeRequest(1, `{"cmd": "new", "cwd": ` ~ JSONValue(dir).toString ~ `}`);
-	assert(backend.stdout.readResponse(1).type == JSON_TYPE.TRUE);
+	assert(backend.stdout.readResponse(1).type == JSONType.true_);
 
 	//backend.register!FSWorkspaceComponent;
 	backend.stdin.writeRequest(2,
 			`{"cmd": "load", "component": "fsworkspace", "cwd": ` ~ JSONValue(dir).toString ~ `}`);
-	assert(backend.stdout.readResponse(2).type == JSON_TYPE.TRUE);
+	assert(backend.stdout.readResponse(2).type == JSONType.true_);
 
 	//auto fsworkspace = backend.get!FSWorkspaceComponent(dir);
 	//assert(instance.importPaths == [getcwd]);
 	backend.stdin.writeRequest(3, `{"cmd": "import-paths", "cwd": ` ~ JSONValue(dir).toString ~ `}`);
 	response = backend.stdout.readResponse(3);
-	assert(response.type == JSON_TYPE.ARRAY);
+	assert(response.type == JSONType.array);
 	assert(response.array.length == 1);
-	assert(response.array[0].type == JSON_TYPE.STRING);
+	assert(response.array[0].type == JSONType.string);
 	assert(response.array[0].str == getcwd);
 
 	//fsworkspace.addImports(["source"]);
@@ -47,11 +47,11 @@ void main()
 	//assert(instance.importPaths == [getcwd, "source"]);
 	backend.stdin.writeRequest(5, `{"cmd": "import-paths", "cwd": ` ~ JSONValue(dir).toString ~ `}`);
 	response = backend.stdout.readResponse(5);
-	assert(response.type == JSON_TYPE.ARRAY);
+	assert(response.type == JSONType.array);
 	assert(response.array.length == 2);
-	assert(response.array[0].type == JSON_TYPE.STRING);
+	assert(response.array[0].type == JSONType.string);
 	assert(response.array[0].str == getcwd);
-	assert(response.array[1].type == JSON_TYPE.STRING);
+	assert(response.array[1].type == JSONType.string);
 	assert(response.array[1].str == "source");
 }
 

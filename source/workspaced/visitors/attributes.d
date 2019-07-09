@@ -272,20 +272,25 @@ struct ASTContext
 			if (auto prag = a.peek!PragmaExpression)
 				return "pragma(" ~ prag.identifier.text ~ ", ...["
 					~ prag.argumentList.items.length.to!string ~ "])";
-			else if (auto depr = a.peek!Deprecated) return "deprecated";
-			else if (auto at = a.peek!AtAttribute) return "@" ~ at.identifier.text;
-			else if (auto align_ = a.peek!AlignAttribute) return "align";
-			else if (auto linkage = a.peek!LinkageAttribute) return "extern (" ~ linkage.identifier.text ~ (
-						linkage.hasPlusPlus ? "++" : "") ~ ")";
-			else if (auto simple = a.peek!SimpleAttribute) return simple.attributes.map!(a => a.text.length
-						? a.text : str(a.type)).join(".");
-			else if (auto mfunAttr = a.peek!MemberFunctionAttribute) return "mfun<" ~ (mfunAttr.atAttribute
-						? "@" ~ mfunAttr.atAttribute.identifier.text : "???") ~ ">";
-			else if (auto container = a.peek!ContainerAttribute) return container.type.to!string[0 .. $ - 1]
-					~ " " ~ container.name;
-			else if (auto user = a.peek!UserdataAttribute) return "user " ~ user.name;
+			else if (auto depr = a.peek!Deprecated)
+				return "deprecated";
+			else if (auto at = a.peek!AtAttribute)
+				return "@" ~ at.identifier.text;
+			else if (auto align_ = a.peek!AlignAttribute)
+				return "align";
+			else if (auto linkage = a.peek!LinkageAttribute)
+				return "extern (" ~ linkage.identifier.text ~ (linkage.hasPlusPlus ? "++" : "") ~ ")";
+			else if (auto simple = a.peek!SimpleAttribute)
+				return simple.attributes.map!(a => a.text.length ? a.text : str(a.type)).join(".");
+			else if (auto mfunAttr = a.peek!MemberFunctionAttribute)
+				return "mfun<" ~ (mfunAttr.atAttribute
+					? "@" ~ mfunAttr.atAttribute.identifier.text : "???") ~ ">";
+			else if (auto container = a.peek!ContainerAttribute)
+				return container.type.to!string[0 .. $ - 1] ~ " " ~ container.name;
+			else if (auto user = a.peek!UserdataAttribute)
+				return "user " ~ user.name;
 			else
-						return "Unknown type?!";
+				return "Unknown type?!";
 		});
 	}
 

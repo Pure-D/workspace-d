@@ -28,15 +28,15 @@ class DMDComponent : ComponentWrapper
 	///   count = how often to compile (duration is divided by either this or less in case timeout is reached)
 	///   timeoutMsecs = when to abort compilation after, note that this will not abort mid-compilation but not do another iteration if this timeout has been reached.
 	/// Returns: [DMDMeasureReturn] containing logs from only the first compilation pass
-	Future!DMDMeasureReturn measure(scope const(char)[] code, string[] dmdArguments = [],
-			int count = 1, int timeoutMsecs = 5000)
+	Future!DMDMeasureReturn measure(scope const(char)[] code,
+			string[] dmdArguments = [], int count = 1, int timeoutMsecs = 5000)
 	{
 		return Future!DMDMeasureReturn.async(() => measureSync(code, dmdArguments, count, timeoutMsecs));
 	}
 
 	/// ditto
-	DMDMeasureReturn measureSync(scope const(char)[] code, string[] dmdArguments = [],
-			int count = 1, int timeoutMsecs = 5000)
+	DMDMeasureReturn measureSync(scope const(char)[] code,
+			string[] dmdArguments = [], int count = 1, int timeoutMsecs = 5000)
 	{
 		dmdArguments ~= ["-c", "-o-"];
 		DMDMeasureReturn ret;
@@ -130,9 +130,9 @@ struct DMDMeasureReturn
 	{
 		DMDMeasureReturn ret;
 		if (auto success = "success" in value)
-			ret.success = success.type == JSON_TYPE.TRUE;
+			ret.success = success.type == JSONType.true_;
 		if (auto crash = "crash" in value)
-			ret.crash = crash.type == JSON_TYPE.TRUE;
+			ret.crash = crash.type == JSONType.true_;
 		if (auto log = "log" in value)
 			ret.log = (*log).fromJSON!(string[]);
 		if (auto duration = "duration" in value)
