@@ -9,7 +9,7 @@
 	"dependencies": {
 		"dub": "~>1.16.0",
 		"dunit": "~>1.0.14",
-		"painlessjson": "~>1.3.9",
+		"painlessjson": "1.4.0",
 		"standardpaths": "~>0.8.1",
 		"dfmt": "0.10.1",
 		"dscanner": "0.7.2",
