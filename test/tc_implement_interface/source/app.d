@@ -62,7 +62,7 @@ int main(string[] args)
 
 			cmd.popFront;
 			auto cmdLine = cmd.front;
-			code = dcdext.implement(source, cmdLine.parse!uint).getBlocking;
+			code = dcdext.implement(source, cmdLine.parse!uint, false).getBlocking;
 			reader.popFront;
 
 			writer.writeln(code);
@@ -147,7 +147,7 @@ int main(string[] args)
 
 			cmd.popFront;
 			auto cmdLine = cmd.front;
-			code = dcdext.implement(source, cmdLine.parse!uint).getBlocking;
+			code = dcdext.implement(source, cmdLine.parse!uint, false).getBlocking;
 			if (code.length != 0)
 			{
 				writer.writeln("unexpected: ", code);

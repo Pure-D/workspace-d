@@ -19,10 +19,16 @@ import std.string;
 
 import workspaced.api;
 import workspaced.com.dcd;
+import workspaced.com.dfmt;
 import workspaced.dparseext;
 
 import workspaced.visitors.classifier;
 import workspaced.visitors.methodfinder;
+
+import painlessjson : SerializeIgnore;
+
+public import workspaced.visitors.methodfinder : InterfaceDetails, FieldDetails,
+	MethodDetails, ArgumentInfo;
 
 @component("dcdext")
 class DCDExtComponent : ComponentWrapper
@@ -424,159 +430,31 @@ class DCDExtComponent : ComponentWrapper
 	}
 
 	/// Implements the interfaces or abstract classes of a specified class/interface.
-	Future!string implement(scope const(char)[] code, int position)
+	/// Helper function which returns all functions as one block for most primitive use.
+	Future!string implement(scope const(char)[] code, int position,
+			bool formatCode = true, string[] formatArgs = [])
 	{
 		auto ret = new Future!string;
 		gthreads.create({
 			mixin(traceTask);
 			try
 			{
-				struct InterfaceTree
+				auto impl = implementAllSync(code, position, formatCode, formatArgs);
+
+				auto buf = appender!string;
+				string lastBaseClass;
+				foreach (ref func; impl)
 				{
-					InterfaceDetails details;
-					InterfaceTree[] inherits;
-				}
-
-				auto baseInterface = getInterfaceDetails("stdin", code, position);
-
-				string[] implementedMethods = baseInterface.methods
-					.filter!"!a.needsImplementation"
-					.map!"a.identifier"
-					.array;
-
-				// start with private, add all the public ones later in traverseTree
-				FieldDetails[] availableVariables = baseInterface.fields.filter!"a.isPrivate".array;
-				InterfaceTree tree = InterfaceTree(baseInterface);
-
-				InterfaceTree* treeByName(InterfaceTree* tree, string name)
-				{
-					if (tree.details.name == name)
-						return tree;
-					foreach (ref parent; tree.inherits)
+					if (func.baseClass != lastBaseClass)
 					{
-						InterfaceTree* t = treeByName(&parent, name);
-						if (t !is null)
-							return t;
-					}
-					return null;
-				}
-
-				void traverseTree(ref InterfaceTree sub)
-				{
-					availableVariables ~= sub.details.fields.filter!"!a.isPrivate".array;
-					foreach (i, parent; sub.details.parentPositions)
-					{
-						string parentName = sub.details.normalizedParents[i];
-						if (treeByName(&tree, parentName) is null)
-						{
-							auto details = lookupInterface(sub.details.code, parent);
-							sub.inherits ~= InterfaceTree(details);
-						}
-					}
-					foreach (ref inherit; sub.inherits)
-						traverseTree(inherit);
-				}
-
-				traverseTree(tree);
-
-				string changes;
-				void processTree(ref InterfaceTree tree)
-				{
-					auto details = tree.details;
-					if (details.methods.length)
-					{
-						bool first = true;
-						foreach (fn; details.methods)
-						{
-							if (implementedMethods.canFind(fn.identifier))
-								continue;
-							if (!fn.needsImplementation)
-							{
-								implementedMethods ~= fn.identifier;
-								continue;
-							}
-							if (first)
-							{
-								changes ~= "// implement " ~ details.name ~ "\n\n";
-								first = false;
-							}
-							if (details.needsOverride)
-								changes ~= "override ";
-							changes ~= fn.signature[0 .. $ - 1];
-							changes ~= " {";
-							if (fn.optionalImplementation)
-							{
-								changes ~= "\n\t// TODO: optional implementation\n";
-							}
-
-							string propertySearch;
-							if (fn.signature.canFind("@property") && fn.arguments.length <= 1)
-								propertySearch = fn.name;
-							else if ((fn.name.startsWith("get") && fn.arguments.length == 0)
-								|| (fn.name.startsWith("set") && fn.arguments.length == 1))
-								propertySearch = fn.name[3 .. $];
-
-							string foundProperty;
-							if (propertySearch)
-							{
-								foreach (variable; availableVariables)
-								{
-									if (fieldNameMatches(variable.name, propertySearch))
-									{
-										foundProperty = variable.name;
-										break;
-									}
-								}
-							}
-
-							if (foundProperty.length)
-							{
-								changes ~= "\n\t";
-								if (fn.returnType != "void")
-									changes ~= "return ";
-								if (fn.name.startsWith("set") || fn.arguments.length == 1)
-									changes ~= foundProperty ~ " = " ~ fn.arguments[0].name;
-								else
-									changes ~= foundProperty;
-								changes ~= ";\n";
-							}
-							else if (fn.hasBody)
-							{
-								changes ~= "\n\t";
-								if (fn.returnType != "void")
-									changes ~= "return ";
-								changes ~= "super." ~ fn.name;
-								if (fn.arguments.length)
-									changes ~= "(" ~ format("%(%s, %)", fn.arguments) ~ ")";
-								else if (fn.returnType == "void")
-									changes ~= "()"; // make functions that don't return add (), otherwise they might be attributes and don't need that
-								changes ~= ";\n";
-							}
-							else if (fn.returnType != "void")
-							{
-								changes ~= "\n\t";
-								if (fn.isNothrowOrNogc)
-								{
-									if (fn.returnType.endsWith("[]"))
-										changes ~= "return null; // TODO: implement";
-									else
-										changes ~= "return " ~ fn.returnType ~ ".init; // TODO: implement";
-								}
-								else
-									changes ~= `assert(false, "Method ` ~ fn.name ~ ` not implemented");`;
-								changes ~= "\n";
-							}
-							changes ~= "}\n\n";
-						}
+						buf.put("// implement " ~ func.baseClass ~ "\n\n");
+						lastBaseClass = func.baseClass;
 					}
 
-					foreach (parent; tree.inherits)
-						processTree(parent);
+					buf.put(func.code);
+					buf.put("\n\n");
 				}
-
-				processTree(tree);
-
-				ret.finish(changes);
+				ret.finish(buf.data.length > 2 ? buf.data : buf.data[0 .. $ - 2]);
 			}
 			catch (Throwable t)
 			{
@@ -586,10 +464,251 @@ class DCDExtComponent : ComponentWrapper
 		return ret;
 	}
 
-private:
-	RollbackAllocator rba;
-	LexerConfig config;
+	/// Implements the interfaces or abstract classes of a specified class/interface.
+	/// The async implementation is preferred when used in background tasks to prevent disruption
+	/// of other services as a lot of code is parsed and processed multiple times for this function.
+	/// Params:
+	/// 	code = input file to parse and edit.
+	/// 	position = position of the superclass or interface to implement after the colon in a class definition.
+	/// 	formatCode = automatically calls dfmt on all function bodys when true.
+	/// 	formatArgs = sets the formatter arguments to pass to dfmt if formatCode is true.
+	/// 	snippetExtensions = if true, snippets according to the vscode documentation will be inserted in place of method content. See https://code.visualstudio.com/docs/editor/userdefinedsnippets#_creating-your-own-snippets
+	/// Returns: a list of newly implemented methods
+	Future!(ImplementedMethod[]) implementAll(scope const(char)[] code, int position,
+			bool formatCode = true, string[] formatArgs = [], bool snippetExtensions = false)
+	{
+		mixin(
+				gthreadsAsyncProxy!`implementAllSync(code, position, formatCode, formatArgs, snippetExtensions)`);
+	}
 
+	/// ditto
+	ImplementedMethod[] implementAllSync(scope const(char)[] code, int position,
+			bool formatCode = true, string[] formatArgs = [], bool snippetExtensions = false)
+	{
+		auto tree = describeInterfaceRecursiveSync(code, position);
+		auto availableVariables = tree.availableVariables;
+
+		string[] implementedMethods = tree.details
+			.methods
+			.filter!"!a.needsImplementation"
+			.map!"a.identifier"
+			.array;
+
+		int snippetIndex = 0;
+		// maintains snippet ids and their value in an AA so they can be replaced after formatting
+		string[string] snippetReplacements;
+
+		auto methods = appender!(ImplementedMethod[]);
+		void processTree(ref InterfaceTree tree)
+		{
+			auto details = tree.details;
+			if (details.methods.length)
+			{
+				foreach (fn; details.methods)
+				{
+					if (implementedMethods.canFind(fn.identifier))
+						continue;
+					if (!fn.needsImplementation)
+					{
+						implementedMethods ~= fn.identifier;
+						continue;
+					}
+
+					//dfmt off
+					ImplementedMethod method = {
+						baseClass: details.name,
+						name: fn.name
+					};
+					//dfmt on
+					auto buf = appender!string;
+
+					snippetIndex++;
+					bool writtenSnippet;
+					string snippetId;
+					auto snippetBuf = appender!string;
+
+					void startSnippet(bool withDefault = true)
+					{
+						if (writtenSnippet || !snippetExtensions)
+							return;
+						snippetId = format!`/***__CODED_SNIPPET__%s__***/`(snippetIndex);
+						buf.put(snippetId);
+						swap(buf, snippetBuf);
+						buf.put("${");
+						buf.put(snippetIndex.to!string);
+						if (withDefault)
+							buf.put(":");
+						writtenSnippet = true;
+					}
+
+					void endSnippet()
+					{
+						if (!writtenSnippet || !snippetExtensions)
+							return;
+						buf.put("}");
+
+						swap(buf, snippetBuf);
+						snippetReplacements[snippetId] = snippetBuf.data;
+					}
+
+					if (details.needsOverride)
+						buf.put("override ");
+					buf.put(fn.signature[0 .. $ - 1]);
+					buf.put(" {");
+					if (fn.optionalImplementation)
+					{
+						buf.put("\n\t");
+						startSnippet();
+						buf.put("// TODO: optional implementation\n");
+					}
+
+					string propertySearch;
+					if (fn.signature.canFind("@property") && fn.arguments.length <= 1)
+						propertySearch = fn.name;
+					else if ((fn.name.startsWith("get") && fn.arguments.length == 0)
+							|| (fn.name.startsWith("set") && fn.arguments.length == 1))
+						propertySearch = fn.name[3 .. $];
+
+					string foundProperty;
+					if (propertySearch)
+					{
+						// frontOrDefault
+						const matching = availableVariables.find!(a => fieldNameMatches(a.name,
+								propertySearch));
+						if (!matching.empty)
+							foundProperty = matching.front.name;
+					}
+
+					if (foundProperty.length)
+					{
+						method.autoProperty = true;
+						buf.put("\n\t");
+						startSnippet();
+						if (fn.returnType != "void")
+						{
+							method.getter = true;
+							buf.put("return ");
+						}
+
+						if (fn.name.startsWith("set") || fn.arguments.length == 1)
+						{
+							method.setter = true;
+							buf.put(foundProperty ~ " = " ~ fn.arguments[0].name);
+						}
+						else
+						{
+							// neither getter nor setter, but we will just put the property here anyway
+							buf.put(foundProperty);
+						}
+						buf.put(";");
+						endSnippet();
+						buf.put("\n");
+					}
+					else if (fn.hasBody)
+					{
+						method.callsSuper = true;
+						buf.put("\n\t");
+						startSnippet();
+						if (fn.returnType != "void")
+							buf.put("return ");
+						buf.put("super." ~ fn.name);
+						if (fn.arguments.length)
+							buf.put("(" ~ format("%(%s, %)", fn.arguments)
+									.translate(['\\': `\\`, '{': `\{`, '$': `\$`, '}': `\}`]) ~ ")");
+						else if (fn.returnType == "void")
+							buf.put("()"); // make functions that don't return add (), otherwise they might be attributes and don't need that
+						buf.put(";");
+						endSnippet();
+						buf.put("\n");
+					}
+					else if (fn.returnType != "void")
+					{
+						method.debugImpl = true;
+						buf.put("\n\t");
+						if (snippetExtensions)
+						{
+							startSnippet(false);
+							buf.put('|');
+							// choice snippet
+
+							if (fn.returnType.endsWith("[]"))
+								buf.put("return null; // TODO: implement");
+							else
+								buf.put("return " ~ fn.returnType.translate([
+											'\\': `\\`,
+											'{': `\{`,
+											'$': `\$`,
+											'}': `\}`,
+											'|': `\|`,
+											',': `\,`
+										]) ~ ".init; // TODO: implement");
+
+							buf.put(',');
+
+							buf.put(`assert(false\, "Method ` ~ fn.name ~ ` not implemented");`);
+
+							buf.put('|');
+							endSnippet();
+						}
+						else
+						{
+							if (fn.isNothrowOrNogc)
+							{
+								if (fn.returnType.endsWith("[]"))
+									buf.put("return null; // TODO: implement");
+								else
+									buf.put("return " ~ fn.returnType.translate([
+												'\\': `\\`,
+												'{': `\{`,
+												'$': `\$`,
+												'}': `\}`
+											]) ~ ".init; // TODO: implement");
+							}
+							else
+								buf.put(`assert(false, "Method ` ~ fn.name ~ ` not implemented");`);
+						}
+						buf.put("\n");
+					}
+					else if (snippetExtensions)
+					{
+						buf.put("\n\t");
+						startSnippet(false);
+						endSnippet();
+						buf.put("\n");
+					}
+
+					buf.put("}");
+
+					method.code = buf.data;
+					methods.put(method);
+				}
+			}
+
+			foreach (parent; tree.inherits)
+				processTree(parent);
+		}
+
+		processTree(tree);
+
+		if (formatCode && instance.has!DfmtComponent)
+		{
+			foreach (ref method; methods.data)
+				method.code = instance.get!DfmtComponent.formatSync(method.code, formatArgs).strip;
+		}
+
+		foreach (ref method; methods.data)
+		{
+			// TODO: replacing using aho-corasick would be far more efficient but there is nothing like that in phobos
+			foreach (key, value; snippetReplacements)
+			{
+				method.code = method.code.replace(key, value);
+			}
+		}
+
+		return methods.data;
+	}
+
+	/// Looks up a declaration of a type and then extracts information about it as class or interface.
 	InterfaceDetails lookupInterface(scope const(char)[] code, int position)
 	{
 		auto data = get!DCDComponent.findDeclaration(code, position).getBlocking;
@@ -606,6 +725,7 @@ private:
 		return getInterfaceDetails(file, newCode, newPosition);
 	}
 
+	/// Extracts information about a given class or interface at the given position.
 	InterfaceDetails getInterfaceDetails(string file, scope const(char)[] code, int position)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
@@ -614,6 +734,54 @@ private:
 		reader.visit(parsed);
 		return reader.details;
 	}
+
+	Future!InterfaceTree describeInterfaceRecursive(scope const(char)[] code, int position)
+	{
+		mixin(gthreadsAsyncProxy!`describeInterfaceRecursiveSync(code, position)`);
+	}
+
+	InterfaceTree describeInterfaceRecursiveSync(scope const(char)[] code, int position)
+	{
+		auto baseInterface = getInterfaceDetails("stdin", code, position);
+
+		InterfaceTree tree = InterfaceTree(baseInterface);
+
+		InterfaceTree* treeByName(InterfaceTree* tree, string name)
+		{
+			if (tree.details.name == name)
+				return tree;
+			foreach (ref parent; tree.inherits)
+			{
+				InterfaceTree* t = treeByName(&parent, name);
+				if (t !is null)
+					return t;
+			}
+			return null;
+		}
+
+		void traverseTree(ref InterfaceTree sub)
+		{
+			foreach (i, parent; sub.details.parentPositions)
+			{
+				string parentName = sub.details.normalizedParents[i];
+				if (treeByName(&tree, parentName) is null)
+				{
+					auto details = lookupInterface(sub.details.code, parent);
+					sub.inherits ~= InterfaceTree(details);
+				}
+			}
+			foreach (ref inherit; sub.inherits)
+				traverseTree(inherit);
+		}
+
+		traverseTree(tree);
+
+		return tree;
+	}
+
+private:
+	RollbackAllocator rba;
+	LexerConfig config;
 }
 
 ///
@@ -760,6 +928,52 @@ struct CalltipsSupport
 	int functionStart;
 	/// Start of the whole call going up all call parents. (`foo.bar.function` having `foo.bar` as parents)
 	int parentStart;
+}
+
+/// Represents one method automatically implemented off a base interface.
+struct ImplementedMethod
+{
+	/// Contains the interface or class name from where this method is implemented.
+	string baseClass;
+	/// The name of the function being implemented.
+	string name;
+	/// True if an automatic implementation calling the base class has been made.
+	bool callsSuper;
+	/// True if a default implementation that should definitely be changed (assert or for nogc/nothrow simple init return) has been implemented.
+	bool debugImpl;
+	/// True if the method has been detected as property and implemented as such.
+	bool autoProperty;
+	/// True if the method is either a getter or a setter but not both. Is none for non-autoProperty methods but also when a getter has been detected but the method returns void.
+	bool getter, setter;
+	/// Actual code to insert for this class without class indentation but optionally already formatted.
+	string code;
+}
+
+/// Contains details about an interface or class and all extended or implemented interfaces/classes recursively.
+struct InterfaceTree
+{
+	/// Details of the template in question.
+	InterfaceDetails details;
+	/// All inherited classes in lexical order.
+	InterfaceTree[] inherits;
+
+	@SerializeIgnore const(FieldDetails)[] availableVariables(bool onlyPublic = false) const
+	{
+		if (!inherits.length && !onlyPublic)
+			return details.fields;
+
+		// start with private, add all the public ones later in traverseTree
+		auto ret = appender!(typeof(return));
+		if (onlyPublic)
+			ret.put(details.fields.filter!(a => !a.isPrivate));
+		else
+			ret.put(details.fields);
+
+		foreach (sub; inherits)
+			ret.put(sub.availableVariables(true));
+
+		return ret.data;
+	}
 }
 
 private:
@@ -1071,9 +1285,8 @@ unittest
 
 	auto replacements = dcdext.insertCodeInContainer("void foo()\n{\n\twriteln();\n}",
 			SimpleClassTestCode, 123);
-	import std.stdio;
 
-	stderr.writeln(replacements);
+	// TODO: make insertCodeInContainer work properly?
 }
 
 unittest
@@ -1085,8 +1298,6 @@ unittest
 	auto instance = backend.addInstance(workspace.directory);
 	backend.register!DCDExtComponent;
 	DCDExtComponent dcdext = instance.get!DCDExtComponent;
-
-	import std.stdio;
 
 	auto extract = dcdext.extractCallParameters("int x; foo.bar(4, fgerg\n\nfoo(); int y;", 23);
 	assert(!extract.hasTemplate);
@@ -1107,4 +1318,66 @@ unittest
 	assert(extract.functionArgs.length == 2);
 	assert(extract.functionArgs[0].contentRange == [15, 16]);
 	assert(extract.functionArgs[1].contentRange == [18, 23]);
+}
+
+unittest
+{
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DCDExtComponent;
+	DCDExtComponent dcdext = instance.get!DCDExtComponent;
+
+	auto info = dcdext.describeInterfaceRecursiveSync(SimpleClassTestCode, 23);
+	assert(info.details.name == "FooBar");
+	assert(info.details.blockRange == [27, 412]);
+
+	assert(info.details.fields.length == 4);
+	assert(info.details.fields[0].name == "i");
+	assert(info.details.fields[1].name == "s");
+	assert(info.details.fields[2].name == "l");
+	assert(info.details.fields[3].name == "x");
+
+	assert(info.details.methods.length == 4);
+	assert(info.details.methods[0].name == "foo");
+	assert(
+			info.details.methods[0].signature
+			== "private static const int foo() @nogc nothrow pure @system;");
+	assert(info.details.methods[0].returnType == "int");
+	assert(info.details.methods[0].isNothrowOrNogc);
+	assert(info.details.methods[0].hasBody);
+	assert(!info.details.methods[0].needsImplementation);
+	assert(!info.details.methods[0].optionalImplementation);
+	assert(info.details.methods[0].definitionRange == [222, 286]);
+	assert(info.details.methods[0].blockRange == [286, 324]);
+
+	assert(info.details.methods[1].name == "bar1");
+	assert(info.details.methods[1].signature == "private static void bar1();");
+	assert(info.details.methods[1].returnType == "void");
+	assert(!info.details.methods[1].isNothrowOrNogc);
+	assert(info.details.methods[1].hasBody);
+	assert(!info.details.methods[1].needsImplementation);
+	assert(!info.details.methods[1].optionalImplementation);
+	assert(info.details.methods[1].definitionRange == [334, 346]);
+	assert(info.details.methods[1].blockRange == [346, 348]);
+
+	assert(info.details.methods[2].name == "bar2");
+	assert(info.details.methods[2].signature == "private void bar2();");
+	assert(info.details.methods[2].returnType == "void");
+	assert(!info.details.methods[2].isNothrowOrNogc);
+	assert(info.details.methods[2].hasBody);
+	assert(!info.details.methods[2].needsImplementation);
+	assert(!info.details.methods[2].optionalImplementation);
+	assert(info.details.methods[2].definitionRange == [351, 363]);
+	assert(info.details.methods[2].blockRange == [363, 365]);
+
+	assert(info.details.methods[3].name == "bar3");
+	assert(info.details.methods[3].signature == "private void bar3();");
+	assert(info.details.methods[3].returnType == "void");
+	assert(!info.details.methods[3].isNothrowOrNogc);
+	assert(info.details.methods[3].hasBody);
+	assert(!info.details.methods[3].needsImplementation);
+	assert(!info.details.methods[3].optionalImplementation);
+	assert(info.details.methods[3].definitionRange == [396, 408]);
+	assert(info.details.methods[3].blockRange == [408, 410]);
 }

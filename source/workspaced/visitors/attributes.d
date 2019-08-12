@@ -212,6 +212,11 @@ struct ASTContext
 			else
 				return Token.init;
 		}
+
+		string toString() const
+		{
+			return attributes.map!(a => a.text.length ? a.text : str(a.type)).join(".");
+		}
 	}
 
 	alias AnyAttribute = Algebraic!(PragmaExpression, Deprecated, AtAttribute, AlignAttribute, LinkageAttribute,
@@ -324,12 +329,12 @@ struct ASTContext
 
 	auto formattedAttributes() @property
 	{
-		return formatAttributes(attributes);
+		return formatAttributes(attributes.normalizeAttributes);
 	}
 
 	auto localFormattedAttributes() @property
 	{
-		return formatAttributes(localAttributes);
+		return formatAttributes(localAttributes.normalizeAttributes);
 	}
 
 	auto simpleAttributes() @property
@@ -347,6 +352,12 @@ struct ASTContext
 	auto atAttributes() @property
 	{
 		return attributes.filter!(a => !!a.peek!AtAttribute)
+			.map!(a => *a.peek!AtAttribute);
+	}
+
+	auto atAttributesInContainer() @property
+	{
+		return localAttributes.filter!(a => !!a.peek!AtAttribute)
 			.map!(a => *a.peek!AtAttribute);
 	}
 
@@ -391,9 +402,19 @@ struct ASTContext
 		return isToken(tok!"nothrow");
 	}
 
+	bool isNothrowInContainer() @property
+	{
+		return isTokenInContainer(tok!"nothrow");
+	}
+
 	bool isNogc() @property
 	{
 		return atAttributes.any!(a => a.identifier.text == "nogc");
+	}
+
+	bool isNogcInContainer() @property
+	{
+		return atAttributesInContainer.any!(a => a.identifier.text == "nogc");
 	}
 
 	bool isStatic() @property
@@ -434,8 +455,7 @@ struct ASTContext
 
 	AttributeWithInfo!SimpleAttribute protectionAttribute() @property
 	{
-		auto prot = simpleAttributes.filter!(a => a.firstAttribute.type.among!(tok!"public",
-				tok!"private", tok!"protected", tok!"package")).tail(1);
+		auto prot = simpleAttributes.filter!(a => a.firstAttribute.isProtectionToken).tail(1);
 		if (prot.empty)
 			return null;
 		else
@@ -475,4 +495,42 @@ struct ASTContext
 	{
 		attributes = c.attributes;
 	}
+}
+
+bool isProtectionToken(const Token t) @property
+{
+	return !!t.type.among!(tok!"public", tok!"private", tok!"protected", tok!"package");
+}
+
+ASTContext.AnyAttributeInfo[] normalizeAttributes(ASTContext.AnyAttributeInfo[] attributes)
+{
+	ASTContext.AnyAttributeInfo[] ret;
+	ret.reserve(attributes.length);
+	bool gotProtection;
+	bool gotSafety;
+	foreach_reverse (ref attr; attributes)
+	{
+		if (auto simple = attr.peek!(ASTContext.SimpleAttribute))
+		{
+			if (simple.firstAttribute.isProtectionToken)
+			{
+				if (gotProtection)
+					continue;
+				gotProtection = true;
+			}
+		}
+		else if (auto at = attr.peek!AtAttribute)
+		{
+			// search & replace for existing @safe, @trusted, @system
+			if (at.identifier.text.among!("safe", "trusted", "system"))
+			{
+				if (gotSafety)
+					continue;
+				gotSafety = true;
+			}
+		}
+		ret ~= attr;
+	}
+	ret.reverse();
+	return ret;
 }
