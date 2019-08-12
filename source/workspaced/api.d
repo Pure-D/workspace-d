@@ -1084,6 +1084,21 @@ class Future(T)
 	}
 }
 
+enum string gthreadsAsyncProxy(string call) = `auto __futureRet = new typeof(return);
+	gthreads.create({
+		mixin(traceTask);
+		try
+		{
+			__futureRet.finish(` ~ call ~ `);
+		}
+		catch (Throwable t)
+		{
+			__futureRet.error(t);
+		}
+	});
+	return __futureRet;
+`;
+
 version (unittest)
 {
 	struct TestingWorkspace

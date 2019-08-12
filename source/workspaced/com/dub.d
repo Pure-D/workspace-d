@@ -175,20 +175,7 @@ class DubComponent : ComponentWrapper
 	Future!bool update()
 	{
 		restart();
-		auto ret = new Future!bool;
-		gthreads.create({
-			mixin(traceTask);
-			try
-			{
-				auto result = updateImportPaths(false);
-				ret.finish(result);
-			}
-			catch (Throwable t)
-			{
-				ret.error(t);
-			}
-		});
-		return ret;
+		mixin(gthreadsAsyncProxy!`updateImportPaths(false)`);
 	}
 
 	bool updateImportPaths(bool restartDub = true)
