@@ -35,7 +35,10 @@ int main(string[] args)
 	dcd.setupServer([], true);
 
 	scope (exit)
+	{
 		dcd.stopServerSync();
+		backend.shutdown();
+	}
 
 	int status = 0;
 
