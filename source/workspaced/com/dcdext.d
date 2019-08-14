@@ -767,6 +767,7 @@ class DCDExtComponent : ComponentWrapper
 				if (treeByName(&tree, parentName) is null)
 				{
 					auto details = lookupInterface(sub.details.code, parent);
+					details.name = parentName;
 					sub.inherits ~= InterfaceTree(details);
 				}
 			}
@@ -1266,6 +1267,11 @@ private:
 
 	void bar2() {} // private instanced methods
 	void bar3() {}
+
+	struct Something { string bar; }
+
+	FooBar.Something somefunc() { return Something.init; }
+	Something somefunc2() { return Something.init; }
 }};
 
 unittest
@@ -1330,7 +1336,12 @@ unittest
 
 	auto info = dcdext.describeInterfaceRecursiveSync(SimpleClassTestCode, 23);
 	assert(info.details.name == "FooBar");
-	assert(info.details.blockRange == [27, 412]);
+	assert(info.details.blockRange == [27, 554]);
+	assert(info.details.referencedTypes.length == 2, info.details.referencedTypes.to!string);
+	assert(info.details.referencedTypes[0].name == "Something");
+	assert(info.details.referencedTypes[0].location == 455);
+	assert(info.details.referencedTypes[1].name == "string");
+	assert(info.details.referencedTypes[1].location == 74);
 
 	assert(info.details.fields.length == 4);
 	assert(info.details.fields[0].name == "i");
@@ -1338,7 +1349,12 @@ unittest
 	assert(info.details.fields[2].name == "l");
 	assert(info.details.fields[3].name == "x");
 
-	assert(info.details.methods.length == 4);
+	assert(info.details.types.length == 1);
+	assert(info.details.types[0].type == TypeDetails.Type.struct_);
+	assert(info.details.types[0].name == ["FooBar", "Something"]);
+	assert(info.details.types[0].nameLocation == 420);
+
+	assert(info.details.methods.length == 6);
 	assert(info.details.methods[0].name == "foo");
 	assert(
 			info.details.methods[0].signature
@@ -1380,4 +1396,134 @@ unittest
 	assert(!info.details.methods[3].optionalImplementation);
 	assert(info.details.methods[3].definitionRange == [396, 408]);
 	assert(info.details.methods[3].blockRange == [408, 410]);
+
+	assert(info.details.methods[4].name == "somefunc");
+	assert(info.details.methods[4].signature == "private FooBar.Something somefunc();");
+	assert(info.details.methods[4].returnType == "FooBar.Something");
+	assert(!info.details.methods[4].isNothrowOrNogc);
+	assert(info.details.methods[4].hasBody);
+	assert(!info.details.methods[4].needsImplementation);
+	assert(!info.details.methods[4].optionalImplementation);
+	assert(info.details.methods[4].definitionRange == [448, 476]);
+	assert(info.details.methods[4].blockRange == [476, 502]);
+
+	// test normalization of types
+	assert(info.details.methods[5].name == "somefunc2");
+	assert(info.details.methods[5].signature == "private FooBar.Something somefunc2();", info.details.methods[5].signature);
+	assert(info.details.methods[5].returnType == "FooBar.Something");
+	assert(!info.details.methods[5].isNothrowOrNogc);
+	assert(info.details.methods[5].hasBody);
+	assert(!info.details.methods[5].needsImplementation);
+	assert(!info.details.methods[5].optionalImplementation);
+	assert(info.details.methods[5].definitionRange == [504, 526]);
+	assert(info.details.methods[5].blockRange == [526, 552]);
+}
+
+unittest
+{
+	string testCode = q{package interface Foo0
+{
+	string stringMethod();
+	Tuple!(int, string, Array!bool)[][] advancedMethod(int a, int b, string c);
+	void normalMethod();
+	int attributeSuffixMethod() nothrow @property @nogc;
+	private
+	{
+		void middleprivate1();
+		void middleprivate2();
+	}
+	extern(C) @property @nogc ref immutable int attributePrefixMethod() const;
+	final void alreadyImplementedMethod() {}
+	deprecated("foo") void deprecatedMethod() {}
+	static void staticMethod() {}
+	protected void protectedMethod();
+private:
+	void barfoo();
+}};
+
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DCDExtComponent;
+	DCDExtComponent dcdext = instance.get!DCDExtComponent;
+
+	auto info = dcdext.describeInterfaceRecursiveSync(testCode, 20);
+	assert(info.details.name == "Foo0");
+	assert(info.details.blockRange == [23, 523]);
+	assert(info.details.referencedTypes.length == 3);
+	assert(info.details.referencedTypes[0].name == "Array");
+	assert(info.details.referencedTypes[0].location == 70);
+	assert(info.details.referencedTypes[1].name == "Tuple");
+	assert(info.details.referencedTypes[1].location == 50);
+	assert(info.details.referencedTypes[2].name == "string");
+	assert(info.details.referencedTypes[2].location == 26);
+
+	assert(info.details.fields.length == 0);
+
+	assert(info.details.methods[0 .. 4].all!"!a.hasBody");
+	assert(info.details.methods[0 .. 4].all!"a.needsImplementation");
+	assert(info.details.methods.all!"!a.optionalImplementation");
+
+	assert(info.details.methods.length == 12);
+	assert(info.details.methods[0].name == "stringMethod");
+	assert(info.details.methods[0].signature == "string stringMethod();");
+	assert(info.details.methods[0].returnType == "string");
+	assert(!info.details.methods[0].isNothrowOrNogc);
+
+	assert(info.details.methods[1].name == "advancedMethod");
+	assert(info.details.methods[1].signature
+			== "Tuple!(int, string, Array!bool)[][] advancedMethod(int a, int b, string c);");
+	assert(info.details.methods[1].returnType == "Tuple!(int, string, Array!bool)[][]");
+	assert(!info.details.methods[1].isNothrowOrNogc);
+
+	assert(info.details.methods[2].name == "normalMethod");
+	assert(info.details.methods[2].signature == "void normalMethod();");
+	assert(info.details.methods[2].returnType == "void");
+
+	assert(info.details.methods[3].name == "attributeSuffixMethod");
+	assert(info.details.methods[3].signature == "int attributeSuffixMethod() nothrow @property @nogc;");
+	assert(info.details.methods[3].returnType == "int");
+	assert(info.details.methods[3].isNothrowOrNogc);
+
+	assert(info.details.methods[4].name == "middleprivate1");
+	assert(info.details.methods[4].signature == "private void middleprivate1();");
+	assert(info.details.methods[4].returnType == "void");
+
+	assert(info.details.methods[5].name == "middleprivate2");
+
+	assert(info.details.methods[6].name == "attributePrefixMethod");
+	assert(info.details.methods[6].signature
+			== "extern (C) @property @nogc ref immutable int attributePrefixMethod() const;");
+	assert(info.details.methods[6].returnType == "int");
+	assert(info.details.methods[6].isNothrowOrNogc);
+
+	assert(info.details.methods[7].name == "alreadyImplementedMethod");
+	assert(info.details.methods[7].signature == "void alreadyImplementedMethod();");
+	assert(info.details.methods[7].returnType == "void");
+	assert(!info.details.methods[7].needsImplementation);
+	assert(info.details.methods[7].hasBody);
+
+	assert(info.details.methods[8].name == "deprecatedMethod");
+	assert(info.details.methods[8].signature == `deprecated("foo") void deprecatedMethod();`);
+	assert(info.details.methods[8].returnType == "void");
+	assert(info.details.methods[8].needsImplementation);
+	assert(info.details.methods[8].hasBody);
+
+	assert(info.details.methods[9].name == "staticMethod");
+	assert(info.details.methods[9].signature == `static void staticMethod();`);
+	assert(info.details.methods[9].returnType == "void");
+	assert(!info.details.methods[9].needsImplementation);
+	assert(info.details.methods[9].hasBody);
+
+	assert(info.details.methods[10].name == "protectedMethod");
+	assert(info.details.methods[10].signature == `protected void protectedMethod();`);
+	assert(info.details.methods[10].returnType == "void");
+	assert(info.details.methods[10].needsImplementation);
+	assert(!info.details.methods[10].hasBody);
+
+	assert(info.details.methods[11].name == "barfoo");
+	assert(info.details.methods[11].signature == `private void barfoo();`);
+	assert(info.details.methods[11].returnType == "void");
+	assert(!info.details.methods[11].needsImplementation);
+	assert(!info.details.methods[11].hasBody);
 }

@@ -73,6 +73,38 @@ struct FieldDetails
 	bool isPrivate;
 }
 
+///
+struct TypeDetails
+{
+	enum Type
+	{
+		none,
+		class_,
+		interface_,
+		enum_,
+		struct_,
+		union_,
+		alias_,
+		template_,
+	}
+
+	/// Name in last element, all parents in previous elements.
+	string[] name;
+	///
+	size_t nameLocation;
+	///
+	Type type;
+}
+
+///
+struct ReferencedType
+{
+	/// Referenced type name, might be longer than actual written name because of normalization of parents.
+	string name;
+	/// Location of name which will start right before the last identifier of the type in a dot chain.
+	size_t location;
+}
+
 /// Information about an interface or class
 struct InterfaceDetails
 {
@@ -86,6 +118,8 @@ struct InterfaceDetails
 	FieldDetails[] fields;
 	/// All methods defined in this container.
 	MethodDetails[] methods;
+	/// A list of nested types and locations defined in this interface/class.
+	TypeDetails[] types;
 	// reserved for future use with templates
 	string[] parents;
 	/// Name of all base classes or interfaces. Should use normalizedParents,
@@ -94,6 +128,8 @@ struct InterfaceDetails
 	int[] parentPositions;
 	/// Range containing the starting and ending braces of the body.
 	size_t[2] blockRange;
+	/// A (name-based) sorted set of referenced types with first occurences of every type or alias not including built-in types, but including object.d types and aliases.
+	ReferencedType[] referencedTypes;
 }
 
 class InterfaceMethodFinder : AttributesVisitor
@@ -105,8 +141,35 @@ class InterfaceMethodFinder : AttributesVisitor
 		this.targetPosition = targetPosition;
 	}
 
+	override void visit(const StructDeclaration dec)
+	{
+		if (inTarget)
+			return;
+		else
+			super.visit(dec);
+	}
+
+	override void visit(const UnionDeclaration dec)
+	{
+		if (inTarget)
+			return;
+		else
+			super.visit(dec);
+	}
+
+	override void visit(const EnumDeclaration dec)
+	{
+		if (inTarget)
+			return;
+		else
+			super.visit(dec);
+	}
+
 	override void visit(const ClassDeclaration dec)
 	{
+		if (inTarget)
+			return;
+
 		auto c = context.save();
 		context.pushContainer(ASTContext.ContainerAttribute.Type.class_, dec.name.text);
 		visitInterface(dec.name, dec.baseClassList, dec.structBody, true);
@@ -115,6 +178,9 @@ class InterfaceMethodFinder : AttributesVisitor
 
 	override void visit(const InterfaceDeclaration dec)
 	{
+		if (inTarget)
+			return;
+
 		auto c = context.save();
 		context.pushContainer(ASTContext.ContainerAttribute.Type.interface_, dec.name.text);
 		visitInterface(dec.name, dec.baseClassList, dec.structBody, false);
@@ -126,6 +192,9 @@ class InterfaceMethodFinder : AttributesVisitor
 	{
 		if (!structBody)
 			return;
+		if (inTarget)
+			return; // ignore nested
+
 		details.blockRange = [structBody.startLocation, structBody.endLocation + 1];
 		if (targetPosition >= name.index && targetPosition < structBody.endLocation)
 		{
@@ -144,6 +213,7 @@ class InterfaceMethodFinder : AttributesVisitor
 				}
 			details.needsOverride = needsOverride;
 			inTarget = true;
+			structBody.accept(new NestedTypeFinder(&details, details.name));
 			super.visit(structBody);
 			inTarget = false;
 		}
@@ -185,16 +255,17 @@ class InterfaceMethodFinder : AttributesVisitor
 			(cast() dec).comment = origComment;
 		}
 		auto t = appender!string;
-		format(t, dec);
+		formatTypeTransforming(t, dec, &resolveType);
 		string method = context.localFormattedAttributes.chain([t.data.strip])
 			.filter!(a => a.length > 0 && !a.among!("abstract", "final")).join(" ");
 		ArgumentInfo[] arguments;
 		if (dec.parameters)
 			foreach (arg; dec.parameters.parameters)
 				arguments ~= ArgumentInfo(astToString(arg), astToString(arg.type), arg.name.text);
-		string returnType = dec.returnType ? astToString(dec.returnType) : "void";
+		string returnType = dec.returnType ? resolveType(astToString(dec.returnType)) : "void";
 
 		// now visit to populate isNothrow, isNogc (before it would add to the localFormattedAttributes string)
+		// also fills in used types
 		super.visit(dec);
 
 		details.methods ~= MethodDetails(dec.name.text, method, returnType, arguments, context.isNothrowInContainer
@@ -217,12 +288,213 @@ class InterfaceMethodFinder : AttributesVisitor
 
 		foreach (decl; variable.declarators)
 			details.fields ~= FieldDetails(decl.name.text, type, isPrivate);
+
+		if (variable.type)
+			variable.type.accept(this); // to fill in types
+	}
+
+	override void visit(const TypeIdentifierPart type)
+	{
+		if (!inTarget)
+			return;
+
+		if (type.identifierOrTemplateInstance && !type.typeIdentifierPart)
+		{
+			auto tok = type.identifierOrTemplateInstance.templateInstance
+				? type.identifierOrTemplateInstance.templateInstance.identifier
+				: type.identifierOrTemplateInstance.identifier;
+
+			usedType(ReferencedType(tok.text, tok.index));
+		}
+
+		super.visit(type);
 	}
 
 	alias visit = AttributesVisitor.visit;
+
+	protected void usedType(ReferencedType type)
+	{
+		// this is a simple sorted set insert
+		auto sorted = assumeSorted!"a.name < b.name"(details.referencedTypes).trisect(type);
+		if (sorted[1].length)
+			return; // exists already
+		details.referencedTypes.insertInPlace(sorted[0].length, type);
+	}
+
+	string resolveType(const(char)[] inType)
+	{
+		auto parts = inType.splitter('.');
+		string[] best;
+		foreach (type; details.types)
+			if ((!best.length || type.name.length < best.length) && type.name.endsWith(parts))
+				best = type.name;
+
+		if (best.length)
+			return best.join(".");
+		else
+			return inType.idup;
+	}
 
 	const(char)[] code;
 	bool inTarget;
 	int targetPosition;
 	InterfaceDetails details;
+}
+
+class NestedTypeFinder : ASTVisitor
+{
+	this(InterfaceDetails* details, string start)
+	{
+		this.details = details;
+		this.nested = [start];
+	}
+
+	override void visit(const StructDeclaration dec)
+	{
+		handleType(TypeDetails.Type.struct_, dec.name.text, dec.name.index, dec);
+	}
+
+	override void visit(const UnionDeclaration dec)
+	{
+		handleType(TypeDetails.Type.union_, dec.name.text, dec.name.index, dec);
+	}
+
+	override void visit(const EnumDeclaration dec)
+	{
+		handleType(TypeDetails.Type.enum_, dec.name.text, dec.name.index, dec);
+	}
+
+	override void visit(const ClassDeclaration dec)
+	{
+		handleType(TypeDetails.Type.class_, dec.name.text, dec.name.index, dec);
+	}
+
+	override void visit(const InterfaceDeclaration dec)
+	{
+		handleType(TypeDetails.Type.interface_, dec.name.text, dec.name.index, dec);
+	}
+
+	override void visit(const TemplateDeclaration dec)
+	{
+		handleType(TypeDetails.Type.template_, dec.name.text, dec.name.index, dec);
+	}
+
+	override void visit(const AliasDeclaration dec)
+	{
+		foreach (ident; dec.declaratorIdentifierList.identifiers)
+			details.types ~= TypeDetails(nested ~ ident.text, ident.index, TypeDetails.Type.alias_);
+	}
+
+	void handleType(T)(TypeDetails.Type type, string name, size_t location, T node)
+	{
+		pushNestedType(type, name, location);
+		super.visit(node);
+		popNestedType();
+	}
+
+	override void visit(const FunctionBody)
+	{
+	}
+
+	alias visit = ASTVisitor.visit;
+
+	protected void pushNestedType(TypeDetails.Type type, string name, size_t index)
+	{
+		nested ~= name;
+		details.types ~= TypeDetails(nested, index, type);
+	}
+
+	protected void popNestedType()
+	{
+		nested.length--;
+	}
+
+	string[] nested;
+	InterfaceDetails* details;
+}
+
+void formatTypeTransforming(Sink, T)(Sink sink, T node, string delegate(const(char)[]) translateType,
+		bool useTabs = false, IndentStyle style = IndentStyle.allman, uint indentWith = 4)
+{
+	TypeTransformingFormatter!Sink formatter = new TypeTransformingFormatter!(Sink)(sink,
+			useTabs, style, indentWith);
+	formatter.translateType = translateType;
+	formatter.format(node);
+}
+
+///
+class TypeTransformingFormatter(Sink) : Formatter!Sink
+{
+	string delegate(const(char)[]) translateType;
+	Appender!(char[]) tempBuffer;
+	bool useTempBuffer;
+
+	this(Sink sink, bool useTabs = false, IndentStyle style = IndentStyle.allman, uint indentWidth = 4)
+	{
+		super(sink, useTabs, style, indentWidth);
+		tempBuffer = appender!(char[]);
+	}
+
+	override void put(string s)
+	{
+		if (useTempBuffer)
+			tempBuffer.put(s);
+		else
+			super.put(s);
+	}
+
+	protected void flushTempBuffer()
+	{
+		if (!useTempBuffer || tempBuffer.data.empty)
+			return;
+
+		useTempBuffer = false;
+		put(translateType(tempBuffer.data));
+		tempBuffer.clear();
+	}
+
+	override void format(const TypeIdentifierPart type)
+	{
+		useTempBuffer = true;
+
+		if (type.dot)
+		{
+			put(".");
+		}
+		if (type.identifierOrTemplateInstance)
+		{
+			format(type.identifierOrTemplateInstance);
+		}
+		if (type.indexer)
+		{
+			flushTempBuffer();
+			put("[");
+			format(type.indexer);
+			put("]");
+		}
+		if (type.typeIdentifierPart)
+		{
+			put(".");
+			format(type.typeIdentifierPart);
+		}
+		else
+		{
+			flushTempBuffer();
+		}
+	}
+
+	override void format(const IdentifierOrTemplateInstance identifierOrTemplateInstance)
+	{
+		with (identifierOrTemplateInstance)
+		{
+			format(identifier);
+			if (templateInstance)
+			{
+				flushTempBuffer();
+				format(templateInstance);
+			}
+		}
+	}
+
+	alias format = Formatter!Sink.format;
 }
