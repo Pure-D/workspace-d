@@ -4,6 +4,7 @@ import std.file : tempDir;
 
 import core.thread;
 import std.algorithm;
+import std.ascii;
 import std.conv;
 import std.datetime;
 import std.experimental.logger;
@@ -496,12 +497,15 @@ class DCDComponent : ComponentWrapper
 							int index;
 							if (location.length)
 							{
-								auto space = location.indexOf(' ');
+								auto space = location.lastIndexOf(' ');
 								if (space != -1)
 								{
 									file = location[0 .. space];
-									index = location[space + 1 .. $].to!int;
+									if (location[space + 1 .. $].all!isDigit)
+										index = location[space + 1 .. $].to!int;
 								}
+								else
+									file = location;
 							}
 							completions._symbols ~= DCDCompletions.Symbol(file, index, parts[4].unescapeTabs);
 						}
@@ -531,12 +535,15 @@ class DCDComponent : ComponentWrapper
 							int index;
 							if (location.length)
 							{
-								auto space = location.indexOf(' ');
+								auto space = location.lastIndexOf(' ');
 								if (space != -1)
 								{
 									file = location[0 .. space];
-									index = location[space + 1 .. $].to!int;
+									if (location[space + 1 .. $].all!isDigit)
+										index = location[space + 1 .. $].to!int;
 								}
+								else
+									file = location;
 							}
 							symbol = DCDIdentifier(splits[0], splits[1], splits[2], file,
 								index, splits[4].unescapeTabs);
