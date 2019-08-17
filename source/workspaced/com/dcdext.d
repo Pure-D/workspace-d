@@ -66,6 +66,8 @@ class DCDExtComponent : ComponentWrapper
 			bool definition = false)
 	{
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		if (!tokens.length)
+			return CalltipsSupport.init;
 		auto queuedToken = tokens.countUntil!(a => a.index >= position) - 1;
 		if (queuedToken == -2)
 			queuedToken = cast(ptrdiff_t) tokens.length - 1;
@@ -90,6 +92,7 @@ class DCDExtComponent : ComponentWrapper
 
 		// describes if the target position is inside template arguments rather than function arguments (only works for calls and not for definition)
 		bool inTemplate;
+		int activeParameter; // counted commas
 		int depth, subDepth;
 		// contains opening parentheses location for arguments or exclamation point for templates.
 		auto startParen = queuedToken;
@@ -140,6 +143,10 @@ class DCDExtComponent : ComponentWrapper
 				}
 				else
 					depth--;
+			}
+			else if (depth == 0 && subDepth == 0 && c.type == tok!",")
+			{
+				activeParameter++;
 			}
 			startParen--;
 		}
@@ -313,8 +320,8 @@ class DCDExtComponent : ComponentWrapper
 				], hasTemplateParens, templateArgs, [
 				tokens.tokenIndex(functionOpen),
 				functionClose ? tokens.tokenEndIndex(functionClose) : 0
-				], functionArgs, funcNameStart != callStart,
-				tokens.tokenIndex(funcNameStart), tokens.tokenIndex(callStart));
+				], functionArgs, funcNameStart != callStart, tokens.tokenIndex(funcNameStart),
+				tokens.tokenIndex(callStart), inTemplate, activeParameter);
 	}
 
 	/// Finds the immediate surrounding code block at a position or returns CodeBlockInfo.init for none/module block.
@@ -970,6 +977,10 @@ struct CalltipsSupport
 	int functionStart;
 	/// Start of the whole call going up all call parents. (`foo.bar.function` having `foo.bar` as parents)
 	int parentStart;
+	/// True if cursor is in template parameters
+	bool inTemplateParameters;
+	/// Number of the active parameter (where the cursor is) or -1 if in none
+	int activeParameter = -1;
 }
 
 /// Represents one method automatically implemented off a base interface.
@@ -1424,6 +1435,8 @@ unittest
 			`auto bar(int foo, Button, my.Callback cb, ..., int[] arr ...)`, 60, true);
 	assert(extract != CalltipsSupport.init);
 	assert(!extract.hasTemplate);
+	assert(!extract.inTemplateParameters);
+	assert(extract.activeParameter == 4);
 	assert(extract.functionStart == 5);
 	assert(extract.parentStart == 5);
 	assert(extract.functionParensRange == [8, 61]);
@@ -1482,6 +1495,7 @@ unittest
 	extract = dcdext.extractCallParameters(`some_garbage(code); before(this); funcCall(4`, 44);
 	assert(extract != CalltipsSupport.init);
 	assert(!extract.hasTemplate);
+	assert(extract.activeParameter == 0);
 	assert(extract.functionStart == 34);
 	assert(extract.parentStart == 34);
 	assert(extract.functionArgs.length == 1);
@@ -1490,6 +1504,7 @@ unittest
 	extract = dcdext.extractCallParameters(`some_garbage(code); before(this); funcCall(4, f(4)`, 50);
 	assert(extract != CalltipsSupport.init);
 	assert(!extract.hasTemplate);
+	assert(extract.activeParameter == 1);
 	assert(extract.functionStart == 34);
 	assert(extract.parentStart == 34);
 	assert(extract.functionArgs.length == 2);
