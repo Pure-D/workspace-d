@@ -494,7 +494,7 @@ class DCDExtComponent : ComponentWrapper
 					buf.put(func.code);
 					buf.put("\n\n");
 				}
-				ret.finish(buf.data.length > 2 ? buf.data : buf.data[0 .. $ - 2]);
+				ret.finish(buf.data.length > 2 ? buf.data[0 .. $ - 2] : buf.data);
 			}
 			catch (Throwable t)
 			{
