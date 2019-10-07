@@ -6,6 +6,7 @@ import std.conv;
 import std.json;
 
 static immutable Version = [3, 3, 0];
+static immutable string BundledDependencies = "dub, dfmt and dscanner are bundled within (compiled in)";
 
 version (Windows) version (CRuntime_DigitalMars) static assert(false, "DigitalMars C Runtime not supported! Compile with -m32mscoff (dmd) or -a x86_mscoff (dub) See Also: https://github.com/Pure-D/code-d/issues/38");
 version (Windows) version (X86_64) static if (Compiler.name == "Digital Mars D")
@@ -17,7 +18,8 @@ string getVersionInfoString()
 	return Version[0].to!string ~ '.' ~ Version[1].to!string ~ '.'
 		~ Version[2].to!string ~ " compiled with " ~ Compiler.name ~ " v"
 		~ Compiler.version_major.to!string ~ "."
-		~ Compiler.version_minor.to!string ~ " - " ~ OS.os.to!string ~ " " ~ OS.endian.to!string;
+		~ Compiler.version_minor.to!string ~ " - " ~ OS.os.to!string ~ " "
+		~ OS.endian.to!string ~ ". " ~ BundledDependencies;
 }
 
 JSONValue getVersionInfoJson()
