@@ -33,6 +33,25 @@ class DCDComponent : ComponentWrapper
 	enum latestKnownVersion = [0, 11, 1];
 	void load()
 	{
+		installedVersion = workspaced.globalConfiguration.get("dcd", "_installedVersion", "");
+
+		if (installedVersion.length && this.clientPath == workspaced.globalConfiguration.get("dcd",
+				"_clientPath", "")
+				&& this.serverPath == workspaced.globalConfiguration.get("dcd", "_serverPath", ""))
+		{
+			version (haveUnixSockets)
+				hasUnixDomainSockets = config.get("dcd", "_hasUnixDomainSockets", false);
+			supportsFullOutput = config.get("dcd", "_supportsFullOutput", false);
+			trace("Reusing previously identified DCD ", installedVersion);
+		}
+		else
+		{
+			reloadBinaries();
+		}
+	}
+
+	void reloadBinaries()
+	{
 		string clientPath = this.clientPath;
 		string serverPath = this.serverPath;
 
@@ -64,6 +83,13 @@ class DCDComponent : ComponentWrapper
 			]));
 		//dfmt on
 		supportsFullOutput = rawExec([clientPath, "--help"]).output.canFind("--extended");
+
+		workspaced.globalConfiguration.set("dcd", "_clientPath", clientPath);
+		workspaced.globalConfiguration.set("dcd", "_serverPath", serverPath);
+		version (haveUnixSockets)
+			workspaced.globalConfiguration.set("dcd", "_hasUnixDomainSockets", hasUnixDomainSockets);
+		workspaced.globalConfiguration.set("dcd", "_supportsFullOutput", supportsFullOutput);
+		workspaced.globalConfiguration.set("dcd", "_installedVersion", installedVersion);
 	}
 
 	/// Returns: true if DCD version is less than latestKnownVersion or if server and client mismatch or if it doesn't exist.
