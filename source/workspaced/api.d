@@ -17,6 +17,7 @@ import std.parallelism;
 import std.path;
 import std.range;
 import std.regex;
+import std.string : strip;
 import std.traits;
 import std.typecons;
 
@@ -944,7 +945,7 @@ package string getVersionAndFixPath(ref string execPath)
 
 	try
 	{
-		return execute([execPath, "--version"]).output;
+		return execute([execPath, "--version"]).output.strip;
 	}
 	catch (ProcessException e)
 	{
@@ -952,7 +953,7 @@ package string getVersionAndFixPath(ref string execPath)
 		if (exists(newPath))
 		{
 			execPath = newPath;
-			return execute([execPath, "--version"]).output;
+			return execute([execPath, "--version"]).output.strip;
 		}
 		throw e;
 	}
