@@ -5,6 +5,7 @@ import core.sync.mutex;
 import core.thread;
 
 import std.algorithm;
+import std.array : appender;
 import std.conv;
 import std.exception;
 import std.json : JSONType, JSONValue;
@@ -466,7 +467,7 @@ class DubComponent : ComponentWrapper
 		new Thread({
 			try
 			{
-				BuildIssue[] issues;
+				auto issues = appender!(BuildIssue[]);
 
 				settings.compileCallback = (status, output) {
 					string[] lines = output.splitLines;
@@ -480,16 +481,14 @@ class DubComponent : ComponentWrapper
 						}
 						else
 						{
-							if (line.canFind("from"))
+							auto contMatch = line.matchFirst(errorFormatCont);
+							if (issues.data.length && contMatch)
 							{
-								auto contMatch = line.matchFirst(errorFormatCont);
-								if (contMatch)
-								{
-									issues ~= BuildIssue(contMatch[2].to!int,
-										contMatch[3].toOr!int(1), contMatch[1], ErrorType.Error, contMatch[4]);
-								}
+								issues ~= BuildIssue(contMatch[2].to!int,
+									contMatch[3].toOr!int(1), contMatch[1],
+									issues.data[$ - 1].type, contMatch[4], true);
 							}
-							if (line.canFind("is deprecated"))
+							else if (line.canFind("is deprecated"))
 							{
 								auto deprMatch = line.matchFirst(deprecationFormat);
 								if (deprMatch)
@@ -512,7 +511,7 @@ class DubComponent : ComponentWrapper
 					if (!e.msg.matchFirst(harmlessExceptionFormat))
 						throw e;
 				}
-				ret.finish(issues);
+				ret.finish(issues.data);
 			}
 			catch (Throwable t)
 			{
@@ -567,10 +566,12 @@ struct BuildIssue
 	int line, column;
 	///
 	string file;
-	///
+	/// The error type (Error/Warning/Deprecation) outputted by dmd or inherited from the last error if this is additional information of the last issue. (indicated by cont)
 	ErrorType type;
 	///
 	string text;
+	/// true if this is additional error information for the last error.
+	bool cont;
 }
 
 private:
@@ -584,7 +585,7 @@ T toOr(T)(string s, T defaultValue)
 
 enum harmlessExceptionFormat = ctRegex!(`failed with exit code`, "g");
 enum errorFormat = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (Deprecation|Warning|Error): (.*)`, "gi");
-enum errorFormatCont = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\): (.*)`, "g");
+enum errorFormatCont = ctRegex!(`(.*?)\((\d+)(?:,(\d+))?\):[ ]{6,}(.*)`, "g");
 enum deprecationFormat = ctRegex!(
 			`(.*?)\((\d+)(?:,(\d+))?\): (.*?) is deprecated, use (.*?) instead.$`, "g");
 
