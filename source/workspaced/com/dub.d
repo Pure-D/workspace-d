@@ -455,13 +455,7 @@ class DubComponent : ComponentWrapper
 		settings.config = _configuration;
 		settings.buildType = _buildType;
 		settings.compiler = compiler;
-		settings.tempBuild = true;
 		settings.buildSettings = _settings;
-		settings.buildSettings.targetPath = tempDir;
-		settings.buildSettings.targetName = "workspace-d-build-"
-			~ thisProcessID.to!string ~ "-" ~ uniform!uint.to!string(36);
-		settings.buildSettings.addOptions(BuildOption.syntaxOnly);
-		settings.buildSettings.addDFlags("-o-");
 
 		auto ret = new Future!(BuildIssue[]);
 		new Thread({
@@ -504,7 +498,9 @@ class DubComponent : ComponentWrapper
 				};
 				try
 				{
-					_dub.generateProject("build", settings);
+					import workspaced.dub.lintgenerator : DubLintGenerator;
+
+					new DubLintGenerator(_dub.project).generate(settings);
 				}
 				catch (Exception e)
 				{
