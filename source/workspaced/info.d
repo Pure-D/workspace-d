@@ -5,7 +5,7 @@ import OS = std.system;
 import std.conv;
 import std.json;
 
-static immutable Version = [3, 3, 0];
+static immutable Version = [3, 4, 0];
 static immutable string BundledDependencies = "dub, dfmt and dscanner are bundled within (compiled in)";
 
 version (Windows) version (CRuntime_DigitalMars) static assert(false, "DigitalMars C Runtime not supported! Compile with -m32mscoff (dmd) or -a x86_mscoff (dub) See Also: https://github.com/Pure-D/code-d/issues/38");
