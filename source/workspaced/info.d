@@ -8,10 +8,8 @@ import std.json;
 static immutable Version = [3, 4, 0];
 static immutable string BundledDependencies = "dub, dfmt and dscanner are bundled within (compiled in)";
 
-version (Windows) version (CRuntime_DigitalMars) static assert(false, "DigitalMars C Runtime not supported! Compile with -m32mscoff (dmd) or -a x86_mscoff (dub) See Also: https://github.com/Pure-D/code-d/issues/38");
-version (Windows) version (X86_64) static if (Compiler.name == "Digital Mars D")
-	static assert(false,
-			"Compiling 64 bit on windows is not supported! (it breaks dub) Compile with -m32mscoff (dmd) or -a x86_mscoff (dub)");
+version (Windows) version (DigitalMars) static assert(false,
+		"DMD not supported on Windows. Please use LDC.");
 
 string getVersionInfoString()
 {
