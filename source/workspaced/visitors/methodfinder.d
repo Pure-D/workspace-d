@@ -381,8 +381,9 @@ class NestedTypeFinder : ASTVisitor
 
 	override void visit(const AliasDeclaration dec)
 	{
-		foreach (ident; dec.declaratorIdentifierList.identifiers)
-			details.types ~= TypeDetails(nested ~ ident.text, ident.index, TypeDetails.Type.alias_);
+		if (dec && dec.declaratorIdentifierList)
+			foreach (ident; dec.declaratorIdentifierList.identifiers)
+				details.types ~= TypeDetails(nested ~ ident.text, ident.index, TypeDetails.Type.alias_);
 	}
 
 	void handleType(T)(TypeDetails.Type type, string name, size_t location, T node)
