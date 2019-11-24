@@ -18,4 +18,5 @@ debs/
 workspace-d*.zip
 workspace-d*.tar.xz
 __test__*__
+*-test-*
 .vscode/

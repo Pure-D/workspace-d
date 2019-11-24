@@ -33,11 +33,6 @@ git clone https://github.com/Pure-D/workspace-d.git
 cd workspace-d
 git submodule init
 git submodule update
-# Linux:
-dub build --build=release
-# Windows:
-dub build --build=debug --arch=x86_mscoff
-# or
 dub build --build=release --compiler=ldc2
 ```
 

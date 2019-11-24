@@ -25,8 +25,6 @@ import std.meta;
 import std.stdio;
 import std.string;
 
-import source.workspaced.info;
-
 __gshared File stdin, stdout;
 shared static this()
 {
@@ -94,7 +92,14 @@ void handleRequest(int id, JSONValue request)
 	}
 	else if (request["cmd"].str == "version")
 	{
-		sendResponse(id, getVersionInfoJson);
+		version (unittest)
+			sendResponse(id, JSONValue(null));
+		else
+		{
+			import source.workspaced.info : getVersionInfoJson;
+
+			sendResponse(id, getVersionInfoJson);
+		}
 	}
 	else if (request["cmd"].str == "load")
 	{
@@ -286,19 +291,21 @@ void processException(int id, JSONValue request, Throwable e)
 	// dfmt on
 }
 
-int main(string[] args)
+version (unittest)
 {
-	import std.file;
-	import etc.linux.memoryerror;
+}
+else
+{
+	int main(string[] args)
+	{
+		import source.workspaced.info;
 
-	version (unittest)
-	{
-	}
-	else
-	{
-		version (DigitalMars)
-			static if (is(typeof(registerMemoryErrorHandler)))
-				registerMemoryErrorHandler();
+		import std.file;
+		import etc.linux.memoryerror;
+
+			version (DigitalMars)
+				static if (is(typeof(registerMemoryErrorHandler)))
+					registerMemoryErrorHandler();
 
 		if (args.length > 1 && (args[1] == "-v" || args[1] == "--version" || args[1] == "-version"))
 		{
@@ -402,6 +409,6 @@ int main(string[] args)
 				}
 			}
 		}
+		return 0;
 	}
-	return 0;
 }
