@@ -140,6 +140,16 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 				assert(false, "Unbound component trying to access config.");
 		}
 
+		bool has(T)()
+		{
+			if (refInstance)
+				return refInstance.has!T;
+			else if (workspaced)
+				return workspaced.has!T;
+			else
+				assert(false, "Unbound component trying to check for component " ~ T.stringof ~ ".");
+		}
+
 		T get(T)()
 		{
 			if (refInstance)
