@@ -22,7 +22,15 @@
 	],
 	"configurations": [
 		{
-			"name": "generic"
+			"name": "executable",
+			"targetType": "executable"
+		},
+		{
+			"name": "library",
+			"targetType": "library",
+			"excludedSourceFiles": [
+				"source/app.d"
+			]
 		},
 		{
 			"name": "unittest",
@@ -32,11 +40,10 @@
 			],
 			"mainSourceFile": "bin/ut.d",
 			"excludedSourceFiles": [
-				"source/main.d",
+				"source/app.d",
 				"source/workspaced/info.d"
 			],
 			"dependencies": {
-				"dunit": "*",
 				"unit-threaded": "*"
 			}
 		}

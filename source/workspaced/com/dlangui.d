@@ -286,40 +286,38 @@ LocationInfo getLocationInfo(scope const(char)[] code, int pos)
 
 unittest
 {
-	import dunit.toolkit;
-
 	auto info = getLocationInfo(" ", 0);
-	assertEqual(info.type, LocationType.RootMember);
+	shouldEqual(info.type, LocationType.RootMember);
 	info = getLocationInfo(`TableLayout { mar }`, 17);
-	assertEqual(info.itemScope, ["TableLayout", "mar"]);
-	assertEqual(info.type, LocationType.Member);
+	shouldEqual(info.itemScope, ["TableLayout", "mar"]);
+	shouldEqual(info.type, LocationType.Member);
 	info = getLocationInfo(`TableLayout { margins: 20; paddin }`, 33);
-	assertEqual(info.itemScope, ["TableLayout", "paddin"]);
-	assertEqual(info.type, LocationType.Member);
+	shouldEqual(info.itemScope, ["TableLayout", "paddin"]);
+	shouldEqual(info.type, LocationType.Member);
 	info = getLocationInfo(
 			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foo } }", 70);
-	assertEqual(info.itemScope, ["TableLayout", "TextWidget", "text"]);
-	assertEqual(info.type, LocationType.PropertyValue);
+	shouldEqual(info.itemScope, ["TableLayout", "TextWidget", "text"]);
+	shouldEqual(info.type, LocationType.PropertyValue);
 	info = getLocationInfo(`TableLayout { margins: 2 }`, 24);
-	assertEqual(info.itemScope, ["TableLayout", "margins"]);
-	assertEqual(info.type, LocationType.PropertyValue);
+	shouldEqual(info.itemScope, ["TableLayout", "margins"]);
+	shouldEqual(info.type, LocationType.PropertyValue);
 	info = getLocationInfo(
 			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\" } } ", int.max);
-	assertEqual(info.itemScope, [""]);
-	assertEqual(info.type, LocationType.RootMember);
+	shouldEqual(info.itemScope, [""]);
+	shouldEqual(info.type, LocationType.RootMember);
 	info = getLocationInfo(
 			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\"; } }", 69);
-	assertEqual(info.itemScope, ["TableLayout", "TextWidget", "text"]);
-	assertEqual(info.type, LocationType.PropertyValue);
+	shouldEqual(info.itemScope, ["TableLayout", "TextWidget", "text"]);
+	shouldEqual(info.type, LocationType.PropertyValue);
 	info = getLocationInfo("TableLayout {\n\t", int.max);
-	assertEqual(info.itemScope, ["TableLayout", ""]);
-	assertEqual(info.type, LocationType.Member);
+	shouldEqual(info.itemScope, ["TableLayout", ""]);
+	shouldEqual(info.type, LocationType.Member);
 	info = getLocationInfo(`TableLayout {
 	colCount: 2
 	margins: 20; padding: 10
 	backgroundColor: "#FFFFE0"
 	TextWidget {
 		t`, int.max);
-	assertEqual(info.itemScope, ["TableLayout", "TextWidget", "t"]);
-	assertEqual(info.type, LocationType.Member);
+	shouldEqual(info.itemScope, ["TableLayout", "TextWidget", "t"]);
+	shouldEqual(info.type, LocationType.Member);
 }
