@@ -20,6 +20,9 @@ string astToString(T, Args...)(in T ast, Args args)
 {
 	import dparse.formatter : Formatter;
 
+	if (!ast)
+		return null;
+
 	auto app = appender!string();
 	auto formatter = new Formatter!(typeof(app))(app);
 	formatter.format(ast, args);
