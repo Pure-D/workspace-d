@@ -12,6 +12,8 @@ public import workspaced.com.dub : DubComponent;
 public import workspaced.com.fsworkspace : FSWorkspaceComponent;
 public import workspaced.com.importer : ImporterComponent;
 public import workspaced.com.moduleman : ModulemanComponent;
+public import workspaced.com.snippets : SnippetsComponent;
 
-alias AllComponents = AliasSeq!(DCDComponent, DfmtComponent, DlanguiComponent, DscannerComponent, DubComponent,
-		FSWorkspaceComponent, ImporterComponent, ModulemanComponent, DCDExtComponent, DMDComponent);
+alias AllComponents = AliasSeq!(DCDComponent, DfmtComponent, DlanguiComponent,
+		DscannerComponent, DubComponent, FSWorkspaceComponent,
+		ImporterComponent, ModulemanComponent, DCDExtComponent, DMDComponent, SnippetsComponent);
