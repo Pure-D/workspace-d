@@ -1037,29 +1037,6 @@ bool isCalltipable(IdType type)
 		|| type == tok!"mixin" || type == tok!"super" || type == tok!"this" || type == tok!"__traits";
 }
 
-/// Other tokens
-private enum dynamicTokens = [
-		"specialTokenSequence", "comment", "identifier", "scriptLine", "whitespace",
-		"doubleLiteral", "floatLiteral", "idoubleLiteral", "ifloatLiteral",
-		"intLiteral", "longLiteral", "realLiteral", "irealLiteral", "uintLiteral",
-		"ulongLiteral", "characterLiteral", "dstringLiteral", "stringLiteral",
-		"wstringLiteral"
-	];
-
-string tokenText(const Token token)
-{
-	switch (token.type)
-	{
-		static foreach (T; dynamicTokens)
-		{
-	case tok!T:
-		}
-		return token.text;
-	default:
-		return str(token.type);
-	}
-}
-
 int[2] tokenRange(const Token token)
 {
 	return [cast(int) token.index, cast(int)(token.index + token.tokenText.length)];
