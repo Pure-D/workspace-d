@@ -120,9 +120,9 @@ class DubLintGenerator : ProjectGenerator
 		buildsettings.libs = null;
 		buildsettings.lflags = null;
 		buildsettings.addOptions(BuildOption.syntaxOnly);
-		buildsettings.sourceFiles = buildsettings.sourceFiles.filter!(f => !isLinkerFile(f)).array;
+		buildsettings.sourceFiles = buildsettings.sourceFiles.filter!(f => !isLinkerFile(settings.platform, f)).array;
 
-		settings.compiler.prepareBuildSettings(buildsettings, BuildSetting.commandLine);
+		settings.compiler.prepareBuildSettings(buildsettings, settings.platform, BuildSetting.commandLine);
 
 		settings.compiler.invoke(buildsettings, settings.platform, settings.compileCallback);
 	}
