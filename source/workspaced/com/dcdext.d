@@ -571,7 +571,7 @@ class DCDExtComponent : ComponentWrapper
 					{
 						if (writtenSnippet || !snippetExtensions)
 							return;
-						snippetId = format!`/***__CODED_SNIPPET__%s__***/`(snippetIndex);
+						snippetId = format!`/+++__WORKSPACED_SNIPPET__%s__+++/`(snippetIndex);
 						buf.put(snippetId);
 						swap(buf, snippetBuf);
 						buf.put("${");
