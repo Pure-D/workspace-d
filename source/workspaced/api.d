@@ -23,8 +23,9 @@ import std.typecons;
 
 version (unittest)
 {
-	public import unit_threaded.assertions;
-	public import std.experimental.logger : trace;
+	version (Have_unit_threaded) package import unit_threaded.assertions;
+
+	package import std.experimental.logger : trace;
 }
 else
 {
