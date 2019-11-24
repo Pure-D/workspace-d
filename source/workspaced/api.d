@@ -21,6 +21,19 @@ import std.string : strip;
 import std.traits;
 import std.typecons;
 
+version (unittest)
+{
+	public import unit_threaded.assertions;
+	public import std.experimental.logger : trace;
+}
+else
+{
+	// dummy
+	pragma(inline, true) package void trace(Args...)(lazy Args)
+	{
+	}
+}
+
 ///
 alias ImportPathProvider = string[] delegate() nothrow;
 ///

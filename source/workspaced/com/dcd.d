@@ -8,6 +8,7 @@ import std.ascii;
 import std.conv;
 import std.datetime;
 import std.experimental.logger;
+import std.experimental.logger : trace;
 import std.json;
 import std.path;
 import std.process;
