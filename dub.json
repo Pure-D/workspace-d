@@ -7,14 +7,14 @@
 		"webfreak"
 	],
 	"dependencies": {
-		"dub": "~>1.18.0",
+		"dub": "1.18.0",
 		"painlessjson": "1.4.0",
-		"standardpaths": "~>0.8.1",
+		"standardpaths": "0.8.1",
 		"dfmt": "0.10.1",
 		"dscanner": "0.7.2",
-		"inifiled": "~>1.3.1",
-		"libdparse": "~>0.11.2",
-		"emsi_containers": "0.8.0-alpha.15"
+		"inifiled": "1.3.1",
+		"libdparse": "0.11.6",
+		"emsi_containers": "0.8.0-alpha.19"
 	},
 	"subPackages": [
 		"./installer",
