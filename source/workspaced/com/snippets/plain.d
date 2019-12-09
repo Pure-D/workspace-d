@@ -209,6 +209,22 @@ static immutable PlainSnippet[] plainSnippets = [
 	),
 	PlainSnippet(
 		[SnippetLevel.type],
+		"toHash",
+		"size_t toHash() in struct",
+		"size_t toHash() const @safe pure nothrow {\n\t$0\n}",
+		"Hash generation for associative arrays.\n\n"
+			~ "Reference: [https://dlang.org/spec/hash-map.html#using_classes_as_key]"
+	),
+	PlainSnippet(
+		[SnippetLevel.type],
+		"toHashClass",
+		"size_t toHash() in class",
+		"override size_t toHash() @safe nothrow {\n\t$0\n}",
+		"Hash generation for associative arrays.\n\n"
+			~ "Reference: [https://dlang.org/spec/hash-map.html#using_struct_as_key]"
+	),
+	PlainSnippet(
+		[SnippetLevel.type],
 		"opCmp",
 		"int opCmp(other) in struct",
 		"int opCmp(R)(${1:const R other}) const {\n\t$0\n}",
