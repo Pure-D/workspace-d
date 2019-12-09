@@ -17,6 +17,7 @@ import std.string;
 
 public import workspaced.com.snippets.plain;
 public import workspaced.com.snippets.smart;
+public import workspaced.com.snippets.dependencies;
 
 /// Component for auto completing snippets with context information and formatting these snippets with dfmt.
 @component("snippets")
@@ -24,14 +25,19 @@ class SnippetsComponent : ComponentWrapper
 {
 	mixin DefaultComponentWrapper;
 
+	static PlainSnippetProvider plainSnippets;
+	static SmartSnippetProvider smartSnippets;
+	static DependencyBasedSnippetProvider dependencySnippets;
+
 	protected SnippetProvider[] providers;
 
 	protected void load()
 	{
 		config.stringBehavior = StringBehavior.source;
 		providers.reserve(16);
-		providers ~= new PlainSnippetProvider();
-		providers ~= new SmartSnippetProvider();
+		providers ~= plainSnippets = new PlainSnippetProvider();
+		providers ~= smartSnippets = new SmartSnippetProvider();
+		providers ~= dependencySnippets = new DependencyBasedSnippetProvider();
 	}
 
 	/** 
@@ -284,6 +290,17 @@ class SnippetsComponent : ComponentWrapper
 			res = res[0 .. $ - "\r\n$0".length] ~ "$0";
 
 		return res;
+	}
+
+	/// Adds snippets which complete conditionally based on dub dependencies being present.
+	/// This function affects the global configuration of all instances.
+	/// Params:
+	///   requiredDependencies = The dependencies which must be present in order for this snippet to show up.
+	///   snippet = The snippet to suggest when the required dependencies are matched.
+	void addDependencySnippet(string[] requiredDependencies, PlainSnippet snippet)
+	{
+		// maybe application global change isn't such a good idea? Current config system seems too inefficient for this.
+		dependencySnippets.addSnippet(requiredDependencies, snippet);
 	}
 
 private:
