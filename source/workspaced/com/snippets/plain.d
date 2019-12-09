@@ -5,14 +5,38 @@ import std.regex;
 import workspaced.api;
 import workspaced.com.snippets;
 
+///
 struct PlainSnippet
 {
+	/// Grammar scopes in which to complete this snippet
 	SnippetLevel[] levels;
+	/// Shortcut to type for this snippet
 	string shortcut;
+	/// Label for this snippet.
 	string title;
+	/// Text with interactive snippet locations to insert assuming global indentation.
 	string snippet;
+	/// Markdown documentation for this snippet
 	string documentation;
+	/// Plain text to insert assuming global level indentation. Optional if snippet is a simple string only using plain variables and snippet locations.
 	string plain;
+
+	/// Creates a resolved snippet based on this plain snippet, filling in plain if neccessary. This drops the levels value.
+	/// Params:
+	///     provider = the providerId to fill in
+	Snippet buildSnippet(string provider) const
+	{
+		Snippet built;
+		built.providerId = provider;
+		built.title = this.title;
+		built.shortcut = this.shortcut;
+		built.documentation = this.documentation;
+		built.snippet = this.snippet;
+		built.plain = this.plain.length ? this.plain
+			: this.snippet.replaceAll(ctRegex!`\$(\d+|[A-Z_]+|\{.*?\})`, "");
+		built.resolved = true;
+		return built;
+	}
 }
 
 //dfmt off
@@ -611,15 +635,7 @@ class PlainSnippetProvider : SnippetProvider
 	{
 		foreach (s; plainSnippets)
 		{
-			Snippet built;
-			built.providerId = typeid(this).name;
-			built.title = s.title;
-			built.shortcut = s.shortcut;
-			built.documentation = s.documentation;
-			built.snippet = s.snippet;
-			built.plain = s.plain.length ? s.plain
-				: s.snippet.replaceAll(ctRegex!`\$(\d+|[A-Z_]+|\{.*?\})`, "");
-			built.resolved = true;
+			Snippet built = s.buildSnippet(typeid(this).name);
 
 			foreach (level; s.levels)
 				prebuilt[level] ~= built;
