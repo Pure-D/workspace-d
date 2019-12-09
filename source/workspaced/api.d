@@ -490,17 +490,17 @@ class WorkspaceD
 			throw new Exception("Component '" ~ component ~ "' not found");
 		}
 
-		T get(T)()
+		inout(T) get(T)() inout
 		{
 			auto name = getUDAs!(T, ComponentInfo)[0].name;
 			foreach (com; instanceComponents)
 				if (com.info.name == name)
-					return cast(T) com.wrapper;
+					return cast(inout T) com.wrapper;
 			throw new Exception(
 					"Attempted to get unknown instance component " ~ T.stringof ~ " in instance cwd:" ~ cwd);
 		}
 
-		bool has(T)()
+		bool has(T)() const
 		{
 			auto name = getUDAs!(T, ComponentInfo)[0].name;
 			foreach (com; instanceComponents)

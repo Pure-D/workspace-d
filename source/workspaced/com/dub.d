@@ -229,7 +229,7 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Throws if configuration is invalid, otherwise does nothing.
-	void validateConfiguration()
+	void validateConfiguration() const
 	{
 		if (!_dub.project.configurations.canFind(_configuration))
 			throw new Exception("Cannot use dub with invalid configuration");
@@ -247,8 +247,8 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Lists all dependencies. This will go through all dependencies and contain the dependencies of dependencies. You need to create a tree structure from this yourself.
-	/// Returns: `[{dependencies: [string], ver: string, name: string}]`
-	auto dependencies() @property
+	/// Returns: `[{dependencies: string[string], ver: string, name: string}]`
+	auto dependencies() @property const
 	{
 		validateConfiguration();
 
@@ -256,7 +256,7 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Lists dependencies of the root package. This can be used as a base to create a tree structure.
-	string[] rootDependencies() @property
+	string[] rootDependencies() @property const
 	{
 		validateConfiguration();
 
@@ -631,7 +631,7 @@ DubPackageInfo getInfo(in Package dep)
 	return info;
 }
 
-auto listDependencies(Project project)
+auto listDependencies(scope const Project project)
 {
 	auto deps = project.dependencies;
 	DubPackageInfo[] dependencies;
@@ -644,7 +644,7 @@ auto listDependencies(Project project)
 	return dependencies;
 }
 
-string[] listDependencies(Package pkg)
+string[] listDependencies(scope const Package pkg)
 {
 	auto deps = pkg.getAllDependencies();
 	string[] dependencies;
