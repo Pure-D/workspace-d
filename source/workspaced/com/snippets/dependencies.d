@@ -125,6 +125,26 @@ unittest
 	assert(!set.hasAll(["diet-ng", "mir", "mir", "vibe-d", "workspace-d"]));
 	assert(!set.hasAll(["diet-ng", "mir", "vibe-d", "workspace-d"]));
 
+	set.set(["vibe-d:http"]);
+	assert(set.hasAll([
+				"botan", "botan", "botan-math", "botan-math", "diet-ng", "diet-ng",
+				"eventcore", "eventcore", "libasync", "libasync", "memutils",
+				"memutils", "memutils", "mir-linux-kernel", "mir-linux-kernel",
+				"openssl", "openssl", "openssl", "stdx-allocator", "stdx-allocator",
+				"stdx-allocator", "taggedalgebraic", "taggedalgebraic", "vibe-core",
+				"vibe-core", "vibe-d", "vibe-d:core", "vibe-d:core", "vibe-d:core",
+				"vibe-d:core", "vibe-d:core", "vibe-d:core", "vibe-d:crypto",
+				"vibe-d:crypto", "vibe-d:crypto", "vibe-d:data", "vibe-d:data",
+				"vibe-d:data", "vibe-d:http", "vibe-d:http", "vibe-d:http", "vibe-d:http",
+				"vibe-d:http", "vibe-d:inet", "vibe-d:inet", "vibe-d:inet", "vibe-d:inet",
+				"vibe-d:mail", "vibe-d:mail", "vibe-d:mongodb", "vibe-d:mongodb",
+				"vibe-d:redis", "vibe-d:redis", "vibe-d:stream", "vibe-d:stream",
+				"vibe-d:stream", "vibe-d:stream", "vibe-d:textfilter", "vibe-d:textfilter",
+				"vibe-d:textfilter", "vibe-d:textfilter", "vibe-d:tls", "vibe-d:tls",
+				"vibe-d:tls", "vibe-d:tls", "vibe-d:utils", "vibe-d:utils", "vibe-d:utils",
+				"vibe-d:utils", "vibe-d:utils", "vibe-d:utils", "vibe-d:web", "vibe-d:web"
+			]));
+
 	set.set(null);
 	assert(set.hasAll([]));
 	assert(set.hasAll(["foo"]));
