@@ -216,7 +216,7 @@ class SnippetsComponent : ComponentWrapper
 			}
 			else
 			{
-				string key = "__WspD_Snp_" ~ dollar.to!string;
+				string key = "__WspD_Snp_" ~ dollar.to!string ~ "_";
 				const(char)[] str;
 
 				bool startOfBlock = snippet[0 .. dollar].stripRight.endsWith("{");
@@ -553,4 +553,7 @@ unittest
 
 	res = snippets.formatSync("foo(delegate() {\n${1:// foo}\n});", args, SnippetLevel.method);
 	shouldEqual(res, "foo(delegate() {\n\t${1:// foo}\n});");
+
+	res = snippets.formatSync(`auto ${1:window} = new SimpleWindow(Size(${2:800, 600}), "$3");`, args, SnippetLevel.method);
+	shouldEqual(res, `auto ${1:window} = new SimpleWindow(Size(${2:800, 600}), "$3");`);
 }
