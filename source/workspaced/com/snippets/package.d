@@ -34,11 +34,18 @@ class SnippetsComponent : ComponentWrapper
 
 	protected void load()
 	{
+		if (!plainSnippets)
+			plainSnippets = new PlainSnippetProvider();
+		if (!smartSnippets)
+			smartSnippets = new SmartSnippetProvider();
+		if (!dependencySnippets)
+			dependencySnippets = new DependencyBasedSnippetProvider();
+
 		config.stringBehavior = StringBehavior.source;
 		providers.reserve(16);
-		providers ~= plainSnippets = new PlainSnippetProvider();
-		providers ~= smartSnippets = new SmartSnippetProvider();
-		providers ~= dependencySnippets = new DependencyBasedSnippetProvider();
+		providers ~= plainSnippets;
+		providers ~= smartSnippets;
+		providers ~= dependencySnippets;
 	}
 
 	/** 
