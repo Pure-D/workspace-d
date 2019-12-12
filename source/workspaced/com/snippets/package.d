@@ -159,14 +159,16 @@ class SnippetsComponent : ComponentWrapper
 		return Future!Snippet.fromResult(snippet);
 	}
 
-	Future!string format(scope const(char)[] snippet, string[] arguments = [])
+	Future!string format(scope const(char)[] snippet, string[] arguments = [],
+			SnippetLevel level = SnippetLevel.global)
 	{
-		mixin(gthreadsAsyncProxy!`formatSync(snippet, arguments)`);
+		mixin(gthreadsAsyncProxy!`formatSync(snippet, arguments, level)`);
 	}
 
 	/// Will format the code passed in synchronously using dfmt. Might take a short moment on larger documents.
 	/// Returns: the formatted code as string or unchanged if dfmt is not active
-	string formatSync(scope const(char)[] snippet, string[] arguments = [])
+	string formatSync(scope const(char)[] snippet, string[] arguments = [],
+			SnippetLevel level = SnippetLevel.global)
 	{
 		if (!has!DfmtComponent)
 			return snippet.idup;
@@ -174,6 +176,22 @@ class SnippetsComponent : ComponentWrapper
 		auto dfmt = get!DfmtComponent;
 
 		auto tmp = appender!string;
+
+		final switch (level)
+		{
+		case SnippetLevel.global:
+		case SnippetLevel.other:
+			break;
+		case SnippetLevel.type:
+			tmp.put("struct FORMAT_HELPER {\n");
+			break;
+		case SnippetLevel.method:
+			tmp.put("void FORMAT_HELPER() {\n");
+			break;
+		case SnippetLevel.value:
+			tmp.put("int FORMAT_HELPER() = ");
+			break;
+		}
 
 		scope const(char)[][string] tokens;
 
@@ -200,6 +218,24 @@ class SnippetsComponent : ComponentWrapper
 			{
 				string key = "__WspD_Snp_" ~ dollar.to!string;
 				const(char)[] str;
+
+				bool startOfBlock = snippet[0 .. dollar].stripRight.endsWith("{");
+				bool endOfBlock;
+
+				bool makeWrappingIfMayBeDelegate()
+				{
+					endOfBlock = snippet[last .. $].stripLeft.startsWith("}");
+					if (startOfBlock && endOfBlock)
+					{
+						// make extra long to make dfmt definitely wrap this (in case this is a delegate, otherwise this doesn't hurt either)
+						key.reserve(key.length + 200);
+						foreach (i; 0 .. 200)
+							key ~= "_";
+						return true;
+					}
+					else
+						return false;
+				}
 
 				if (snippet[dollar + 1] == '{')
 				{
@@ -234,13 +270,20 @@ class SnippetsComponent : ComponentWrapper
 					str = snippet[dollar .. i];
 					last = i;
 
-					if (str.length > 5 || snippet[last .. $].stripLeft.startsWith(";", ".", "{"))
+					const wrapped = makeWrappingIfMayBeDelegate();
+
+					const placeholderMightBeIdentifier = str.length > 5
+						|| snippet[last .. $].stripLeft.startsWith(";", ".", "{");
+
+					if (wrapped || placeholderMightBeIdentifier)
 					{
 						// let's insert some token in here instead of a comment because there is probably some default content
-						if (str[0 .. $ - 1].endsWith(';'))
+						// if there is a semicolon at the end we probably need to insert a semicolon here too
+						// if this is a comment placeholder let's insert a semicolon to make dfmt wrap
+						if (str[0 .. $ - 1].endsWith(';') || str[0 .. $ - 1].canFind("//"))
 							key ~= ';';
 					}
-					else
+					else if (level != SnippetLevel.value)
 					{
 						// empty default, put in comment
 						key = "/+++" ~ key ~ "+++/";
@@ -263,11 +306,17 @@ class SnippetsComponent : ComponentWrapper
 
 					str = snippet[dollar .. end];
 					last = end;
-					if (snippet[last .. $].stripLeft.startsWith(";", ".", "{"))
+
+					makeWrappingIfMayBeDelegate();
+
+					const placeholderMightBeIdentifier = snippet[last .. $].stripLeft.startsWith(";",
+							".", "{");
+
+					if (placeholderMightBeIdentifier)
 					{
-						// keep value thing as token
+						// keep value thing as simple identifier as we don't have any placeholder text
 					}
-					else
+					else if (level != SnippetLevel.value)
 					{
 						// primitive placeholder as comment
 						key = "/+++" ~ key ~ "+++/";
@@ -279,7 +328,70 @@ class SnippetsComponent : ComponentWrapper
 			}
 		}
 
+		final switch (level)
+		{
+		case SnippetLevel.global:
+		case SnippetLevel.other:
+			break;
+		case SnippetLevel.type:
+		case SnippetLevel.method:
+			tmp.put("}");
+			break;
+		case SnippetLevel.value:
+			tmp.put(";");
+			break;
+		}
+
 		auto res = dfmt.formatSync(tmp.data, arguments);
+
+		string chompStr;
+		char del;
+		final switch (level)
+		{
+		case SnippetLevel.global:
+		case SnippetLevel.other:
+			break;
+		case SnippetLevel.type:
+		case SnippetLevel.method:
+			chompStr = "}";
+			del = '{';
+			break;
+		case SnippetLevel.value:
+			chompStr = ";";
+			del = '=';
+			break;
+		}
+
+		if (chompStr.length)
+			res = res.stripRight.chomp(chompStr);
+
+		if (del != char.init)
+		{
+			auto start = res.indexOf(del);
+			if (start != -1)
+			{
+				res = res[start + 1 .. $];
+
+				while (true)
+				{
+					// delete empty lines before first line
+					auto nl = res.indexOf('\n');
+					if (nl != -1 && res[0 .. nl].all!isWhite)
+						res = res[nl + 1 .. $];
+					else
+						break;
+				}
+
+				auto indent = res[0 .. res.length - res.stripLeft.length];
+				if (indent.length)
+				{
+					// remove indentation of whole block
+					assert(indent.all!isWhite);
+					res = res.splitLines.map!(a => a.startsWith(indent)
+							? a[indent.length .. $] : a.stripRight).join("\n");
+				}
+			}
+		}
 
 		foreach (key, value; tokens)
 		{
@@ -435,4 +547,10 @@ unittest
 
 	res = snippets.formatSync("import ${1:std};\n$0", args);
 	shouldEqual(res, "import ${1:std};\n$0");
+
+	res = snippets.formatSync("import ${1:std};\n$0", args, SnippetLevel.method);
+	shouldEqual(res, "import ${1:std};\n$0");
+
+	res = snippets.formatSync("foo(delegate() {\n${1:// foo}\n});", args, SnippetLevel.method);
+	shouldEqual(res, "foo(delegate() {\n\t${1:// foo}\n});");
 }
