@@ -14,6 +14,7 @@ import std.ascii;
 import std.conv;
 import std.json;
 import std.string;
+import std.typecons;
 
 public import workspaced.com.snippets.plain;
 public import workspaced.com.snippets.smart;
@@ -111,29 +112,29 @@ class SnippetsComponent : ComponentWrapper
 		return gen.value;
 	}
 
-	Future!(Snippet[]) getSnippets(scope const(char)[] file, scope const(char)[] code, int position)
+	Future!SnippetList getSnippets(scope const(char)[] file, scope const(char)[] code, int position)
 	{
 		mixin(gthreadsAsyncProxy!`getSnippetsBlocking(file, code, position)`);
 	}
 
-	Snippet[] getSnippetsBlocking(scope const(char)[] file, scope const(char)[] code, int position)
+	SnippetList getSnippetsBlocking(scope const(char)[] file, scope const(char)[] code, int position)
 	{
 		auto futures = collectSnippets(file, code, position);
 
 		auto ret = appender!(Snippet[]);
-		foreach (fut; futures)
+		foreach (fut; futures[1])
 			ret.put(fut.getBlocking());
-		return ret.data;
+		return SnippetList(futures[0], ret.data);
 	}
 
-	Snippet[] getSnippetsYield(scope const(char)[] file, scope const(char)[] code, int position)
+	SnippetList getSnippetsYield(scope const(char)[] file, scope const(char)[] code, int position)
 	{
 		auto futures = collectSnippets(file, code, position);
 
 		auto ret = appender!(Snippet[]);
-		foreach (fut; futures)
+		foreach (fut; futures[1])
 			ret.put(fut.getYield());
-		return ret.data;
+		return SnippetList(futures[0], ret.data);
 	}
 
 	Future!Snippet resolveSnippet(scope const(char)[] file, scope const(char)[] code,
@@ -304,15 +305,15 @@ class SnippetsComponent : ComponentWrapper
 	}
 
 private:
-	Future!(Snippet[])[] collectSnippets(scope const(char)[] file,
+	Tuple!(SnippetInfo, Future!(Snippet[])[]) collectSnippets(scope const(char)[] file,
 			scope const(char)[] code, int position)
 	{
 		const inst = instance;
-		const info = determineSnippetInfo(file, code, position);
+		auto info = determineSnippetInfo(file, code, position);
 		auto futures = appender!(Future!(Snippet[])[]);
 		foreach (provider; providers)
 			futures.put(provider.provideSnippets(inst, file, code, position, info));
-		return futures.data;
+		return tuple(info, futures.data);
 	}
 
 	RollbackAllocator rba;
@@ -362,6 +363,15 @@ struct SnippetInfo
 	{
 		return stack.length ? stack[$ - 1] : SnippetLevel.other;
 	}
+}
+
+/// A list of snippets resolved at a given position.
+struct SnippetList
+{
+	/// The info where this snippet is completing at.
+	SnippetInfo info;
+	/// The list of snippets that got returned.
+	Snippet[] snippets;
 }
 
 ///
