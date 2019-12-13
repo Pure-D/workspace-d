@@ -168,6 +168,9 @@ class ImporterComponent : ComponentWrapper
 			acc += line.length;
 		}
 
+		// go back to start of line
+		start = code[0 .. start].lastIndexOf('\n', start) + 1;
+
 		part = code[start .. end];
 
 		auto tokens = getTokensForParser(cast(ubyte[]) part, config, &workspaced.stringCache);
@@ -356,6 +359,35 @@ import std.algorithm;
 		ImportInfo(["std", "algorithm"]),
 		ImportInfo(["std", "traits"])
 	]));
+
+	// ----------------
+
+	code = `void foo()
+{
+	// import std.algorithm;
+	// import std.array;
+	import std.path;
+	import std.file;
+}`;
+
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 70), ImportBlock(62, 96, [
+		ImportInfo(["std", "file"]),
+		ImportInfo(["std", "path"])
+	], "\t"));
+
+	code = `void foo()
+{
+	/*
+	import std.algorithm;
+	import std.array; */
+	import std.path;
+	import std.file;
+}`;
+
+	assertEqual(backend.get!ImporterComponent(workspace.directory).sortImports(code, 75), ImportBlock(63, 97, [
+		ImportInfo(["std", "file"]),
+		ImportInfo(["std", "path"])
+	], "\t"));
 	//dfmt on
 }
 
