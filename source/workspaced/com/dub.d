@@ -252,7 +252,7 @@ class DubComponent : ComponentWrapper
 	{
 		validateConfiguration();
 
-		return _dub.project.listDependencies();
+		return listDependencies(_dub.project);
 	}
 
 	/// Lists dependencies of the root package. This can be used as a base to create a tree structure.
@@ -260,7 +260,7 @@ class DubComponent : ComponentWrapper
 	{
 		validateConfiguration();
 
-		return _dub.project.rootPackage.listDependencies();
+		return listDependencies(_dub.project.rootPackage);
 	}
 
 	/// Returns the path to the root package recipe (dub.json/dub.sdl)
