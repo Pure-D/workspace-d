@@ -23,14 +23,15 @@ import dub.dub;
 import dub.package_;
 import dub.project;
 
+import dub.compilers.buildsettings;
 import dub.compilers.compiler;
 import dub.generators.build;
 import dub.generators.generator;
 
-import dub.compilers.buildsettings;
-
 import dub.internal.vibecompat.core.log;
 import dub.internal.vibecompat.inet.url;
+
+import dub.recipe.io;
 
 @component("dub")
 class DubComponent : ComponentWrapper
@@ -269,6 +270,25 @@ class DubComponent : ComponentWrapper
 	string recipePath() @property
 	{
 		return _dub.project.rootPackage.recipePath.toString;
+	}
+
+	/// Re-parses the package recipe on the file system and returns if the syntax is valid.
+	/// Returns: empty string/null if no error occured, error message if an error occured.
+	string validateRecipeSyntaxOnFileSystem()
+	{
+		auto p = recipePath;
+		if (!p.length)
+			return "Package is not in local file system";
+
+		try
+		{
+			readPackageRecipe(p);
+			return null;
+		}
+		catch (Exception e)
+		{
+			return e.msg;
+		}
 	}
 
 	/// Lists all import paths
