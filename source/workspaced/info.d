@@ -5,7 +5,7 @@ import OS = std.system;
 import std.conv;
 import std.json;
 
-static immutable Version = [3, 4, 0];
+static immutable Version = [3, 5, 0];
 static immutable string BundledDependencies = "dub, dfmt and dscanner are bundled within (compiled in)";
 
 version (Windows) version (DigitalMars) static assert(false,
