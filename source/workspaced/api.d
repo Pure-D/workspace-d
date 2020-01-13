@@ -39,8 +39,13 @@ else
 alias ImportPathProvider = string[] delegate() nothrow;
 ///
 alias BroadcastCallback = void delegate(WorkspaceD, WorkspaceD.Instance, JSONValue);
-///
-alias ComponentBindFailCallback = void delegate(WorkspaceD.Instance, ComponentFactory, Exception);
+/// Called when ComponentFactory.create is called and errored (when the .bind call on a component fails)
+/// Params:
+/// 	instance = the instance for which the component was attempted to initialize (or null for global component registration)
+/// 	factory = the factory on which the error occured with
+/// 	error = the stacktrace that was catched on the bind call
+alias ComponentBindFailCallback = void delegate(WorkspaceD.Instance instance,
+		ComponentFactory factory, Exception error);
 
 /// Will never call this function
 enum ignoredFunc;
@@ -533,7 +538,10 @@ class WorkspaceD
 		}
 	}
 
+	/// Event which is called when $(LREF broadcast) is called
 	BroadcastCallback onBroadcast;
+	/// Called when ComponentFactory.create is called and errored (when the .bind call on a component fails)
+	/// See_Also: $(LREF ComponentBindFailCallback)
 	ComponentBindFailCallback onBindFail;
 
 	Instance[] instances;
@@ -754,6 +762,9 @@ class WorkspaceD
 		auto glob = factory.create(this, null, error);
 		if (glob)
 			globalComponents ~= ComponentWrapperInstance(glob, info);
+		else if (onBindFail)
+			onBindFail(null, factory, error);
+
 		if (autoRegister)
 			foreach (ref instance; instances)
 			{
