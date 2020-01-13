@@ -4,6 +4,7 @@ import std.file : tempDir;
 
 import core.thread;
 import std.algorithm;
+import std.array;
 import std.ascii;
 import std.conv;
 import std.datetime;
@@ -731,7 +732,54 @@ unittest
 
 private string unescapeTabs(string val)
 {
-	return val.replace("\\t", "\t").replace("\\n", "\n").replace("\\\\", "\\");
+	if (!val.length)
+		return val;
+
+	auto ret = appender!string;
+	size_t i = 0;
+	while (i < val.length)
+	{
+		size_t index = val.indexOf('\\', i);
+		if (index == -1 || cast(int) index == cast(int) val.length - 1)
+		{
+			if (!ret.data.length)
+			{
+				return val;
+			}
+			else
+			{
+				ret.put(val[i .. $]);
+				break;
+			}
+		}
+		else
+		{
+			char c = val[index + 1];
+			switch (c)
+			{
+			case 'n':
+				c = '\n';
+				break;
+			case 't':
+				c = '\t';
+				break;
+			default:
+				break;
+			}
+			ret.put(val[i .. index]);
+			ret.put(c);
+			i = index + 2;
+		}
+	}
+	return ret.data;
+}
+
+unittest
+{
+	shouldEqual("hello world", "hello world".unescapeTabs);
+	shouldEqual("hello\nworld", "hello\\nworld".unescapeTabs);
+	shouldEqual("hello\\nworld", "hello\\\\nworld".unescapeTabs);
+	shouldEqual("hello\\\nworld", "hello\\\\\\nworld".unescapeTabs);
 }
 
 /// Returned by findDeclaration
