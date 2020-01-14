@@ -90,11 +90,11 @@ class DCDExtComponent : ComponentWrapper
 		// it's reasonably readable with the variable names and that pseudo explanation there pretty much directly maps to the code,
 		// so it shouldn't be too hard of a problem, it's just a lot return values per step and taking in multiple returns from previous steps.
 
-		// describes if the target position is inside template arguments rather than function arguments (only works for calls and not for definition)
+		/// describes if the target position is inside template arguments rather than function arguments (only works for calls and not for definition)
 		bool inTemplate;
 		int activeParameter; // counted commas
 		int depth, subDepth;
-		// contains opening parentheses location for arguments or exclamation point for templates.
+		/// contains opening parentheses location for arguments or exclamation point for templates.
 		auto startParen = queuedToken;
 		while (startParen >= 0)
 		{
@@ -154,29 +154,39 @@ class DCDExtComponent : ComponentWrapper
 		if (startParen <= 0)
 			return CalltipsSupport.init;
 
+		/// Token index where the opening template parentheses or exclamation point is. At first this is only set if !definition but later on this is resolved.
 		auto templateOpen = inTemplate ? startParen : 0;
+		/// Token index where the normal argument parentheses start or 0 if it doesn't exist for this call/definition
 		auto functionOpen = inTemplate ? 0 : startParen;
+
+		bool hasTemplateParens = false;
 
 		if (inTemplate)
 		{
 			// go forwards to function arguments
-			if (templateOpen + 2 < tokens.length && tokens[templateOpen + 1].type != tok!"(")
+			if (templateOpen + 2 < tokens.length)
 			{
-				// single template arg (can only be one token)
-				// https://dlang.org/spec/grammar.html#TemplateSingleArgument
-				if (tokens[templateOpen + 2] == tok!"(")
-					functionOpen = templateOpen + 2;
+				if (tokens[templateOpen + 1].type == tok!"(")
+				{
+					hasTemplateParens = true;
+					templateOpen++;
+					functionOpen = findClosingParenForward(tokens, templateOpen,
+							"in template function open finder");
+					functionOpen++;
+
+					if (functionOpen >= tokens.length)
+						functionOpen = 0;
+				}
+				else
+				{
+					// single template arg (can only be one token)
+					// https://dlang.org/spec/grammar.html#TemplateSingleArgument
+					if (tokens[templateOpen + 2] == tok!"(")
+						functionOpen = templateOpen + 2;
+				}
 			}
 			else
-			{
-				if (tokens[templateOpen + 2].type != tok!"(")
-					return CalltipsSupport.init; // syntax error
-
-				functionOpen = findClosingParenForward(tokens, templateOpen + 2);
-
-				if (functionOpen >= tokens.length)
-					functionOpen = 0;
-			}
+				return CalltipsSupport.init; // syntax error
 		}
 		else
 		{
@@ -219,20 +229,19 @@ class DCDExtComponent : ComponentWrapper
 
 				if (templateOpen < minTokenIndex)
 					templateOpen = 0;
+				else
+					hasTemplateParens = true;
 			}
 			else
 			{
 				// single template arg (can only be one token) or no template at all here
-				if (functionOpen > 2 && tokens[functionOpen - 2] == tok!"!"
+				if (functionOpen >= 3 && tokens[functionOpen - 2] == tok!"!"
 						&& tokens[functionOpen - 3] == tok!"identifier")
 				{
 					templateOpen = functionOpen - 2;
 				}
 			}
 		}
-
-		bool hasTemplateParens = (definition && templateOpen) || (templateOpen
-				&& templateOpen != functionOpen - 2);
 
 		depth = 0;
 		subDepth = 0;
@@ -301,10 +310,23 @@ class DCDExtComponent : ComponentWrapper
 		if (inFuncName)
 			funcNameStart = callStart;
 
-		auto templateClose = templateOpen ? (hasTemplateParens ? (functionOpen
-				? functionOpen - 1 : findClosingParenForward(tokens, templateOpen + 1)) : templateOpen + 2)
-			: 0;
-		auto functionClose = functionOpen ? findClosingParenForward(tokens, functionOpen) : 0;
+		ptrdiff_t templateClose;
+		if (templateOpen)
+		{
+			if (hasTemplateParens)
+			{
+				if (functionOpen)
+					templateClose = functionOpen - 1;
+				else
+					templateClose = findClosingParenForward(tokens, templateOpen,
+							"in template close finder");
+			}
+			else
+				templateClose = templateOpen + 2;
+		}
+		//dfmt on
+		auto functionClose = functionOpen ? findClosingParenForward(tokens,
+				functionOpen, "in function close finder") : 0;
 
 		CalltipsSupport.Argument[] templateArgs;
 		if (templateOpen)
@@ -1061,10 +1083,11 @@ int tokenEndIndex(const(Token)[] tokens, ptrdiff_t i)
 	return i >= 0 ? cast(int)(tokens[i].index + tokens[i].tokenText.length) : 0;
 }
 
-ptrdiff_t findClosingParenForward(const(Token)[] tokens, ptrdiff_t open)
+/// Returns the index of the closing parentheses in tokens starting at the opening parentheses which is must be at tokens[open].
+ptrdiff_t findClosingParenForward(const(Token)[] tokens, ptrdiff_t open, string what = null)
 in(tokens[open].type == tok!"(",
 		"Calling findClosingParenForward must be done on a ( token and not on a " ~ str(
-			tokens[open].type) ~ "token!")
+			tokens[open].type) ~ " token! " ~ what)
 {
 	if (open >= tokens.length || open < 0)
 		return open;
@@ -1500,6 +1523,10 @@ unittest
 	assert(extract.functionArgs[2].contentRange == [53, 85]);
 	assert(extract.functionArgs[3].contentRange == [87, 112]);
 	assert(extract.functionArgs[4].contentRange == [114, 129]);
+
+	extract = dcdext.extractCallParameters(`void log(T t = T.x, A...)(A a) { call(Foo(["bar":"hello"])); } bool x() const @property { return false; } /// This is not code, but rather documentation`,
+			127);
+	assert(extract == CalltipsSupport.init);
 }
 
 unittest
