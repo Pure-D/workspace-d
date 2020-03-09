@@ -350,6 +350,7 @@ class DCDExtComponent : ComponentWrapper
 	/// See_Also: CodeBlockInfo
 	CodeBlockInfo getCodeBlockRange(scope const(char)[] code, int position)
 	{
+		RollbackAllocator rba;
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto parsed = parseModule(tokens, "getCodeBlockRange_input.d", &rba);
 		auto reader = new CodeBlockInfoFinder(position);
@@ -367,6 +368,7 @@ class DCDExtComponent : ComponentWrapper
 
 		scope const(char)[] codeBlock = code[container.innerRange[0] .. container.innerRange[1]];
 
+		RollbackAllocator rba;
 		scope tokensInsert = getTokensForParser(cast(ubyte[]) insert, config,
 				&workspaced.stringCache);
 		scope parsedInsert = parseModule(tokensInsert, "insertCode_insert.d", &rba);
@@ -790,6 +792,7 @@ class DCDExtComponent : ComponentWrapper
 	/// Extracts information about a given class or interface at the given position.
 	InterfaceDetails getInterfaceDetails(string file, scope const(char)[] code, int position)
 	{
+		RollbackAllocator rba;
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto parsed = parseModule(tokens, file, &rba);
 		auto reader = new InterfaceMethodFinder(code, position);
@@ -843,7 +846,6 @@ class DCDExtComponent : ComponentWrapper
 	}
 
 private:
-	RollbackAllocator rba;
 	LexerConfig config;
 }
 

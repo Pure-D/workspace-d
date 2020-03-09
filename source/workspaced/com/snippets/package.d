@@ -48,7 +48,7 @@ class SnippetsComponent : ComponentWrapper
 		providers ~= dependencySnippets;
 	}
 
-	/** 
+	/**
 	 * Params:
 	 *   file = Filename to resolve dependencies relatively from.
 	 *   code = Code to complete snippet in.
@@ -95,6 +95,7 @@ class SnippetsComponent : ComponentWrapper
 			}
 		}
 
+		RollbackAllocator rba;
 		scope parsed = parseModule(tokens, cast(string) file, &rba);
 
 		trace("determineSnippetInfo at ", position);
@@ -435,7 +436,6 @@ private:
 		return tuple(info, futures.data);
 	}
 
-	RollbackAllocator rba;
 	LexerConfig config;
 }
 

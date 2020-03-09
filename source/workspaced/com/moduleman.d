@@ -34,6 +34,7 @@ class ModulemanComponent : ComponentWrapper
 		if (!refInstance)
 			throw new Exception("moduleman.rename requires to be instanced");
 
+		RollbackAllocator rba;
 		FileChanges[] changes;
 		bool foundModule = false;
 		auto from = mod.split('.');
@@ -170,7 +171,6 @@ class ModulemanComponent : ComponentWrapper
 	}
 
 private:
-	RollbackAllocator rba;
 	LexerConfig config;
 }
 
