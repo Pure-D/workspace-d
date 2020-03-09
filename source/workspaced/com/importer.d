@@ -31,6 +31,7 @@ class ImporterComponent : ComponentWrapper
 	/// Returns all imports available at some code position.
 	ImportInfo[] get(scope const(char)[] code, int pos)
 	{
+		RollbackAllocator rba;
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto mod = parseModule(tokens, "code", &rba);
 		auto reader = new ImporterReaderVisitor(pos);
@@ -43,6 +44,7 @@ class ImporterComponent : ComponentWrapper
 	ImportModification add(string importName, scope const(char)[] code, int pos,
 			bool insertOutermost = true)
 	{
+		RollbackAllocator rba;
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto mod = parseModule(tokens, "code", &rba);
 		auto reader = new ImporterReaderVisitor(pos);
@@ -173,6 +175,7 @@ class ImporterComponent : ComponentWrapper
 
 		part = code[start .. end];
 
+		RollbackAllocator rba;
 		auto tokens = getTokensForParser(cast(ubyte[]) part, config, &workspaced.stringCache);
 		auto mod = parseModule(tokens, "code", &rba);
 		auto reader = new ImporterReaderVisitor(-1);
@@ -198,7 +201,6 @@ class ImporterComponent : ComponentWrapper
 	}
 
 private:
-	RollbackAllocator rba;
 	LexerConfig config;
 }
 
