@@ -996,11 +996,14 @@ package string getVersionAndFixPath(ref string execPath)
 
 class Future(T)
 {
+	import core.thread : Fiber, Thread;
+
 	static if (!is(T == void))
 		T value;
 	Throwable exception;
 	bool has;
 	void delegate() _onDone;
+	private Thread _worker;
 
 	/// Sets the onDone callback if no value has been set yet or calls immediately if the value has already been set or was set during setting the callback.
 	/// Crashes with an assert error if attempting to override an existing callback (i.e. calling this function on the same object twice).
@@ -1036,10 +1039,8 @@ class Future(T)
 
 	static Future!T async(T delegate() cb)
 	{
-		import core.thread : Thread;
-
 		auto ret = new Future!T;
-		new Thread({
+		ret._worker = new Thread({
 			try
 			{
 				static if (is(T == void))
@@ -1096,10 +1097,13 @@ class Future(T)
 	/// Waits for the result of this future using Thread.sleep
 	T getBlocking(alias sleepDur = 1.msecs)()
 	{
-		import core.thread : Thread;
-
 		while (!has)
 			Thread.sleep(sleepDur);
+		if (_worker)
+		{
+			_worker.join();
+			_worker = null;
+		}
 		if (exception)
 			throw exception;
 		static if (!is(T == void))
@@ -1109,10 +1113,13 @@ class Future(T)
 	/// Waits for the result of this future using Fiber.yield
 	T getYield()
 	{
-		import core.thread : Fiber;
-
 		while (!has)
 			Fiber.yield();
+		if (_worker)
+		{
+			_worker.join();
+			_worker = null;
+		}
 		if (exception)
 			throw exception;
 		static if (!is(T == void))
