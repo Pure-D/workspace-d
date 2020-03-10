@@ -95,7 +95,8 @@ class SnippetsComponent : ComponentWrapper
 			}
 		}
 
-		RollbackAllocator rba;
+		const rollbackPoint = rba.setCheckpoint();
+		scope (exit) rba.rollback(rollbackPoint);
 		scope parsed = parseModule(tokens, cast(string) file, &rba);
 
 		trace("determineSnippetInfo at ", position);
@@ -436,6 +437,7 @@ private:
 		return tuple(info, futures.data);
 	}
 
+	RollbackAllocator rba;
 	LexerConfig config;
 }
 
