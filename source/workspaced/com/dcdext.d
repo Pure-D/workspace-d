@@ -779,7 +779,7 @@ class DCDExtComponent : ComponentWrapper
 		string file = data.file;
 		int newPosition = data.position;
 
-		if (!file.length)
+		if (!file.length || !newPosition)
 			return InterfaceDetails.init;
 
 		auto newCode = code;
