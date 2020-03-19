@@ -13,6 +13,7 @@ import std.range : chain;
 import std.traits : getUDAs;
 
 import workspaced.api;
+import workspaced.sourcecache;
 
 struct Configuration
 {
@@ -228,12 +229,14 @@ class WorkspaceD
 	ComponentWrapperInstance[] globalComponents;
 	ComponentFactoryInstance[] components;
 	StringCache stringCache;
+	SourceCache sourceCache;
 
 	TaskPool _gthreads;
 
 	this()
 	{
 		stringCache = StringCache(StringCache.defaultBucketCount * 4);
+		sourceCache.setup(&stringCache);
 	}
 
 	~this()

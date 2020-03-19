@@ -180,6 +180,23 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 			return instance.cwd;
 		}
 
+		auto getCachedTokens(const(ubyte)[] code, string file)
+		{
+			import dparse.lexer : getTokensForParser, LexerConfig;
+
+			if (file.length)
+			{
+				return workspaced.sourceCache.cacheFile(file, code).tokens;
+			}
+			else
+			{
+				LexerConfig config;
+				config.fileName = "stdin";
+				config.stringBehavior = StringBehavior.source;
+				return getTokensForParser(code, config, &workspaced.stringCache);
+			}
+		}
+
 		override void shutdown(bool dtor = false)
 		{
 			if (!dtor && _threads)

@@ -29,10 +29,10 @@ class ImporterComponent : ComponentWrapper
 	}
 
 	/// Returns all imports available at some code position.
-	ImportInfo[] get(scope const(char)[] code, int pos)
+	ImportInfo[] get(const(char)[] code, int pos, string file = null)
 	{
 		RollbackAllocator rba;
-		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		auto tokens = getCachedTokens(cast(ubyte[]) code, file);
 		auto mod = parseModule(tokens, "code", &rba);
 		auto reader = new ImporterReaderVisitor(pos);
 		reader.visit(mod);
@@ -41,11 +41,11 @@ class ImporterComponent : ComponentWrapper
 
 	/// Returns a list of code patches for adding an import.
 	/// If `insertOutermost` is false, the import will get added to the innermost block.
-	ImportModification add(string importName, scope const(char)[] code, int pos,
-			bool insertOutermost = true)
+	ImportModification add(string importName, const(char)[] code, int pos,
+			bool insertOutermost = true, string file = null)
 	{
 		RollbackAllocator rba;
-		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		auto tokens = getCachedTokens(cast(ubyte[]) code, file);
 		auto mod = parseModule(tokens, "code", &rba);
 		auto reader = new ImporterReaderVisitor(pos);
 		reader.visit(mod);
@@ -88,8 +88,10 @@ class ImporterComponent : ComponentWrapper
 
 	/// Sorts the imports in a whitespace separated group of code
 	/// Returns `ImportBlock.init` if no changes would be done.
-	ImportBlock sortImports(scope const(char)[] code, int pos)
+	ImportBlock sortImports(const(char)[] code, int pos, string file = null)
 	{
+		// TODO: use tokens
+
 		bool startBlock = true;
 		string indentation;
 		size_t start, end;
@@ -176,7 +178,7 @@ class ImporterComponent : ComponentWrapper
 		part = code[start .. end];
 
 		RollbackAllocator rba;
-		auto tokens = getTokensForParser(cast(ubyte[]) part, config, &workspaced.stringCache);
+		auto tokens = getCachedTokens(cast(ubyte[]) part, null);
 		auto mod = parseModule(tokens, "code", &rba);
 		auto reader = new ImporterReaderVisitor(-1);
 		reader.visit(mod);

@@ -141,13 +141,10 @@ class DscannerComponent : ComponentWrapper
 		return config;
 	}
 
-	private const(Module) parseModule(string file, ubyte[] code, RollbackAllocator* p,
+	private const(Module) parseModule(string file, const(ubyte)[] code, RollbackAllocator* p,
 			ref StringCache cache, ref const(Token)[] tokens, ref DScannerIssue[] issues)
 	{
-		LexerConfig config;
-		config.fileName = file;
-		config.stringBehavior = StringBehavior.source;
-		tokens = getTokensForParser(code, config, &cache);
+		tokens = getCachedTokens(code, file);
 
 		void addIssue(string fileName, size_t line, size_t column, string message, bool isError)
 		{
@@ -161,7 +158,7 @@ class DscannerComponent : ComponentWrapper
 
 	/// Asynchronously lists all definitions in the specified file.
 	/// If you provide code the file wont be manually read.
-	Future!(DefinitionElement[]) listDefinitions(string file, scope const(char)[] code = "")
+	Future!(DefinitionElement[]) listDefinitions(string file, const(char)[] code = "")
 	{
 		auto ret = new Future!(DefinitionElement[]);
 		gthreads.create({
@@ -180,10 +177,8 @@ class DscannerComponent : ComponentWrapper
 				}
 
 				RollbackAllocator r;
-				LexerConfig config;
-				auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
-
-				auto m = dparse.parser.parseModule(tokens.array, file, &r);
+				auto tokens = getCachedTokens(cast(const(ubyte)[]) code, file);
+				auto m = dparse.parser.parseModule(tokens, file, &r);
 
 				auto defFinder = new DefinitionFinder();
 				defFinder.visit(m);

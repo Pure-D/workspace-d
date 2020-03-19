@@ -62,10 +62,10 @@ class DCDExtComponent : ComponentWrapper
 	///   code = code to analyze
 	///   position = byte offset where to check for function arguments
 	///   definition = true if this hints is a function definition (templates don't have an exclamation point '!')
-	CalltipsSupport extractCallParameters(scope const(char)[] code, int position,
-			bool definition = false)
+	CalltipsSupport extractCallParameters(const(char)[] code, int position,
+			bool definition = false, string file = null)
 	{
-		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		scope tokens = getCachedTokens(cast(ubyte[]) code, file);
 		if (!tokens.length)
 			return CalltipsSupport.init;
 		auto queuedToken = tokens.countUntil!(a => a.index >= position) - 1;
@@ -133,8 +133,8 @@ class DCDExtComponent : ComponentWrapper
 			{
 				if (depth == 0 && subDepth == 0)
 				{
-					if (startParen > 1 && p.type == tok!"!" && tokens[startParen - 2].type
-							== tok!"identifier")
+					if (startParen > 1 && p.type == tok!"!"
+							&& tokens[startParen - 2].type == tok!"identifier")
 					{
 						startParen--;
 						inTemplate = true;
@@ -170,8 +170,8 @@ class DCDExtComponent : ComponentWrapper
 				{
 					hasTemplateParens = true;
 					templateOpen++;
-					functionOpen = findClosingParenForward(tokens, templateOpen,
-							"in template function open finder");
+					functionOpen = findClosingParenForward(tokens,
+							templateOpen, "in template function open finder");
 					functionOpen++;
 
 					if (functionOpen >= tokens.length)
@@ -208,9 +208,9 @@ class DCDExtComponent : ComponentWrapper
 					{
 						if (depth == 1 && templateOpen > minTokenIndex && c.type == tok!"(")
 						{
-							if (definition
-									? tokens[templateOpen - 1].type == tok!"identifier" : (tokens[templateOpen - 1].type == tok!"!"
-										&& tokens[templateOpen - 2].type == tok!"identifier"))
+							if (definition ? tokens[templateOpen - 1].type == tok!"identifier" : (
+									tokens[templateOpen - 1].type == tok!"!"
+									&& tokens[templateOpen - 2].type == tok!"identifier"))
 								break;
 						}
 
@@ -280,9 +280,9 @@ class DCDExtComponent : ComponentWrapper
 
 				if (c.type.isCalltipable)
 				{
-					if (c.type == tok!"identifier" && p.type == tok!"." && (callStart < 2
-							|| !tokens[callStart - 2].type.among!(tok!";", tok!",",
-							tok!"{", tok!"}", tok!"(")))
+					if (c.type == tok!"identifier" && p.type == tok!"."
+							&& (callStart < 2 || !tokens[callStart - 2].type.among!(tok!";",
+								tok!",", tok!"{", tok!"}", tok!"(")))
 					{
 						// member function, traverse further...
 						if (inFuncName)
@@ -318,8 +318,8 @@ class DCDExtComponent : ComponentWrapper
 				if (functionOpen)
 					templateClose = functionOpen - 1;
 				else
-					templateClose = findClosingParenForward(tokens, templateOpen,
-							"in template close finder");
+					templateClose = findClosingParenForward(tokens,
+							templateOpen, "in template close finder");
 			}
 			else
 				templateClose = templateOpen + 2;
@@ -348,10 +348,10 @@ class DCDExtComponent : ComponentWrapper
 
 	/// Finds the immediate surrounding code block at a position or returns CodeBlockInfo.init for none/module block.
 	/// See_Also: CodeBlockInfo
-	CodeBlockInfo getCodeBlockRange(scope const(char)[] code, int position)
+	CodeBlockInfo getCodeBlockRange(const(char)[] code, int position, string file = null)
 	{
 		RollbackAllocator rba;
-		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		auto tokens = getCachedTokens(cast(ubyte[]) code, file);
 		auto parsed = parseModule(tokens, "getCodeBlockRange_input.d", &rba);
 		auto reader = new CodeBlockInfoFinder(position);
 		reader.visit(parsed);
@@ -361,23 +361,22 @@ class DCDExtComponent : ComponentWrapper
 	/// Inserts a generic method after the corresponding block inside the scope where position is.
 	/// If it can't find a good spot it will insert the code properly indented ata fitting location.
 	// make public once usable
-	private CodeReplacement[] insertCodeInContainer(string insert, scope const(char)[] code,
-			int position, bool insertInLastBlock = true, bool insertAtEnd = true)
+	private CodeReplacement[] insertCodeInContainer(string insert, const(char)[] code,
+			int position, bool insertInLastBlock = true, bool insertAtEnd = true, string file = null)
 	{
 		auto container = getCodeBlockRange(code, position);
 
 		scope const(char)[] codeBlock = code[container.innerRange[0] .. container.innerRange[1]];
 
 		RollbackAllocator rba;
-		scope tokensInsert = getTokensForParser(cast(ubyte[]) insert, config,
-				&workspaced.stringCache);
+		scope tokensInsert = getCachedTokens(cast(ubyte[]) insert, null);
 		scope parsedInsert = parseModule(tokensInsert, "insertCode_insert.d", &rba);
 
 		scope insertReader = new CodeDefinitionClassifier(insert);
 		insertReader.visit(parsedInsert);
 		scope insertRegions = insertReader.regions.sort!"a.type < b.type".uniq.array;
 
-		scope tokens = getTokensForParser(cast(ubyte[]) codeBlock, config, &workspaced.stringCache);
+		scope tokens = getCachedTokens(cast(ubyte[]) codeBlock, file);
 		scope parsed = parseModule(tokens, "insertCode_code.d", &rba);
 
 		scope reader = new CodeDefinitionClassifier(codeBlock);
@@ -431,8 +430,10 @@ class DCDExtComponent : ComponentWrapper
 
 				if (inIncompatible)
 				{
-					int insertRegion = fittingProtection == -1 ? firstStickyProtection : regionAfterFitting;
-					insertCode = text(indent(insertCode, regions[insertRegion].minIndentation), "\n\n");
+					int insertRegion = fittingProtection == -1 ? firstStickyProtection
+						: regionAfterFitting;
+					insertCode = text(indent(insertCode,
+							regions[insertRegion].minIndentation), "\n\n");
 					auto len = cast(uint) insertCode.length;
 
 					toInsert.region[0] = regions[insertRegion].region[0];
@@ -458,7 +459,8 @@ class DCDExtComponent : ComponentWrapper
 			{
 				auto target = insertInLastBlock ? existing.tail(1).front : existing.front;
 
-				insertCode = text("\n\n", indent(insertCode, regions[target.index].minIndentation));
+				insertCode = text("\n\n", indent(insertCode,
+						regions[target.index].minIndentation));
 				const codeLength = cast(int) insertCode.length;
 
 				if (insertAtEnd)
@@ -629,7 +631,8 @@ class DCDExtComponent : ComponentWrapper
 					string propertySearch;
 					if (fn.signature.canFind("@property") && fn.arguments.length <= 1)
 						propertySearch = fn.name;
-					else if ((fn.name.startsWith("get") && fn.arguments.length == 0)
+					else if ((fn.name.startsWith("get")
+							&& fn.arguments.length == 0)
 							|| (fn.name.startsWith("set") && fn.arguments.length == 1))
 						propertySearch = fn.name[3 .. $];
 
@@ -678,7 +681,12 @@ class DCDExtComponent : ComponentWrapper
 						buf.put("super." ~ fn.name);
 						if (fn.arguments.length)
 							buf.put("(" ~ format("%(%s, %)", fn.arguments)
-									.translate(['\\': `\\`, '{': `\{`, '$': `\$`, '}': `\}`]) ~ ")");
+									.translate([
+											'\\': `\\`,
+											'{': `\{`,
+											'$': `\$`,
+											'}': `\}`
+										]) ~ ")");
 						else if (fn.returnType == "void")
 							buf.put("()"); // make functions that don't return add (), otherwise they might be attributes and don't need that
 						buf.put(";");
@@ -773,7 +781,7 @@ class DCDExtComponent : ComponentWrapper
 	}
 
 	/// Looks up a declaration of a type and then extracts information about it as class or interface.
-	InterfaceDetails lookupInterface(scope const(char)[] code, int position)
+	InterfaceDetails lookupInterface(const(char)[] code, int position)
 	{
 		auto data = get!DCDComponent.findDeclaration(code, position).getBlocking;
 		string file = data.file;
@@ -790,22 +798,22 @@ class DCDExtComponent : ComponentWrapper
 	}
 
 	/// Extracts information about a given class or interface at the given position.
-	InterfaceDetails getInterfaceDetails(string file, scope const(char)[] code, int position)
+	InterfaceDetails getInterfaceDetails(string file, const(char)[] code, int position)
 	{
 		RollbackAllocator rba;
-		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		auto tokens = getCachedTokens(cast(ubyte[]) code, file);
 		auto parsed = parseModule(tokens, file, &rba);
 		auto reader = new InterfaceMethodFinder(code, position);
 		reader.visit(parsed);
 		return reader.details;
 	}
 
-	Future!InterfaceTree describeInterfaceRecursive(scope const(char)[] code, int position)
+	Future!InterfaceTree describeInterfaceRecursive(const(char)[] code, int position)
 	{
 		mixin(gthreadsAsyncProxy!`describeInterfaceRecursiveSync(code, position)`);
 	}
 
-	InterfaceTree describeInterfaceRecursiveSync(scope const(char)[] code, int position)
+	InterfaceTree describeInterfaceRecursiveSync(const(char)[] code, int position)
 	{
 		auto baseInterface = getInterfaceDetails("stdin", code, position);
 
@@ -975,7 +983,8 @@ struct CalltipsSupport
 		/// Creates Argument(range, 0, 0, 0, true)
 		static Argument anyVariadic(int[2] range)
 		{
-			return Argument(range, typeof(range).init, typeof(range).init, typeof(range).init, true);
+			return Argument(range, typeof(range).init, typeof(range).init,
+					typeof(range).init, true);
 		}
 	}
 
@@ -1058,12 +1067,15 @@ private:
 bool isCalltipable(IdType type)
 {
 	return type == tok!"identifier" || type == tok!"assert" || type == tok!"import"
-		|| type == tok!"mixin" || type == tok!"super" || type == tok!"this" || type == tok!"__traits";
+		|| type == tok!"mixin" || type == tok!"super" || type == tok!"this"
+		|| type == tok!"__traits";
 }
 
 int[2] tokenRange(const Token token)
 {
-	return [cast(int) token.index, cast(int)(token.index + token.tokenText.length)];
+	return [
+		cast(int) token.index, cast(int)(token.index + token.tokenText.length)
+	];
 }
 
 int tokenEnd(const Token token)
@@ -1196,7 +1208,9 @@ CalltipsSupport.Argument[] splitArgs(const(Token)[] tokens)
 				}
 
 				if (typename.length)
-					arg.typeRange = [cast(int) typename[0].index, typename[$ - 1].tokenEnd];
+					arg.typeRange = [
+						cast(int) typename[0].index, typename[$ - 1].tokenEnd
+					];
 			}
 		}
 
@@ -1294,7 +1308,8 @@ final class CodeBlockInfoFinder : ASTVisitor
 
 	override void visit(const TemplateDeclaration dec)
 	{
-		if (cast(int) targetPosition >= cast(int) dec.name.index && targetPosition < dec.endLocation)
+		if (cast(int) targetPosition >= cast(int) dec.name.index && targetPosition < dec
+				.endLocation)
 		{
 			block = CodeBlockInfo.init;
 			block.type = CodeBlockInfo.Type.template_;
@@ -1309,11 +1324,13 @@ final class CodeBlockInfoFinder : ASTVisitor
 		}
 	}
 
-	private void visitContainer(const Token name, CodeBlockInfo.Type type, const StructBody structBody)
+	private void visitContainer(const Token name, CodeBlockInfo.Type type,
+			const StructBody structBody)
 	{
 		if (!structBody)
 			return;
-		if (cast(int) targetPosition >= cast(int) name.index && targetPosition < structBody.endLocation)
+		if (cast(int) targetPosition >= cast(int) name.index
+				&& targetPosition < structBody.endLocation)
 		{
 			block = CodeBlockInfo.init;
 			block.type = type;
@@ -1322,7 +1339,8 @@ final class CodeBlockInfoFinder : ASTVisitor
 				cast(uint) name.index, cast(uint) structBody.endLocation + 1
 			];
 			block.innerRange = [
-				cast(uint) structBody.startLocation + 1, cast(uint) structBody.endLocation
+				cast(uint) structBody.startLocation + 1,
+				cast(uint) structBody.endLocation
 			];
 			structBody.accept(this);
 		}
@@ -1503,7 +1521,8 @@ unittest
 	assert(extract.functionArgs.length == 1);
 	assert(extract.functionArgs[0].contentRange == [43, 44]);
 
-	extract = dcdext.extractCallParameters(`some_garbage(code); before(this); funcCall(4, f(4)`, 50);
+	extract = dcdext.extractCallParameters(
+			`some_garbage(code); before(this); funcCall(4, f(4)`, 50);
 	assert(extract != CalltipsSupport.init);
 	assert(!extract.hasTemplate);
 	assert(extract.activeParameter == 1);
@@ -1561,8 +1580,7 @@ unittest
 
 	assert(info.details.methods.length == 6);
 	assert(info.details.methods[0].name == "foo");
-	assert(
-			info.details.methods[0].signature
+	assert(info.details.methods[0].signature
 			== "private static const int foo() @nogc nothrow pure @system;");
 	assert(info.details.methods[0].returnType == "int");
 	assert(info.details.methods[0].isNothrowOrNogc);
@@ -1687,7 +1705,9 @@ private:
 	assert(info.details.methods[2].returnType == "void");
 
 	assert(info.details.methods[3].name == "attributeSuffixMethod");
-	assert(info.details.methods[3].signature == "int attributeSuffixMethod() nothrow @property @nogc;");
+	assert(
+			info.details.methods[3].signature
+			== "int attributeSuffixMethod() nothrow @property @nogc;");
 	assert(info.details.methods[3].returnType == "int");
 	assert(info.details.methods[3].isNothrowOrNogc);
 

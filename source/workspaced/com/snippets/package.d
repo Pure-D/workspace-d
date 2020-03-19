@@ -61,13 +61,13 @@ class SnippetsComponent : ComponentWrapper
 	 * with information about close ranges. Contains `SnippetLoopScope.init` if
 	 * this is not a location where a loop can be inserted.
 	 */
-	SnippetInfo determineSnippetInfo(scope const(char)[] file, scope const(char)[] code, int position)
+	SnippetInfo determineSnippetInfo(string file, const(char)[] code, int position)
 	{
 		// each variable is 1
 		// maybe more expensive lookups with DCD in the future
 		enum LoopVariableAnalyzeMaxCost = 90;
 
-		scope tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		scope tokens = getCachedTokens(cast(ubyte[]) code, file);
 		auto loc = tokens.tokenIndexAtByteIndex(position);
 
 		// nudge in next token if position is not exactly on the start of it
@@ -127,9 +127,9 @@ class SnippetsComponent : ComponentWrapper
 			{
 				return SnippetInfo([SnippetLevel.global, SnippetLevel.other]);
 			}
-			else if (t.type.among!(tok!"=", tok!"+", tok!"-", tok!"*", tok!"/",
-					tok!"%", tok!"^^", tok!"&", tok!"|", tok!"^", tok!"<<",
-					tok!">>", tok!">>>", tok!"~", tok!"in"))
+			else if (t.type.among!(tok!"=", tok!"+", tok!"-", tok!"*",
+					tok!"/", tok!"%", tok!"^^", tok!"&", tok!"|", tok!"^",
+					tok!"<<", tok!">>", tok!">>>", tok!"~", tok!"in"))
 			{
 				return SnippetInfo([SnippetLevel.global, SnippetLevel.value]);
 			}
@@ -160,12 +160,12 @@ class SnippetsComponent : ComponentWrapper
 		return gen.value;
 	}
 
-	Future!SnippetList getSnippets(scope const(char)[] file, scope const(char)[] code, int position)
+	Future!SnippetList getSnippets(string file, const(char)[] code, int position)
 	{
 		mixin(gthreadsAsyncProxy!`getSnippetsBlocking(file, code, position)`);
 	}
 
-	SnippetList getSnippetsBlocking(scope const(char)[] file, scope const(char)[] code, int position)
+	SnippetList getSnippetsBlocking(string file, const(char)[] code, int position)
 	{
 		auto futures = collectSnippets(file, code, position);
 
@@ -175,7 +175,7 @@ class SnippetsComponent : ComponentWrapper
 		return SnippetList(futures[0], ret.data);
 	}
 
-	SnippetList getSnippetsYield(scope const(char)[] file, scope const(char)[] code, int position)
+	SnippetList getSnippetsYield(string file, const(char)[] code, int position)
 	{
 		auto futures = collectSnippets(file, code, position);
 
@@ -185,8 +185,7 @@ class SnippetsComponent : ComponentWrapper
 		return SnippetList(futures[0], ret.data);
 	}
 
-	Future!Snippet resolveSnippet(scope const(char)[] file, scope const(char)[] code,
-			int position, Snippet snippet)
+	Future!Snippet resolveSnippet(string file, const(char)[] code, int position, Snippet snippet)
 	{
 		foreach (provider; providers)
 		{
@@ -344,7 +343,8 @@ class SnippetsComponent : ComponentWrapper
 					}
 					else
 					{
-						while (end < snippet.length && (snippet[end].isAlphaNum || snippet[end] == '_'))
+						while (end < snippet.length
+								&& (snippet[end].isAlphaNum || snippet[end] == '_'))
 							end++;
 					}
 
@@ -474,8 +474,8 @@ class SnippetsComponent : ComponentWrapper
 	}
 
 private:
-	Tuple!(SnippetInfo, Future!(Snippet[])[]) collectSnippets(scope const(char)[] file,
-			scope const(char)[] code, int position)
+	Tuple!(SnippetInfo, Future!(Snippet[])[]) collectSnippets(string file,
+			const(char)[] code, int position)
 	{
 		const inst = instance;
 		auto info = determineSnippetInfo(file, code, position);
@@ -611,7 +611,8 @@ unittest
 	res = snippets.formatSync("foo(delegate() {\n${1:// foo}\n});", args, SnippetLevel.method);
 	shouldEqual(res, "foo(delegate() {\n\t${1:// foo}\n});");
 
-	res = snippets.formatSync(`auto ${1:window} = new SimpleWindow(Size(${2:800, 600}), "$3");`, args, SnippetLevel.method);
+	res = snippets.formatSync(`auto ${1:window} = new SimpleWindow(Size(${2:800, 600}), "$3");`,
+			args, SnippetLevel.method);
 	shouldEqual(res, `auto ${1:window} = new SimpleWindow(Size(${2:800, 600}), "$3");`);
 }
 

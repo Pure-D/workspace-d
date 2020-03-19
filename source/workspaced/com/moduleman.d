@@ -44,8 +44,7 @@ class ModulemanComponent : ComponentWrapper
 		{
 			if (file.extension != ".d")
 				continue;
-			string code = readText(file);
-			auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+			auto tokens = getCachedTokens(null, file);
 			auto parsed = parseModule(tokens, file, &rba);
 			auto reader = new ModuleChangerVisitor(file, from, to, renameSubmodules);
 			reader.visit(parsed);
@@ -135,9 +134,9 @@ class ModulemanComponent : ComponentWrapper
 	}
 
 	///
-	FileModuleInfo describeModule(scope const(char)[] code)
+	FileModuleInfo describeModule(const(char)[] code, string file = null)
 	{
-		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		auto tokens = getCachedTokens(cast(ubyte[]) code, file);
 		ptrdiff_t start = -1;
 		size_t from, to;
 		size_t outerFrom, outerTo;
