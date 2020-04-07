@@ -212,7 +212,7 @@ unittest
 	SourceCache sc;
 	sc.setup(&stringCache);
 
-	auto entry = sc.cacheFile("/tmp/a.d", "module foo.bar; void main() {}");
+	auto entry = sc.cacheFile("/tmp/a.d", cast(ubyte[]) "module foo.bar; void main() {}");
 	assert(cast(string[]) entry.moduleName == ["foo", "bar"]);
 	assert(entry.tokens.length > 10);
 }

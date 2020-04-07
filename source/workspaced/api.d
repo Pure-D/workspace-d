@@ -182,7 +182,7 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 
 		auto getCachedTokens(const(ubyte)[] code, string file)
 		{
-			import dparse.lexer : getTokensForParser, LexerConfig;
+			import dparse.lexer : getTokensForParser, LexerConfig, StringBehavior;
 
 			if (file.length)
 			{
