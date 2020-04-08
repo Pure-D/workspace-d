@@ -174,6 +174,24 @@ class WorkspaceD
 			return false;
 		}
 
+		/// Shuts down an attached component and removes it from this component
+		/// list. If you plan to remove all components, call $(LREF shutdown)
+		/// instead.
+		/// Returns: `true` if the component was loaded and is now unloaded and
+		///          removed or `false` if the component wasn't found.
+		bool detach(T)()
+		{
+			auto name = getUDAs!(T, ComponentInfo)[0].name;
+			foreach (i, com; instanceComponents)
+				if (com.info.name == name)
+				{
+					instanceComponents = instanceComponents.remove(i);
+					com.wrapper.shutdown(false);
+					return true;
+				}
+			return false;
+		}
+
 		/// Loads a registered component which didn't have auto register on just for this instance.
 		/// Returns: false instead of using the onBindFail callback on failure.
 		/// Throws: Exception if component was not registered in workspaced.
