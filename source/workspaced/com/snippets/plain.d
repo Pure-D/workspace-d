@@ -643,6 +643,33 @@ static immutable PlainSnippet[] plainSnippets = [
 		"Implements an infinite forward range with random access indexing support.\n\n"
 			~ "Reference: [https://dlang.org/phobos/std_range_primitives.html#isBidirectionalRange]"
 	),
+	PlainSnippet(
+		[SnippetLevel.method],
+		"debug_writeln",
+		"debug try-catch writeln",
+		`debug { import std.stdio : writeln; try { writeln("$1"); } catch (Exception) {} }$0`,
+		"A `writeln` call in a debug block with try-catch wrapping around it.\n\n"
+			~ "Useful to do a debug output inside a pure or nothrow function.",
+		null, true
+	),
+	PlainSnippet(
+		[SnippetLevel.method],
+		"debug_writefln",
+		"debug try-catch writefln",
+		`debug { import std.stdio : writefln; try { writefln!"$1"($2); } catch (Exception) {} }$0`,
+		"A `writefln` call in a debug block with try-catch wrapping around it.\n\n"
+			~ "Useful to do a debug output inside a pure or nothrow function.",
+		null, true
+	),
+	PlainSnippet(
+		[SnippetLevel.method],
+		"debug_printf",
+		"debug try-catch printf",
+		`debug { import core.stdc.stdio : printf; printf("$1\\n"); }$0`,
+		"A `printf` call in a debug block.\n\n"
+			~ "Useful to do a debug output inside a pure, nothrow or @nogc function.",
+		null, true
+	),
 ];
 //dfmt on
 
