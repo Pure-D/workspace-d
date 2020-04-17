@@ -523,6 +523,8 @@ struct Snippet
 	string snippet;
 	/// true if this snippet can be used as-is
 	bool resolved;
+	/// true if this snippet shouldn't be formatted.
+	bool unformatted;
 }
 
 unittest

@@ -20,6 +20,8 @@ struct PlainSnippet
 	string documentation;
 	/// Plain text to insert assuming global level indentation. Optional if snippet is a simple string only using plain variables and snippet locations.
 	string plain;
+	/// true if this snippet shouldn't be formatted before inserting.
+	bool unformatted;
 
 	/// Creates a resolved snippet based on this plain snippet, filling in plain if neccessary. This drops the levels value.
 	/// Params:
@@ -35,6 +37,7 @@ struct PlainSnippet
 		built.plain = this.plain.length ? this.plain
 			: this.snippet.replaceAll(ctRegex!`\$(\d+|[A-Z_]+|\{.*?\})`, "");
 		built.resolved = true;
+		built.unformatted = unformatted;
 		return built;
 	}
 }
