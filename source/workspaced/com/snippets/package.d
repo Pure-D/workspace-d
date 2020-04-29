@@ -78,6 +78,45 @@ class SnippetsComponent : ComponentWrapper
 			return SnippetInfo([SnippetLevel.global]);
 
 		auto leading = tokens[0 .. loc];
+
+		if (leading.length)
+		{
+			auto last = leading[$ - 1];
+			switch (last.type)
+			{
+			case tok!"comment":
+				size_t len = max(0, cast(ptrdiff_t)position
+					- cast(ptrdiff_t)last.index);
+				// TODO: currently never called because we would either need to
+				// use the DLexer struct as parser immediately or wait until
+				// libdparse >=0.15.0 which contains trivia, where this switch
+				// needs to be modified to check the exact trivia token instead
+				// of the associated token with it.
+				if (last.text[0 .. len].startsWith("///", "/++", "/**"))
+					return SnippetInfo([SnippetLevel.docComment]);
+				else if (len >= 2)
+					return SnippetInfo([SnippetLevel.comment]);
+				else
+					break;
+			case tok!"dstringLiteral":
+			case tok!"wstringLiteral":
+			case tok!"stringLiteral":
+				if (position <= last.index)
+					break;
+
+				auto textSoFar = last.text[1 .. position - last.index];
+				// no string complete if we are immediately after escape or
+				// quote character
+				// TODO: properly check if this is an unescaped escape
+				if (textSoFar.endsWith('\\', last.text[0]))
+					return SnippetInfo([SnippetLevel.strings, SnippetLevel.other]);
+				else
+					return SnippetInfo([SnippetLevel.strings]);
+			default:
+				break;
+			}
+		}
+
 		foreach_reverse (t; leading)
 		{
 			if (t.type == tok!";")
@@ -183,6 +222,9 @@ class SnippetsComponent : ComponentWrapper
 		{
 		case SnippetLevel.global:
 		case SnippetLevel.other:
+		case SnippetLevel.comment:
+		case SnippetLevel.docComment:
+		case SnippetLevel.strings:
 			break;
 		case SnippetLevel.type:
 			tmp.put("struct FORMAT_HELPER {\n");
@@ -334,6 +376,9 @@ class SnippetsComponent : ComponentWrapper
 		{
 		case SnippetLevel.global:
 		case SnippetLevel.other:
+		case SnippetLevel.comment:
+		case SnippetLevel.docComment:
+		case SnippetLevel.strings:
 			break;
 		case SnippetLevel.type:
 		case SnippetLevel.method:
@@ -352,6 +397,9 @@ class SnippetsComponent : ComponentWrapper
 		{
 		case SnippetLevel.global:
 		case SnippetLevel.other:
+		case SnippetLevel.comment:
+		case SnippetLevel.docComment:
+		case SnippetLevel.strings:
 			break;
 		case SnippetLevel.type:
 		case SnippetLevel.method:
@@ -452,7 +500,13 @@ enum SnippetLevel
 	/// inside a variable value, argument call, default value or similar
 	value,
 	/// Other scope types (for example outside of braces but after a function definition or some other invalid syntax place)
-	other
+	other,
+	/// Inside a string literal.
+	strings,
+	/// Inside a normal comment
+	comment,
+	/// Inside a documentation comment
+	docComment,
 }
 
 ///
@@ -559,4 +613,74 @@ unittest
 
 	res = snippets.formatSync(`auto ${1:window} = new SimpleWindow(Size(${2:800, 600}), "$3");`, args, SnippetLevel.method);
 	shouldEqual(res, `auto ${1:window} = new SimpleWindow(Size(${2:800, 600}), "$3");`);
+}
+
+unittest
+{
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!SnippetsComponent;
+	SnippetsComponent snippets = backend.get!SnippetsComponent(workspace.directory);
+
+	static immutable testCode = `/// this is a cool module
+module something;
+
+// todo stuff
+
+/// a lot of functionality
+void foo()
+{
+	writeln("hello world");
+}
+
+int main(string[] args)
+{
+	foo();
+}
+`;
+
+	// TODO: comment snippets not yet implemented
+
+	auto i = snippets.determineSnippetInfo(null, testCode, 0);
+	assert(i.level == SnippetLevel.global, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 1);
+	assert(i.level == SnippetLevel.global, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 2);
+	// assert(i.level == SnippetLevel.comment, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 3);
+	// assert(i.level == SnippetLevel.docComment, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 10);
+	// assert(i.level == SnippetLevel.docComment, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 25);
+	// assert(i.level == SnippetLevel.docComment, i.stack.to!string);
+
+	i = snippets.determineSnippetInfo(null, testCode, 26);
+	assert(i.level == SnippetLevel.global, i.stack.to!string);
+
+	i = snippets.determineSnippetInfo(null, testCode, 47);
+	// assert(i.level == SnippetLevel.comment, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 50);
+	// assert(i.level == SnippetLevel.comment, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 58);
+	// assert(i.level == SnippetLevel.comment, i.stack.to!string);
+
+	i = snippets.determineSnippetInfo(null, testCode, 59);
+	assert(i.level == SnippetLevel.global, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 60);
+	assert(i.level == SnippetLevel.global, i.stack.to!string);
+
+	i = snippets.determineSnippetInfo(null, testCode, 63);
+	// assert(i.level == SnippetLevel.docComment, i.stack.to!string);
+
+	i = snippets.determineSnippetInfo(null, testCode, 109);
+	assert(i.level == SnippetLevel.value, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 110);
+	assert(i.level == SnippetLevel.strings, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 111);
+	assert(i.level == SnippetLevel.strings, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 121);
+	assert(i.level == SnippetLevel.strings, i.stack.to!string);
+	i = snippets.determineSnippetInfo(null, testCode, 122);
+	assert(i.level == SnippetLevel.other, i.stack.to!string);
 }
