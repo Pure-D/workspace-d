@@ -7,6 +7,7 @@ import dparse.rollback_allocator;
 import workspaced.api;
 import workspaced.com.dfmt : DfmtComponent;
 import workspaced.com.snippets.generator;
+import workspaced.dparseext;
 
 import std.algorithm;
 import std.array;
@@ -67,14 +68,14 @@ class SnippetsComponent : ComponentWrapper
 		enum LoopVariableAnalyzeMaxCost = 90;
 
 		scope tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
-		// TODO: binary search
-		size_t loc;
-		foreach (i, tok; tokens)
-			if (tok.index >= position)
-			{
-				loc = i;
-				break;
-			}
+		auto loc = tokens.tokenIndexAtByteIndex(position);
+
+		// nudge in next token if position is not exactly on the start of it
+		if (loc < tokens.length && tokens[loc].index < position)
+			loc++;
+
+		if (loc == 0 || loc == tokens.length)
+			return SnippetInfo([SnippetLevel.global]);
 
 		auto leading = tokens[0 .. loc];
 		foreach_reverse (t; leading)

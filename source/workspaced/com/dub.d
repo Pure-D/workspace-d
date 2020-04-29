@@ -510,7 +510,6 @@ class DubComponent : ComponentWrapper
 									issues ~= BuildIssue(deprMatch[2].to!int, deprMatch[3].toOr!int(1),
 										deprMatch[1], ErrorType.Deprecation,
 										deprMatch[4] ~ " is deprecated, use " ~ deprMatch[5] ~ " instead.");
-									// TODO: maybe add special type or output
 								}
 							}
 						}
