@@ -340,6 +340,7 @@ else
 		while (stdin.isOpen && stdout.isOpen && !stdin.eof)
 		{
 			dataBuffer = stdin.rawRead(intBuffer);
+			if (dataBuffer.length == 0) break;
 			assert(dataBuffer.length == 4, "Unexpected buffer data");
 			length = bigEndianToNative!int(dataBuffer[0 .. 4]);
 
