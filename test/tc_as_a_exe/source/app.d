@@ -18,7 +18,10 @@ void main()
 	JSONValue response;
 
 	//scope backend = new WorkspaceD();
-	auto backend = pipeProcess(["../../workspace-d"], Redirect.stdout | Redirect.stdin);
+	version (Windows)
+		auto backend = pipeProcess(["..\\..\\workspace-d.exe"], Redirect.stdout | Redirect.stdin);
+	else
+		auto backend = pipeProcess(["../../workspace-d"], Redirect.stdout | Redirect.stdin);
 
 	//auto instance = backend.addInstance(dir);
 	backend.stdin.writeRequest(1, `{"cmd": "new", "cwd": ` ~ JSONValue(dir).toString ~ `}`);

@@ -1,2 +1,4 @@
 */test-*
 testout.txt
+*.zip
+*.tar.gz
