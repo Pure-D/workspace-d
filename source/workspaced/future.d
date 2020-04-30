@@ -124,6 +124,9 @@ class Future(T)
 	/// Waits for the result of this future using Fiber.yield
 	T getYield()
 	{
+		assert(Fiber.getThis() !is null,
+			"Attempted to getYield without being in a Fiber context");
+
 		while (!has)
 			Fiber.yield();
 		if (_worker)
