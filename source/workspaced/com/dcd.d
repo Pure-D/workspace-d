@@ -16,16 +16,13 @@ import std.process;
 import std.random;
 import std.stdio;
 import std.string;
+import std.typecons;
 
 import painlessjson;
 
 import workspaced.api;
 import workspaced.helpers;
-
-version (OSX) version = haveUnixSockets;
-version (linux) version = haveUnixSockets;
-version (BSD) version = haveUnixSockets;
-version (FreeBSD) version = haveUnixSockets;
+import workspaced.dcd.client;
 
 @component("dcd")
 class DCDComponent : ComponentWrapper
@@ -37,13 +34,14 @@ class DCDComponent : ComponentWrapper
 	{
 		installedVersion = workspaced.globalConfiguration.get("dcd", "_installedVersion", "");
 
-		if (installedVersion.length && this.clientPath == workspaced.globalConfiguration.get("dcd",
-				"_clientPath", "")
+		if (installedVersion.length
+				&& this.clientPath == workspaced.globalConfiguration.get("dcd", "_clientPath", "")
 				&& this.serverPath == workspaced.globalConfiguration.get("dcd", "_serverPath", ""))
 		{
-			version (haveUnixSockets)
-				hasUnixDomainSockets = config.get("dcd", "_hasUnixDomainSockets", false);
-			supportsFullOutput = config.get("dcd", "_supportsFullOutput", false);
+			if (workspaced.globalConfiguration.get("dcd", "_usingInternal", false))
+				client = new BuiltinDCDClient();
+			else
+				client = new ExternalDCDClient(this.clientPath);
 			trace("Reusing previously identified DCD ", installedVersion);
 		}
 		else
@@ -57,25 +55,37 @@ class DCDComponent : ComponentWrapper
 		string clientPath = this.clientPath;
 		string serverPath = this.serverPath;
 
-		installedVersion = clientPath.getVersionAndFixPath;
-		string clientPathInfo = clientPath != "dcd-client" ? "(" ~ clientPath ~ ") " : "";
-		trace("Detected dcd-client ", clientPathInfo, installedVersion);
+		client = null;
 
-		string serverInstalledVersion = serverPath.getVersionAndFixPath;
+		installedVersion = serverPath.getVersionAndFixPath;
 		string serverPathInfo = serverPath != "dcd-server" ? "(" ~ serverPath ~ ") " : "";
-		trace("Detected dcd-server ", serverPathInfo, serverInstalledVersion);
+		trace("Detected dcd-server ", serverPathInfo, installedVersion);
 
-		if (serverInstalledVersion != installedVersion)
-			throw new Exception("client & server version mismatch");
+		if (!checkVersion(installedVersion, BuiltinDCDClient.minSupportedServerInclusive)
+				|| checkVersion(installedVersion, BuiltinDCDClient.maxSupportedServerExclusive))
+		{
+			info("Using dcd-client instead of internal workspace-d client");
+
+			string clientInstalledVersion = clientPath.getVersionAndFixPath;
+			string clientPathInfo = clientPath != "dcd-client" ? "(" ~ clientPath ~ ") " : "";
+			trace("Detected dcd-client ", clientPathInfo, clientInstalledVersion);
+
+			if (clientInstalledVersion != installedVersion)
+				throw new Exception("client & server version mismatch");
+
+			client = new ExternalDCDClient(clientPath);
+		}
+		else
+		{
+			info("using builtin DCD client");
+			client = new BuiltinDCDClient();
+		}
 
 		config.set("dcd", "clientPath", clientPath);
 		config.set("dcd", "serverPath", serverPath);
 
 		assert(this.clientPath == clientPath);
 		assert(this.serverPath == serverPath);
-
-		version (haveUnixSockets)
-			hasUnixDomainSockets = supportsUnixDomainSockets(installedVersion);
 
 		//dfmt off
 		if (isOutdated)
@@ -84,13 +94,11 @@ class DCDComponent : ComponentWrapper
 				"component": JSONValue("dcd")
 			]));
 		//dfmt on
-		supportsFullOutput = rawExec([clientPath, "--help"]).output.canFind("--extended");
 
+		workspaced.globalConfiguration.set("dcd", "_usingInternal",
+				cast(ExternalDCDClient) client ? false : true);
 		workspaced.globalConfiguration.set("dcd", "_clientPath", clientPath);
 		workspaced.globalConfiguration.set("dcd", "_serverPath", serverPath);
-		version (haveUnixSockets)
-			workspaced.globalConfiguration.set("dcd", "_hasUnixDomainSockets", hasUnixDomainSockets);
-		workspaced.globalConfiguration.set("dcd", "_supportsFullOutput", supportsFullOutput);
 		workspaced.globalConfiguration.set("dcd", "_installedVersion", installedVersion);
 	}
 
@@ -99,14 +107,11 @@ class DCDComponent : ComponentWrapper
 	{
 		if (!installedVersion)
 		{
-			string clientPath = this.clientPath;
 			string serverPath = this.serverPath;
 
 			try
 			{
-				installedVersion = clientPath.getVersionAndFixPath;
-				if (serverPath.getVersionAndFixPath != installedVersion)
-					return true;
+				installedVersion = serverPath.getVersionAndFixPath;
 			}
 			catch (ProcessException)
 			{
@@ -120,10 +125,13 @@ class DCDComponent : ComponentWrapper
 		return !checkVersion(installedVersion, latestKnownVersion);
 	}
 
-	/// Returns: the current detected installed version of dcd-client.
+	/// Returns: The current detected installed version of dcd-client.
+	///          Ends with `"-workspaced-builtin"` if this is using the builtin
+	///          client.
 	string clientInstalledVersion() @property const
 	{
-		return installedVersion;
+		return cast(ExternalDCDClient) client ? installedVersion :
+			BuiltinDCDClient.clientVersion ~ "-workspaced-builtin";
 	}
 
 	private auto serverThreads()
@@ -154,10 +162,18 @@ class DCDComponent : ComponentWrapper
 		foreach (i; additionalImports)
 			if (i.length)
 				imports ~= "-I" ~ i;
-		this.runningPort = port;
-		this.socketFile = buildPath(tempDir,
+
+		client.runningPort = port;
+		client.socketFile = buildPath(tempDir,
 				"workspace-d-sock" ~ thisProcessID.to!string ~ "-" ~ uniform!ulong.to!string(36));
-		serverPipes = raw([serverPath] ~ clientArgs ~ imports,
+
+		string[] serverArgs;
+		static if (platformSupportsDCDUnixSockets)
+			serverArgs = [serverPath, "--socketFile", client.socketFile];
+		else
+			serverArgs = [serverPath, "--port", client.runningPort.to!string];
+
+		serverPipes = raw(serverArgs ~ imports,
 				Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
 		while (!serverPipes.stderr.eof)
 		{
@@ -200,7 +216,7 @@ class DCDComponent : ComponentWrapper
 			return;
 		int i = 0;
 		running = false;
-		doClient(["--shutdown"]).pid.wait;
+		client.shutdown();
 		while (serverPipes.pid && !serverPipes.pid.tryWait().terminated)
 		{
 			Thread.sleep(10.msecs);
@@ -261,16 +277,18 @@ class DCDComponent : ComponentWrapper
 	}
 
 	/// This will query the current dcd-server status
-	/// Returns: `{isRunning: bool}` If the dcd-server process is not running anymore it will return isRunning: false. Otherwise it will check for server status using `dcd-client --query`
+	/// Returns: `{isRunning: bool}` If the dcd-server process is not running
+	/// anymore it will return isRunning: false. Otherwise it will check for
+	/// server status using `dcd-client --query` (or using builtin equivalent)
 	auto serverStatus() @property
 	{
 		DCDServerStatus status;
 		if (serverPipes.pid && serverPipes.pid.tryWait().terminated)
 			status.isRunning = false;
-		else if (hasUnixDomainSockets)
+		else if (client.usingUnixDomainSockets)
 			status.isRunning = true;
 		else
-			status.isRunning = isPortRunning(runningPort);
+			status.isRunning = client.queryRunning();
 		return status;
 	}
 
@@ -287,24 +305,10 @@ class DCDComponent : ComponentWrapper
 					ret.finish(null);
 					return;
 				}
-				auto pipes = doClient(["--search", query]);
-				scope (exit)
-				{
-					pipes.pid.wait();
-					pipes.destroy();
-				}
-				pipes.stdin.close();
-				DCDSearchResult[] results;
-				while (pipes.stdout.isOpen && !pipes.stdout.eof)
-				{
-					string line = pipes.stdout.readln();
-					if (line.length == 0)
-						continue;
-					string[] splits = line.chomp.split('\t');
-					if (splits.length >= 3)
-						results ~= DCDSearchResult(splits[0], splits[2].to!int, splits[1]);
-				}
-				ret.finish(results);
+
+				ret.finish(client.requestSymbolSearch(query)
+					.map!(a => DCDSearchResult(a.symbolFilePath,
+					cast(int)a.symbolLocation, [cast(char) a.kind].idup)).array);
 			}
 			catch (Throwable t)
 			{
@@ -355,7 +359,7 @@ class DCDComponent : ComponentWrapper
 	/// Returns: 0 if not available, otherwise the port as number
 	Future!ushort findAndSelectPort(ushort port = 9166)
 	{
-		if (hasUnixDomainSockets)
+		if (client.usingUnixDomainSockets)
 		{
 			return Future!ushort.fromResult(0);
 		}
@@ -394,27 +398,9 @@ class DCDComponent : ComponentWrapper
 				if (!isIdentifierSeparatingChar(code[pos]))
 					pos++;
 
-				auto pipes = doClient(["-c", pos.to!string, "--symbolLocation"]);
-				scope (exit)
-				{
-					pipes.pid.wait();
-					pipes.destroy();
-				}
-				pipes.stdin.write(code);
-				pipes.stdin.close();
-				string line = pipes.stdout.readln();
-				if (line.length == 0)
-				{
-					ret.finish(DCDDeclaration.init);
-					return;
-				}
-				string[] splits = line.chomp.split('\t');
-				if (splits.length != 2)
-				{
-					ret.finish(DCDDeclaration.init);
-					return;
-				}
-				ret.finish(DCDDeclaration(splits[0], splits[1].to!int));
+				auto info = client.requestSymbolInfo(CodeRequest("stdin", code, pos));
+				ret.finish(DCDDeclaration(info.declarationFilePath,
+					cast(int) info.declarationLocation));
 			}
 			catch (Throwable t)
 			{
@@ -437,22 +423,8 @@ class DCDComponent : ComponentWrapper
 					ret.finish("");
 					return;
 				}
-				auto pipes = doClient(["--doc", "-c", pos.to!string]);
-				scope (exit)
-				{
-					pipes.pid.wait();
-					pipes.destroy();
-				}
-				pipes.stdin.write(code);
-				pipes.stdin.close();
-				string data;
-				while (pipes.stdout.isOpen && !pipes.stdout.eof)
-				{
-					string line = pipes.stdout.readln();
-					if (line.length)
-						data ~= line.chomp;
-				}
-				ret.finish(data.unescapeTabs);
+				auto doc = client.requestDocumentation(CodeRequest("stdin", code, pos));
+				ret.finish(doc.join("\n"));
 			}
 			catch (Throwable t)
 			{
@@ -466,17 +438,17 @@ class DCDComponent : ComponentWrapper
 	/// Throws an error if not available.
 	string getSocketFile()
 	{
-		if (!hasUnixDomainSockets)
+		if (!client.usingUnixDomainSockets)
 			throw new Exception("Unix domain sockets not supported");
-		return socketFile;
+		return client.socketFile;
 	}
 
 	/// Returns the used running port. Throws an error if using unix sockets instead
 	ushort getRunningPort()
 	{
-		if (hasUnixDomainSockets)
+		if (client.usingUnixDomainSockets)
 			throw new Exception("Using unix domain sockets instead of a port");
-		return runningPort;
+		return client.runningPort;
 	}
 
 	/// Queries for code completion at position `pos` in code
@@ -496,118 +468,41 @@ class DCDComponent : ComponentWrapper
 					ret.finish(completions);
 					return;
 				}
-				auto pipes = doClient((supportsFullOutput ? ["--extended"] : []) ~ [
-						"-c", pos.to!string
-					]);
-				scope (exit)
+
+				auto c = client.requestAutocomplete(CodeRequest("stdin", code, pos));
+				if (c.type == DCDCompletionType.calltips)
 				{
-					pipes.pid.wait();
-					pipes.destroy();
-				}
-				pipes.stdin.write(code);
-				pipes.stdin.close();
-				string[] data;
-				while (pipes.stdout.isOpen && !pipes.stdout.eof)
-				{
-					string line = pipes.stdout.readln();
-					trace("DCD Client: ", line);
-					if (line.length == 0)
-						continue;
-					data ~= line.chomp;
-				}
-				completions.raw = data;
-				int[] emptyArr;
-				if (data.length == 0)
-				{
-					completions.type = DCDCompletions.Type.identifiers;
-					ret.finish(completions);
-					return;
-				}
-				if (data[0] == "calltips")
-				{
-					if (supportsFullOutput)
-					{
-						foreach (line; data[1 .. $])
-						{
-							auto parts = line.split("\t");
-							if (parts.length < 5)
-								continue;
-							completions._calltips ~= parts[2];
-							string location = parts[3];
-							string file;
-							int index;
-							if (location.length)
-							{
-								auto space = location.lastIndexOf(' ');
-								if (space != -1)
-								{
-									file = location[0 .. space];
-									if (location[space + 1 .. $].all!isDigit)
-										index = location[space + 1 .. $].to!int;
-								}
-								else
-									file = location;
-							}
-							completions._symbols ~= DCDCompletions.Symbol(file, index, parts[4].unescapeTabs);
-						}
-					}
-					else
-					{
-						completions._calltips = data[1 .. $];
-						completions._symbols.length = completions._calltips.length;
-					}
 					completions.type = DCDCompletions.Type.calltips;
-					ret.finish(completions);
-					return;
-				}
-				else if (data[0] == "identifiers")
-				{
-					DCDIdentifier[] identifiers;
-					foreach (line; data[1 .. $])
+					auto calltips = appender!(string[]);
+					auto symbols = appender!(DCDCompletions.Symbol[]);
+					foreach (item; c.completions)
 					{
-						string[] splits = line.split('\t');
-						DCDIdentifier symbol;
-						if (supportsFullOutput)
-						{
-							if (splits.length < 5)
-								continue;
-							string location = splits[3];
-							string file;
-							int index;
-							if (location.length)
-							{
-								auto space = location.lastIndexOf(' ');
-								if (space != -1)
-								{
-									file = location[0 .. space];
-									if (location[space + 1 .. $].all!isDigit)
-										index = location[space + 1 .. $].to!int;
-								}
-								else
-									file = location;
-							}
-							symbol = DCDIdentifier(splits[0], splits[1], splits[2], file,
-								index, splits[4].unescapeTabs);
-						}
-						else
-						{
-							if (splits.length < 2)
-								continue;
-							symbol = DCDIdentifier(splits[0], splits[1]);
-						}
-						identifiers ~= symbol;
+						calltips ~= item.definition;
+						symbols ~= DCDCompletions.Symbol(item.symbolFilePath,
+							cast(int)item.symbolLocation, item.documentation);
 					}
+					completions._calltips = calltips.data;
+					completions._symbols = symbols.data;
+				}
+				else if (c.type == DCDCompletionType.identifiers)
+				{
 					completions.type = DCDCompletions.Type.identifiers;
-					completions._identifiers = identifiers;
-					ret.finish(completions);
-					return;
+					auto identifiers = appender!(DCDIdentifier[]);
+					foreach (item; c.completions)
+					{
+						identifiers ~= DCDIdentifier(item.identifier,
+							item.kind == char.init ? "" : [cast(char)item.kind].idup,
+							item.definition, item.symbolFilePath,
+							cast(int)item.symbolLocation, item.documentation);
+					}
+					completions._identifiers = identifiers.data;
 				}
 				else
 				{
 					completions.type = DCDCompletions.Type.raw;
-					ret.finish(completions);
-					return;
+					warning("Unknown DCD completion type: ", c.type);
 				}
+				ret.finish(completions);
 			}
 			catch (Throwable e)
 			{
@@ -621,11 +516,11 @@ class DCDComponent : ComponentWrapper
 	{
 		if (!running)
 			return;
-		string[] args;
-		foreach (path; knownImports)
-			if (path.length)
-				args ~= "-I" ~ path;
-		execClient(args);
+
+		auto existing = client.listImportPaths();
+		existing.sort!"a<b";
+		auto toAdd = setDifference(knownImports, existing);
+		client.addImportPaths(toAdd.array);
 	}
 
 	bool fromRunning(bool supportsFullOutput, string socketFile, ushort runningPort)
@@ -633,24 +528,22 @@ class DCDComponent : ComponentWrapper
 		if (socketFile.length ? isSocketRunning(socketFile) : isPortRunning(runningPort))
 		{
 			running = true;
-			this.supportsFullOutput = supportsFullOutput;
-			this.socketFile = socketFile;
-			this.runningPort = runningPort;
-			this.hasUnixDomainSockets = !!socketFile.length;
+			client.socketFile = socketFile;
+			client.runningPort = runningPort;
 			return true;
 		}
 		else
 			return false;
 	}
 
-	bool getSupportsFullOutput() @property
+	deprecated("clients without full output support no longer supported") bool getSupportsFullOutput() @property
 	{
-		return supportsFullOutput;
+		return true;
 	}
 
 	bool isUsingUnixDomainSockets() @property
 	{
-		return hasUnixDomainSockets;
+		return client.usingUnixDomainSockets;
 	}
 
 	bool isActive() @property
@@ -660,35 +553,14 @@ class DCDComponent : ComponentWrapper
 
 private:
 	string installedVersion;
-	bool supportsFullOutput;
-	bool hasUnixDomainSockets = false;
 	bool running = false;
 	ProcessPipes serverPipes;
-	ushort runningPort;
-	string socketFile;
 	string[] knownImports;
-
-	string[] clientArgs()
-	{
-		if (hasUnixDomainSockets)
-			return ["--socketFile", socketFile];
-		else
-			return ["--port", runningPort.to!string];
-	}
-
-	auto doClient(string[] args)
-	{
-		return raw([clientPath] ~ clientArgs ~ args);
-	}
+	IDCDClient client = new NullDCDClient();
 
 	auto raw(string[] args, Redirect redirect = Redirect.all)
 	{
 		return pipeProcess(args, redirect, null, Config.none, refInstance ? instance.cwd : null);
-	}
-
-	auto execClient(string[] args)
-	{
-		return rawExec([clientPath] ~ clientArgs ~ args);
 	}
 
 	auto rawExec(string[] args)
@@ -698,18 +570,18 @@ private:
 
 	bool isSocketRunning(string socket)
 	{
-		if (!hasUnixDomainSockets)
+		static if (!platformSupportsDCDUnixSockets)
 			return false;
-		auto ret = execute([clientPath, "-q", "--socketFile", socket]);
-		return ret.status == 0;
+		else
+			return isDCDServerRunning(false, socket, 0);
 	}
 
 	bool isPortRunning(ushort port)
 	{
-		if (hasUnixDomainSockets)
+		static if (platformSupportsDCDUnixSockets)
 			return false;
-		auto ret = execute([clientPath, "-q", "--port", port.to!string]);
-		return ret.status == 0;
+		else
+			return isDCDServerRunning(true, null, port);
 	}
 
 	ushort findOpen(ushort port)
@@ -725,6 +597,18 @@ private:
 	}
 }
 
+private string NullDCDClientGenerator(Base, alias fun)()
+{
+	return q{
+		import std.experimental.logger : warningf;
+		warningf("Trying to use DCD function %s on uninitialized client!", __FUNCTION__);
+		static if (!is(typeof(return) == void))
+			return typeof(return).init;
+	};
+}
+
+alias NullDCDClient = AutoImplement!(IDCDClient, NullDCDClientGenerator);
+
 bool supportsUnixDomainSockets(string ver)
 {
 	return checkVersion(ver, [0, 8, 0]);
@@ -737,58 +621,6 @@ unittest
 	assert(!supportsUnixDomainSockets("0.7.0"));
 	assert(supportsUnixDomainSockets("v0.9.8 c7ea7e081ed9ad2d85e9f981fd047d7fcdb2cf51"));
 	assert(supportsUnixDomainSockets("1.0.0"));
-}
-
-private string unescapeTabs(string val)
-{
-	if (!val.length)
-		return val;
-
-	auto ret = appender!string;
-	size_t i = 0;
-	while (i < val.length)
-	{
-		size_t index = val.indexOf('\\', i);
-		if (index == -1 || cast(int) index == cast(int) val.length - 1)
-		{
-			if (!ret.data.length)
-			{
-				return val;
-			}
-			else
-			{
-				ret.put(val[i .. $]);
-				break;
-			}
-		}
-		else
-		{
-			char c = val[index + 1];
-			switch (c)
-			{
-			case 'n':
-				c = '\n';
-				break;
-			case 't':
-				c = '\t';
-				break;
-			default:
-				break;
-			}
-			ret.put(val[i .. index]);
-			ret.put(c);
-			i = index + 2;
-		}
-	}
-	return ret.data;
-}
-
-unittest
-{
-	shouldEqual("hello world", "hello world".unescapeTabs);
-	shouldEqual("hello\nworld", "hello\\nworld".unescapeTabs);
-	shouldEqual("hello\\nworld", "hello\\\\nworld".unescapeTabs);
-	shouldEqual("hello\\\nworld", "hello\\\\\\nworld".unescapeTabs);
 }
 
 /// Returned by findDeclaration
@@ -807,7 +639,7 @@ struct DCDCompletions
 	/// Type of a completion
 	enum Type
 	{
-		/// Unknown/Unimplemented raw output
+		/// Unknown/Unimplemented output
 		raw,
 		/// Completion after a dot or a variable name
 		identifiers,
@@ -824,8 +656,7 @@ struct DCDCompletions
 
 	/// Type of the completion (identifiers, calltips, raw)
 	Type type;
-	/// Contains the raw DCD output
-	string[] raw;
+	deprecated string[] raw;
 	union
 	{
 		DCDIdentifier[] _identifiers;
