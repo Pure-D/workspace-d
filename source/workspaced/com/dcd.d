@@ -323,7 +323,16 @@ class DCDComponent : ComponentWrapper
 	/// Manually adds import paths as string array
 	void addImports(string[] imports)
 	{
-		knownImports ~= imports;
+		knownImports = multiwayUnion([knownImports.filterNonEmpty, imports.filterNonEmpty]).array;
+		updateImports();
+	}
+
+	/// Manually removes import paths using a string array. Note that trying to
+	/// remove import paths from the import paths provider will result in them
+	/// being readded as soon as refreshImports is called again.
+	void removeImports(string[] imports)
+	{
+		knownImports = setDifference(knownImports, imports.filterNonEmpty).array;
 		updateImports();
 	}
 
@@ -887,4 +896,9 @@ struct DCDSearchResult
 	int position;
 	///
 	string type;
+}
+
+private auto filterNonEmpty(T)(T range)
+{
+	return range.filter!(a => a.length);
 }
