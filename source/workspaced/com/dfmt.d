@@ -52,11 +52,15 @@ class DfmtComponent : ComponentWrapper
 				json.tryFetchProperty(config.dfmt_outdent_attributes, "outdent_attributes");
 				json.tryFetchProperty(config.dfmt_space_after_cast, "space_after_cast");
 				json.tryFetchProperty(config.dfmt_space_after_keywords, "space_after_keywords");
+				json.tryFetchProperty(config.dfmt_space_before_function_parameters, "space_before_function_parameters");
 				json.tryFetchProperty(config.dfmt_split_operator_at_line_end, "split_operator_at_line_end");
 				json.tryFetchProperty(config.tab_width, "tab_width");
 				json.tryFetchProperty(config.dfmt_selective_import_space, "selective_import_space");
 				json.tryFetchProperty(config.dfmt_compact_labeled_statements, "compact_labeled_statements");
 				json.tryFetchProperty(config.dfmt_template_constraint_style, "template_constraint_style");
+				json.tryFetchProperty(config.dfmt_single_template_constraint_indent, "single_template_constraint_indent");
+				json.tryFetchProperty(config.dfmt_space_before_aa_colon, "space_before_aa_colon");
+				json.tryFetchProperty(config.dfmt_keep_line_breaks, "keep_line_breaks");
 			}
 			catch (Exception e)
 			{
@@ -66,6 +70,8 @@ class DfmtComponent : ComponentWrapper
 		}
 		else if (arguments.length)
 		{
+			// code for parsing args from dfmt main.d (keep up-to-date!)
+			// https://github.com/dlang-community/dfmt/blob/master/src/dfmt/main.d
 			void handleBooleans(string option, string value)
 			{
 				import dfmt.editorconfig : OptionalBoolean;
@@ -84,6 +90,9 @@ class DfmtComponent : ComponentWrapper
 				case "space_after_cast":
 					config.dfmt_space_after_cast = val;
 					break;
+				case "space_before_function_parameters":
+					config.dfmt_space_before_function_parameters = val;
+					break;
 				case "split_operator_at_line_end":
 					config.dfmt_split_operator_at_line_end = val;
 					break;
@@ -93,29 +102,47 @@ class DfmtComponent : ComponentWrapper
 				case "compact_labeled_statements":
 					config.dfmt_compact_labeled_statements = val;
 					break;
+				case "single_template_constraint_indent":
+					config.dfmt_single_template_constraint_indent = val;
+					break;
+				case "space_before_aa_colon":
+					config.dfmt_space_before_aa_colon = val;
+					break;
+				case "keep_line_breaks":
+					config.dfmt_keep_line_breaks = val;
+					break;
 				default:
 					throw new Exception("Invalid command-line switch");
 				}
 			}
 
 			arguments = "dfmt" ~ arguments;
+
+			// this too keep up-to-date
+			// everything except "version", "config", "help", "inplace" arguments
+
 			//dfmt off
-					getopt(arguments,
-						"align_switch_statements", &handleBooleans,
-						"brace_style", &config.dfmt_brace_style,
-						"end_of_line", &config.end_of_line,
-						"indent_size", &config.indent_size,
-						"indent_style|t", &config.indent_style,
-						"max_line_length", &config.max_line_length,
-						"soft_max_line_length", &config.dfmt_soft_max_line_length,
-						"outdent_attributes", &handleBooleans,
-						"space_after_cast", &handleBooleans,
-						"selective_import_space", &handleBooleans,
-						"split_operator_at_line_end", &handleBooleans,
-						"compact_labeled_statements", &handleBooleans,
-						"tab_width", &config.tab_width,
-						"template_constraint_style", &config.dfmt_template_constraint_style);
-					//dfmt on
+			getopt(arguments,
+				"align_switch_statements", &handleBooleans,
+				"brace_style", &config.dfmt_brace_style,
+				"end_of_line", &config.end_of_line,
+				"indent_size", &config.indent_size,
+				"indent_style|t", &config.indent_style,
+				"max_line_length", &config.max_line_length,
+				"soft_max_line_length", &config.dfmt_soft_max_line_length,
+				"outdent_attributes", &handleBooleans,
+				"space_after_cast", &handleBooleans,
+				"selective_import_space", &handleBooleans,
+				"space_before_function_parameters", &handleBooleans,
+				"split_operator_at_line_end", &handleBooleans,
+				"compact_labeled_statements", &handleBooleans,
+				"single_template_constraint_indent", &handleBooleans,
+				"space_before_aa_colon", &handleBooleans,
+				"tab_width", &config.tab_width,
+				"template_constraint_style", &config.dfmt_template_constraint_style,
+				"keep_line_breaks", &handleBooleans
+			);
+			//dfmt on
 		}
 		auto output = appender!string;
 		fmt("stdin", cast(ubyte[]) code, output, &config);

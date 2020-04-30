@@ -20,3 +20,5 @@ workspace-d*.tar.xz
 __test__*__
 *-test-*
 .vscode/
+.vs/
+*.lib
