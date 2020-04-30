@@ -3,6 +3,7 @@ module workspaced.com.dscanner;
 import std.algorithm;
 import std.array;
 import std.conv;
+import std.experimental.logger;
 import std.file;
 import std.json;
 import std.stdio;
@@ -38,7 +39,7 @@ class DscannerComponent : ComponentWrapper
 	/// Asynchronously lints the file passed.
 	/// If you provide code then the code will be used and file will be ignored.
 	Future!(DScannerIssue[]) lint(string file = "", string ini = "dscanner.ini",
-			scope const(char)[] code = "")
+			scope const(char)[] code = "", bool skipWorkspacedPaths = false)
 	{
 		auto ret = new Future!(DScannerIssue[]);
 		gthreads.create({
@@ -47,11 +48,7 @@ class DscannerComponent : ComponentWrapper
 			{
 				if (code.length && !file.length)
 					file = "stdin";
-				auto config = defaultStaticAnalysisConfig();
-				if (getConfigPath("dscanner.ini", ini))
-					stderr.writeln("Overriding Dscanner ini with workspace-d dscanner.ini config file");
-				if (ini.exists)
-					readINIFile(config, ini);
+				auto config = getConfig(ini, skipWorkspacedPaths);
 				if (!code.length)
 					code = readText(file);
 				DScannerIssue[] issues;
@@ -95,6 +92,46 @@ class DscannerComponent : ComponentWrapper
 			}
 		});
 		return ret;
+	}
+
+	/// Gets the used D-Scanner config, optionally reading from a given
+	/// dscanner.ini file.
+	/// Params:
+	///   ini = an ini to load. Only reading from it if it exists. If this is
+	///         relative, this function will try both in getcwd and in the
+	///         instance.cwd, if an instance is set.
+	///   skipWorkspacedPaths = if true, don't attempt to override the given ini
+	///         with workspace-d user configs.
+	StaticAnalysisConfig getConfig(string ini = "dscanner.ini",
+		bool skipWorkspacedPaths = false)
+	{
+		import std.path : buildPath;
+
+		auto config = defaultStaticAnalysisConfig();
+		if (!skipWorkspacedPaths && getConfigPath("dscanner.ini", ini))
+		{
+			static bool didWarn = false;
+			if (!didWarn)
+			{
+				warning("Overriding Dscanner ini with workspace-d dscanner.ini config file");
+				didWarn = true;
+			}
+		}
+		string cwd = getcwd;
+		if (refInstance !is null)
+			cwd = refInstance.cwd;
+
+		if (ini.exists)
+		{
+			readINIFile(config, ini);
+		}
+		else
+		{
+			auto p = buildPath(cwd, ini);
+			if (p != ini && p.exists)
+				readINIFile(config, p);
+		}
+		return config;
 	}
 
 	private const(Module) parseModule(string file, ubyte[] code, RollbackAllocator* p,
