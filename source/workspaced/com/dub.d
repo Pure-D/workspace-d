@@ -549,6 +549,26 @@ class DubComponent : ComponentWrapper
 		return dst.data;
 	}
 
+	/// Tries to find a suitable code byte range where a given dub build issue
+	/// applies to.
+	/// Returns: `[pos, pos]` if not found, otherwise range in bytes which might
+	/// not contain the position at all.
+	int[2] resolveDiagnosticRange(scope const(char)[] code, int position,
+		scope const(char)[] diagnostic)
+	{
+		import dparse.lexer : getTokensForParser, LexerConfig;
+		import dparse.parser : parseModule;
+		import dparse.rollback_allocator : RollbackAllocator;
+		import workspaced.dub.diagnostics : resolveDubDiagnosticRange;
+
+		LexerConfig config;
+		RollbackAllocator rba;
+		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		auto parsed = parseModule(tokens, "equal_finder.d", &rba);
+
+		return resolveDubDiagnosticRange(code, tokens, parsed, position, diagnostic);
+	}
+
 private:
 	Dub _dub;
 	bool _dubRunning = false;
