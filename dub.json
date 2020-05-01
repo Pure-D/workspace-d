@@ -7,7 +7,7 @@
 		"webfreak"
 	],
 	"dependencies": {
-		"dub": "1.18.0",
+		"dub": "1.20.0",
 		"painlessjson": "1.4.0",
 		"standardpaths": "0.8.1",
 		"dfmt": "0.12.0",
