@@ -38,8 +38,10 @@ class DscannerComponent : ComponentWrapper
 
 	/// Asynchronously lints the file passed.
 	/// If you provide code then the code will be used and file will be ignored.
+	/// See_Also: $(LREF getConfig)
 	Future!(DScannerIssue[]) lint(string file = "", string ini = "dscanner.ini",
-			scope const(char)[] code = "", bool skipWorkspacedPaths = false)
+			scope const(char)[] code = "", bool skipWorkspacedPaths = false,
+			const StaticAnalysisConfig defaultConfig = StaticAnalysisConfig.init)
 	{
 		auto ret = new Future!(DScannerIssue[]);
 		gthreads.create({
@@ -48,7 +50,7 @@ class DscannerComponent : ComponentWrapper
 			{
 				if (code.length && !file.length)
 					file = "stdin";
-				auto config = getConfig(ini, skipWorkspacedPaths);
+				auto config = getConfig(ini, skipWorkspacedPaths, defaultConfig);
 				if (!code.length)
 					code = readText(file);
 				DScannerIssue[] issues;
@@ -102,12 +104,17 @@ class DscannerComponent : ComponentWrapper
 	///         instance.cwd, if an instance is set.
 	///   skipWorkspacedPaths = if true, don't attempt to override the given ini
 	///         with workspace-d user configs.
+	///   defaultConfig = default D-Scanner configuration to use if no user
+	///         config exists (workspace-d specific or ini argument)
 	StaticAnalysisConfig getConfig(string ini = "dscanner.ini",
-		bool skipWorkspacedPaths = false)
+		bool skipWorkspacedPaths = false,
+		const StaticAnalysisConfig defaultConfig = StaticAnalysisConfig.init)
 	{
 		import std.path : buildPath;
 
-		auto config = defaultStaticAnalysisConfig();
+		StaticAnalysisConfig config = defaultConfig is StaticAnalysisConfig.init
+			? defaultStaticAnalysisConfig()
+			: cast()defaultConfig;
 		if (!skipWorkspacedPaths && getConfigPath("dscanner.ini", ini))
 		{
 			static bool didWarn = false;
@@ -659,4 +666,10 @@ struct ContextType
 {
 	string[string] attr;
 	string access;
+}
+
+unittest
+{
+	StaticAnalysisConfig check = StaticAnalysisConfig.init;
+	assert(check is StaticAnalysisConfig.init);
 }
