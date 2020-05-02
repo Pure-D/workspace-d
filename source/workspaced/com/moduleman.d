@@ -9,6 +9,7 @@ import std.algorithm;
 import std.array;
 import std.conv;
 import std.file;
+import std.format;
 import std.functional;
 import std.path;
 import std.string;
@@ -103,12 +104,21 @@ class ModulemanComponent : ComponentWrapper
 		else
 		{
 			if (modName == "")
+			{
 				return [CodeReplacement([existing.outerFrom, existing.outerTo], "")];
+			}
 			else
+			{
+				const trailing = code[min(existing.outerTo, $) .. $];
+				// determine number of new lines to insert after full module name + semicolon
+				string semicolonNewlines = trailing.startsWith("\n\n", "\r\r", "\r\n\r\n") ? ";"
+					: trailing.startsWith("\n", "\r") ? ";\n"
+					: ";\n\n";
 				return [
 					CodeReplacement([existing.outerFrom, existing.outerTo], text("module ",
-							modName, (existing.outerTo == existing.outerFrom ? ";\n\n" : ";")))
+							modName, (existing.outerTo == existing.outerFrom ? semicolonNewlines : ";")))
 				];
+			}
 		}
 	}
 
@@ -143,7 +153,41 @@ class ModulemanComponent : ComponentWrapper
 		}
 
 		if (start == -1)
-			return FileModuleInfo.init;
+		{
+			FileModuleInfo ret;
+			start = 0;
+			if (tokens.length && tokens[0].type == tok!"scriptLine")
+			{
+				start = code.indexOfAny("\r\n");
+				if (start == -1)
+				{
+					start = 0;
+				}
+				else
+				{
+					if (start + 1 < code.length && code[start] == '\r' && code[start + 1] == '\n')
+						start += 2;
+					else
+						start++;
+					// support /+ dub.sdl: lines or similar starts directly after a script line
+					auto leading = code[start .. $].stripLeft;
+					if (leading.startsWith("/+", "/*"))
+					{
+						size_t end = code.indexOf(leading[1] == '+' ? "+/" : "*/", start);
+						if (end != -1)
+						{
+							start = end + 2;
+							if (code[start .. $].startsWith("\r\n"))
+								start += 2;
+							else if (code[start .. $].startsWith("\r", "\n"))
+								start += 1;
+						}
+					}
+				}
+			}
+			ret.outerFrom = ret.outerTo = ret.from = ret.to = start;
+			return ret;
+		}
 
 		const(string)[] raw;
 		string moduleName;
@@ -185,6 +229,11 @@ struct FileModuleInfo
 	size_t from, to;
 	/// Code index of the whole module statement starting right at module and ending right after the semicolon.
 	size_t outerFrom, outerTo;
+
+	string toString() const
+	{
+		return format!"FileModuleInfo[%s..%s](name[%s..%s]=%s)"(outerFrom, outerTo, from, to, moduleName);
+	}
 }
 
 private:
@@ -319,5 +368,18 @@ unittest
 	assert(nrm == [CodeReplacement([0, 0], "module pkg.test;\n\n")]);
 
 	auto fetched = mod.describeModule("/* hello world */ module\nfoo . \nbar  ;\n\nvoid foo() {");
-	assert(fetched == FileModuleInfo(["foo", "bar"], "foo.bar", 25, 35, 18, 38));
+	shouldEqual(fetched, FileModuleInfo(["foo", "bar"], "foo.bar", 25, 35, 18, 38));
+
+	fetched = mod.describeModule(`#!/usr/bin/env dub
+/+ dub.sdl:
+	name "hello"
++/
+void main() {}`);
+	shouldEqual(fetched, FileModuleInfo([], "", 48, 48, 48, 48));
+
+	fetched = mod.describeModule("#!/usr/bin/rdmd\r\n");
+	shouldEqual(fetched, FileModuleInfo([], "", 17, 17, 17, 17));
+
+	fetched = mod.describeModule("#!/usr/bin/rdmd\n");
+	shouldEqual(fetched, FileModuleInfo([], "", 16, 16, 16, 16));
 }
