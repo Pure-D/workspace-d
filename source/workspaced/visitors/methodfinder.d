@@ -195,9 +195,9 @@ class InterfaceMethodFinder : AttributesVisitor
 		if (inTarget)
 			return; // ignore nested
 
-		details.blockRange = [structBody.startLocation, structBody.endLocation + 1];
 		if (targetPosition >= name.index && targetPosition < structBody.endLocation)
 		{
+			details.blockRange = [structBody.startLocation, structBody.endLocation + 1];
 			details.name = name.text;
 			if (baseClassList)
 				foreach (base; baseClassList.items)

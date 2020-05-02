@@ -1733,3 +1733,34 @@ private:
 	assert(!info.details.methods[11].needsImplementation);
 	assert(!info.details.methods[11].hasBody);
 }
+
+unittest
+{
+	string testCode = q{module hello;
+
+interface MyInterface
+{
+	void foo();
+}
+
+class ImplA : MyInterface
+{
+
+}
+
+class ImplB : MyInterface
+{
+	void foo() {}
+}
+};
+
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DCDExtComponent;
+	DCDExtComponent dcdext = instance.get!DCDExtComponent;
+
+	auto info = dcdext.getInterfaceDetails("stdin", testCode, 72);
+
+	shouldEqual(info.blockRange, [81, 85]);
+}
