@@ -26,7 +26,7 @@ version (unittest)
 else
 {
 	// dummy
-	pragma(inline, true) package void trace(Args...)(lazy Args)
+	package void trace(Args...)(lazy Args)
 	{
 	}
 }
