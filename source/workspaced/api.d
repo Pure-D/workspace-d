@@ -434,14 +434,19 @@ bool checkVersion(string ver, int[3] target)
 	auto match = ver.matchFirst(verRegex);
 	if (!match)
 		return false;
-	int major = match[1].to!int;
-	int minor = match[2].to!int;
-	int patch = match[3].to!int;
-	if (major > target[0])
+	const major = match[1].to!int;
+	const minor = match[2].to!int;
+	const patch = match[3].to!int;
+	return checkVersion([major, minor, patch], target);
+}
+
+bool checkVersion(int[3] ver, int[3] target)
+{
+	if (ver[0] > target[0])
 		return true;
-	if (major == target[0] && minor > target[1])
+	if (ver[0] == target[0] && ver[1] > target[1])
 		return true;
-	if (major == target[0] && minor == target[1] && patch >= target[2])
+	if (ver[0] == target[0] && ver[1] == target[1] && ver[2] >= target[2])
 		return true;
 	return false;
 }
