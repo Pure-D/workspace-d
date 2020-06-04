@@ -845,6 +845,97 @@ class DCDExtComponent : ComponentWrapper
 		return tree;
 	}
 
+	/// Formats DCD definitions (symbol declarations) in a readable format.
+	/// For functions this formats each argument in a separate line.
+	/// For other symbols the definition is returned as-is.
+	string formatDefinitionBlock(string definition)
+	{
+		// DCD definition help contains calltips for functions, which always end
+		// with )
+		if (!definition.endsWith(")"))
+			return definition;
+
+		auto tokens = getTokensForParser(cast(const(ubyte)[]) definition ~ ';',
+			config, &workspaced.stringCache);
+		if (!tokens.length)
+			return definition;
+
+		RollbackAllocator rba;
+		auto parser = new Parser();
+		parser.fileName = "stdin";
+		parser.tokens = tokens;
+		parser.messageFunction = null;
+		parser.messageDelegate = null;
+		parser.allocator = &rba;
+		const Declaration decl = parser.parseDeclaration(
+			false, // strict
+			true // must be declaration (for constructor)
+		);
+		if (!decl)
+			return definition;
+
+		const FunctionDeclaration funcdecl = decl.functionDeclaration;
+		const Constructor ctor = decl.constructor;
+		if (!funcdecl && !ctor)
+			return definition;
+
+		auto ret = appender!string();
+		ret.reserve(definition.length);
+
+		if (funcdecl)
+			ret.put(definition[0 .. funcdecl.name.index + funcdecl.name.text.length]);
+		else if (ctor)
+			ret.put("this");
+
+		const templateParameters = funcdecl ? funcdecl.templateParameters : ctor.templateParameters;
+		if (templateParameters && templateParameters.templateParameterList)
+		{
+			const params = templateParameters.templateParameterList.items;
+			ret.put("(\n");
+			foreach (i, param; params)
+			{
+				assert(param.tokens.length, "no tokens for template parameter?!");
+				const start = param.tokens[0].index;
+				const end = param.tokens[$ - 1].index + tokenText(param.tokens[$ - 1]).length;
+				const hasNext = i + 1 < params.length;
+				ret.put("\t");
+				ret.put(definition[start .. end]);
+				if (hasNext)
+					ret.put(",");
+				ret.put("\n");
+			}
+			ret.put(")");
+		}
+
+		const parameters = funcdecl ? funcdecl.parameters : ctor.parameters;
+		if (parameters && (parameters.parameters.length || parameters.hasVarargs))
+		{
+			const params = parameters.parameters;
+			ret.put("(\n");
+			foreach (i, param; params)
+			{
+				assert(param.tokens.length, "no tokens for parameter?!");
+				const start = param.tokens[0].index;
+				const end = param.tokens[$ - 1].index + tokenText(param.tokens[$ - 1]).length;
+				const hasNext = parameters.hasVarargs || i + 1 < params.length;
+				ret.put("\t");
+				ret.put(definition[start .. end]);
+				if (hasNext)
+					ret.put(",");
+				ret.put("\n");
+			}
+			if (parameters.hasVarargs)
+				ret.put("\t...\n");
+			ret.put(")");
+		}
+		else
+		{
+			ret.put("()");
+		}
+
+		return ret.data;
+	}
+
 private:
 	LexerConfig config;
 }
@@ -1763,4 +1854,26 @@ class ImplB : MyInterface
 	auto info = dcdext.getInterfaceDetails("stdin", testCode, 72);
 
 	shouldEqual(info.blockRange, [81, 85]);
+}
+
+unittest
+{
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DCDExtComponent;
+	DCDExtComponent dcdext = instance.get!DCDExtComponent;
+
+	shouldEqual(dcdext.formatDefinitionBlock("Foo!(int, string) x"), "Foo!(int, string) x");
+	shouldEqual(dcdext.formatDefinitionBlock("void foo()"), "void foo()");
+	shouldEqual(dcdext.formatDefinitionBlock("void foo(string x)"), "void foo(\n\tstring x\n)");
+	shouldEqual(dcdext.formatDefinitionBlock("void foo(string x,)"), "void foo(\n\tstring x\n)");
+	shouldEqual(dcdext.formatDefinitionBlock("void foo(string x, int y)"), "void foo(\n\tstring x,\n\tint y\n)");
+	shouldEqual(dcdext.formatDefinitionBlock("void foo(string, int)"), "void foo(\n\tstring,\n\tint\n)");
+	shouldEqual(dcdext.formatDefinitionBlock("this(string, int)"), "this(\n\tstring,\n\tint\n)");
+	shouldEqual(dcdext.formatDefinitionBlock("auto foo(string, int)"), "auto foo(\n\tstring,\n\tint\n)");
+	shouldEqual(dcdext.formatDefinitionBlock("ComplexTemplate!(int, 'a', string, Nested!(Foo)) foo(string, int)"),
+		"ComplexTemplate!(int, 'a', string, Nested!(Foo)) foo(\n\tstring,\n\tint\n)");
+	shouldEqual(dcdext.formatDefinitionBlock("auto foo(T, V)(string, int)"), "auto foo(\n\tT,\n\tV\n)(\n\tstring,\n\tint\n)");
+	shouldEqual(dcdext.formatDefinitionBlock("auto foo(string, int f, ...)"), "auto foo(\n\tstring,\n\tint f,\n\t...\n)");
 }
