@@ -2,6 +2,7 @@ module workspaced.coms;
 
 import std.meta;
 
+public import workspaced.com.cache : CacheComponent;
 public import workspaced.com.dcd : DCDComponent;
 public import workspaced.com.dcdext : DCDExtComponent;
 public import workspaced.com.dfmt : DfmtComponent;
@@ -16,4 +17,5 @@ public import workspaced.com.snippets : SnippetsComponent;
 
 alias AllComponents = AliasSeq!(DCDComponent, DfmtComponent, DlanguiComponent,
 		DscannerComponent, DubComponent, FSWorkspaceComponent,
-		ImporterComponent, ModulemanComponent, DCDExtComponent, DMDComponent, SnippetsComponent);
+		ImporterComponent, ModulemanComponent, DCDExtComponent, DMDComponent,
+		SnippetsComponent, CacheComponent);

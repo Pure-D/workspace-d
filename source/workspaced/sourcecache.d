@@ -17,6 +17,8 @@ struct SourceCache
 	CacheLRU!(string, SourceCacheEntry*) fileCache;
 	/// A module -> path mapping for all files currently inside the cache.
 	TreeMap!(string[], string) moduleMap;
+	/// Fallback cache entry for non-existant files
+	SourceCacheEntry uncachable;
 
 	TypedAllocator!(Mallocator, AllocFlag.immutableShared) entryAllocator;
 
@@ -33,11 +35,17 @@ struct SourceCache
 	}
 
 	/**
-	 * Caches a file path with the given content. If no content is given, read the file instead.
+	 * Caches a file path with the given content. If no content is given, read
+	 * the file instead.
 	 *
-	 * A missing file will be parsed fresh, existing files will be updated with the content or reread if neccessary.
+	 * A missing file will be parsed fresh, existing files will be updated with
+	 * the content or reread if neccessary. If no content was given and the file
+	 * path doesn't exist (anymore) it will be removed from cache and the
+	 * fallback cache entry `uncachable` will be returned.
 	 *
-	 * First providing content and then not providing content anymore will cause the content to stay unless the file modified time has changed since the content was set.
+	 * First providing content and then not providing content anymore will cause
+	 * the content to stay unless the file modified time has changed since the
+	 * content was set.
 	 */
 	ref SourceCacheEntry cacheFile(string path, const(ubyte)[] content = null)
 	{
@@ -48,9 +56,14 @@ struct SourceCache
 			processEvents();
 			value = existing.get();
 			if (content.length)
+			{
 				value.fromContent(path, content);
-			else
-				value.fromFile(path);
+			}
+			else if (!value.fromFile(path))
+			{
+				removeEntry(path);
+				return uncachable;
+			}
 			return *value;
 		}
 
@@ -59,9 +72,14 @@ struct SourceCache
 		value.stringCache = stringCache;
 
 		if (content.length)
+		{
 			value.fromContent(path, content);
-		else
-			value.fromFile(path);
+		}
+		else if (!value.fromFile(path))
+		{
+			removeEntry(path);
+			return uncachable;
+		}
 
 		moduleMap.insert(cast(string[]) value.moduleName, path);
 		fileCache.put(path, value);
@@ -70,24 +88,39 @@ struct SourceCache
 	}
 
 	/// Removes a given path from both the module map and the file cache.
-	void removeEntry(string path)
+	/// Returns: true if path existed and was now removed or false otherwise.
+	bool removeEntry(string path)
 	{
-		fileCache.remove(path);
-		processEvents();
+		if (fileCache.remove(path))
+		{
+			processEvents();
+			return true;
+		}
+		else
+		{
+			return false;
+		}
 	}
 
 	/// Caches all .d and .di files in a given path recursively.
 	/// If there are more files than the cache limit, this will do a lot of work and throw it away immediately again.
-	void cacheRecursively(string path)
+	/// Returns: number of cached D files in the directory path.
+	size_t cacheRecursively(string path)
 	{
 		import std.file : dirEntries, getcwd, SpanMode;
 		import std.path : buildNormalizedPath;
 
 		auto normalized = buildNormalizedPath(getcwd, path);
 
+		size_t numCached;
 		foreach (file; dirEntries(normalized, SpanMode.breadth))
 			if (file.isFile && file.name.endsWith(".d", ".di"))
+			{
 				cacheFile(file);
+				numCached++;
+			}
+
+		return numCached;
 	}
 
 	private void processEvents()
@@ -163,13 +196,16 @@ struct SourceCacheEntry
 			.array;
 	}
 
-	void fromFile(string path)
+	/// Returns: false if this file doesn't exist
+	bool fromFile(string path)
 	{
 		import std.file : read;
 
 		const modified = safeModifiedTime(path);
+		if (modified == SysTime.init)
+			return false;
 		if (modified == fileDate)
-			return;
+			return true;
 
 		if (ownCode)
 			destroy(code);
@@ -177,6 +213,7 @@ struct SourceCacheEntry
 		fileDate = modified;
 		code = cast(const(ubyte)[]) read(path);
 		reparse(path);
+		return true;
 	}
 
 	void fromContent(string path, const(ubyte)[] content)
