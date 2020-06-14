@@ -341,7 +341,7 @@ class BuiltinDCDClient : IDCDClient
 	{
 		version (haveUnixSockets)
 		{
-			this(generateSocketName());
+			this((() @trusted => generateSocketName())());
 		}
 		else
 		{
