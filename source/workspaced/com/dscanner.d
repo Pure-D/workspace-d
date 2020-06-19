@@ -273,7 +273,7 @@ struct FileLocation
 {
 	///
 	string file;
-	///
+	/// 1-based line number and column byte offset
 	int line, column;
 }
 
@@ -282,7 +282,7 @@ struct DefinitionElement
 {
 	///
 	string name;
-	///
+	/// 1-based line number
 	int line;
 	/// One of "c" (class), "s" (struct), "i" (interface), "T" (template), "f" (function/ctor/dtor), "g" (enum {}), "u" (union), "e" (enum member/definition), "v" (variable/invariant)
 	string type;
@@ -650,7 +650,7 @@ final class DefinitionFinder : ASTVisitor
 DefinitionElement makeDefinition(string name, size_t line, string type,
 		ContextType context, int[2] range)
 {
-	string[string] attr = context.attr;
+	string[string] attr = context.attr.dup;
 	if (context.access.length)
 		attr["access"] = context.access;
 	return DefinitionElement(name, cast(int) line, type, attr, range);
