@@ -8,6 +8,7 @@ import std.file;
 import std.json;
 import std.stdio;
 import std.typecons;
+import std.meta : AliasSeq;
 
 import core.sync.mutex;
 import core.thread;
@@ -160,8 +161,13 @@ class DscannerComponent : ComponentWrapper
 	}
 
 	/// Asynchronously lists all definitions in the specified file.
+	///
 	/// If you provide code the file wont be manually read.
-	Future!(DefinitionElement[]) listDefinitions(string file, scope const(char)[] code = "")
+	///
+	/// Set verbose to true if you want to receive more temporary symbols and
+	/// things that could be considered clutter as well.
+	Future!(DefinitionElement[]) listDefinitions(string file,
+		scope const(char)[] code = "", bool verbose = false)
 	{
 		auto ret = new Future!(DefinitionElement[]);
 		gthreads.create({
@@ -186,6 +192,7 @@ class DscannerComponent : ComponentWrapper
 				auto m = dparse.parser.parseModule(tokens.array, file, &r);
 
 				auto defFinder = new DefinitionFinder();
+				defFinder.verbose = verbose;
 				defFinder.visit(m);
 
 				ret.finish(defFinder.definitions);
@@ -284,7 +291,25 @@ struct DefinitionElement
 	string name;
 	/// 1-based line number
 	int line;
-	/// One of "c" (class), "s" (struct), "i" (interface), "T" (template), "f" (function/ctor/dtor), "g" (enum {}), "u" (union), "e" (enum member/definition), "v" (variable/invariant)
+	/// One of
+	/// * `c` = class
+	/// * `s` = struct
+	/// * `i` = interface
+	/// * `T` = template
+	/// * `f` = function/ctor/dtor
+	/// * `g` = enum {}
+	/// * `u` = union
+	/// * `e` = enum member/definition
+	/// * `v` = variable/invariant
+	/// * `a` = alias
+	/// * `U` = unittest (only in verbose mode)
+	/// * `D` = debug specification (only in verbose mode)
+	/// * `V` = version specification (only in verbose mode)
+	/// * `C` = static module ctor (only in verbose mode)
+	/// * `S` = shared static module ctor (only in verbose mode)
+	/// * `Q` = static module dtor (only in verbose mode)
+	/// * `W` = shared static module dtor (only in verbose mode)
+	/// * `P` = postblit/copy ctor (only in verbose mode)
 	string type;
 	///
 	string[string] attributes;
@@ -463,6 +488,21 @@ final class DefinitionFinder : ASTVisitor
 				]);
 	}
 
+	override void visit(const Postblit dec)
+	{
+		if (!verbose)
+			return;
+
+		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody
+				|| !dec.functionBody.specifiedFunctionBody.blockStatement)
+			return;
+		definitions ~= makeDefinition("this(this)", dec.line, "f", context,
+				[
+					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
+					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
+				]);
+	}
+
 	override void visit(const EnumDeclaration dec)
 	{
 		if (!dec.enumBody)
@@ -601,13 +641,80 @@ final class DefinitionFinder : ASTVisitor
 		accessSt = AccessState.Reset;
 	}
 
+	override void visit(const DebugSpecification dec)
+	{
+		if (!verbose)
+			return;
+
+		auto tok = dec.identifierOrInteger;
+		auto def = makeDefinition(tok.tokenText, tok.line, "D", context,
+				[
+					cast(int) tok.index,
+					cast(int) tok.index + cast(int) tok.text.length
+				]);
+
+		definitions ~= def;
+		dec.accept(this);
+	}
+
+	override void visit(const VersionSpecification dec)
+	{
+		if (!verbose)
+			return;
+
+		auto tok = dec.token;
+		auto def = makeDefinition(tok.tokenText, tok.line, "V", context,
+				[
+					cast(int) tok.index,
+					cast(int) tok.index + cast(int) tok.text.length
+				]);
+
+		definitions ~= def;
+		dec.accept(this);
+	}
+
 	override void visit(const Unittest dec)
 	{
-		// skipping symbols inside a unit test to not clutter the ctags file
-		// with "temporary" symbols.
-		// TODO when phobos have a unittest library investigate how that could
-		// be used to describe the tests.
-		// Maybe with UDA's to give the unittest a "name".
+		if (!verbose)
+			return;
+
+		if (!dec.blockStatement)
+			return;
+		string testName;
+		testName = text("__unittest_L", dec.line, "_C", dec.column);
+		definitions ~= makeDefinition(testName, dec.line, "U", context,
+				[
+					cast(int) dec.blockStatement.startLocation,
+					cast(int) dec.blockStatement.endLocation
+				]);
+
+		// TODO: decide if we want to include types nested in unittests
+		// dec.accept(this);
+	}
+
+	private static immutable CtorTypes = ["C", "S", "Q", "W"];
+	private static immutable CtorNames = [
+		"static this()", "shared static this()",
+		"static ~this()", "shared static ~this()"
+	];
+	static foreach (i, T; AliasSeq!(StaticConstructor, SharedStaticConstructor,
+			StaticDestructor, SharedStaticDestructor))
+	{
+		override void visit(const T dec)
+		{
+			if (!verbose)
+				return;
+
+			if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody
+					|| !dec.functionBody.specifiedFunctionBody.blockStatement)
+				return;
+			definitions ~= makeDefinition(CtorNames[i], dec.line, CtorTypes[i], context,
+				[
+					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
+					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
+				]);
+			dec.accept(this);
+		}
 	}
 
 	override void visit(const AliasDeclaration dec)
@@ -645,6 +752,7 @@ final class DefinitionFinder : ASTVisitor
 	ContextType context;
 	AccessState accessSt;
 	DefinitionElement[] definitions;
+	bool verbose;
 }
 
 DefinitionElement makeDefinition(string name, size_t line, string type,
@@ -672,4 +780,130 @@ unittest
 {
 	StaticAnalysisConfig check = StaticAnalysisConfig.init;
 	assert(check is StaticAnalysisConfig.init);
+}
+
+unittest
+{
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DscannerComponent;
+	DscannerComponent dscanner = instance.get!DscannerComponent;
+
+	string code = `module foo.bar;
+
+version = Foo;
+debug = Bar;
+
+void hello() {
+	int x = 1;
+}
+
+int y = 2;
+
+int
+bar()
+{
+}
+
+unittest
+{
+}
+
+@( "named" )
+unittest
+{
+}
+
+class X
+{
+	this(int x) {}
+	this(this) {}
+	~this() {}
+
+	unittest
+	{
+	}
+}
+
+shared static this()
+{
+}
+
+`;
+
+	auto defs = dscanner.listDefinitions("stdin", code, false).getBlocking();
+
+	shouldEqual(defs, [
+			DefinitionElement("hello", 6, "f", [
+					"signature": "()",
+					"access": "public",
+					"return": "void"
+				], [59, 73]),
+			DefinitionElement("y", 10, "v", ["access": "public"], [80, 81]),
+			DefinitionElement("bar", 13, "f", [
+					"signature": "()",
+					"access": "public",
+					"return": "int"
+				], [98, 100]),
+			DefinitionElement("X", 26, "c", ["access": "public"], [152,
+					214]),
+			DefinitionElement("this", 28, "f", [
+					"signature": "(int x)",
+					"access": "public",
+					"class": "X"
+				], [167, 168]),
+			DefinitionElement("~this", 30, "f", [
+					"access": "public",
+					"class": "X"
+				], [194, 195])
+			]);
+
+	// verbose definitions
+	defs = dscanner.listDefinitions("stdin", code, true).getBlocking();
+
+	shouldEqual(defs, [
+			DefinitionElement("Foo", 3, "V", ["access": "public"], [27, 30]),
+			DefinitionElement("Bar", 4, "D", ["access": "public"], [40, 43]),
+			DefinitionElement("hello", 6, "f", [
+					"signature": "()",
+					"access": "public",
+					"return": "void"
+				], [59, 73]),
+			DefinitionElement("y", 10, "v", ["access": "public"], [80, 81]),
+			DefinitionElement("bar", 13, "f", [
+					"signature": "()",
+					"access": "public",
+					"return": "int"
+				], [98, 100]),
+			DefinitionElement("__unittest_L17_C1", 17, "U",
+				["access": "public"], [112,
+					114]),
+			DefinitionElement("__unittest_L22_C1", 22, "U",
+				["access": "public"],
+				[139, 141]),
+			DefinitionElement("X", 26, "c", ["access": "public"], [152,
+					214]),
+			DefinitionElement("this", 28, "f", [
+					"signature": "(int x)",
+					"access": "public",
+					"class": "X"
+				], [167, 168]),
+			DefinitionElement("this(this)", 29, "f", [
+					"access": "public",
+					"class": "X"
+				], [182, 183]),
+			DefinitionElement("~this", 30, "f", [
+					"access": "public",
+					"class": "X"
+				], [194, 195]),
+			DefinitionElement("__unittest_L32_C2", 32, "U", [
+					"access": "public",
+					"class": "X"
+				], [209, 212]),
+			DefinitionElement("shared static this()", 37, "S", [
+					"access": "public"
+				], [238, 240])
+			]);
+
 }
