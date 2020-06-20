@@ -327,6 +327,7 @@ class DCDComponent : ComponentWrapper
 	/// Manually adds import paths as string array
 	void addImports(string[] imports)
 	{
+		imports.sort!"a<b";
 		knownImports = multiwayUnion([knownImports.filterNonEmpty, imports.filterNonEmpty]).array;
 		updateImports();
 	}
