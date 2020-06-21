@@ -705,7 +705,7 @@ final class DefinitionFinder : ASTVisitor
 		string testName = text("__unittest_L", dec.line, "_C", dec.column);
 		definitions ~= makeDefinition(testName, dec.line, "U", context,
 				[
-					cast(int) dec.blockStatement.startLocation,
+					cast(int) dec.tokens[0].index,
 					cast(int) dec.blockStatement.endLocation
 				], "U");
 
@@ -905,11 +905,11 @@ shared static this()
 					"return": "int"
 				], [98, 100]),
 			DefinitionElement("__unittest_L17_C1", 17, "U",
-				["access": "public"], [112,
+				["access": "public"], [103,
 					114]),
 			DefinitionElement("__unittest_L22_C1", 22, "U",
 				["access": "public", "name": "named"],
-				[139, 141]),
+				[130, 141]),
 			DefinitionElement("X", 26, "c", ["access": "public"], [152,
 					214]),
 			DefinitionElement("this", 28, "f", [
@@ -928,7 +928,7 @@ shared static this()
 			DefinitionElement("__unittest_L32_C2", 32, "U", [
 					"access": "public",
 					"class": "X"
-				], [209, 212]),
+				], [199, 212]),
 			DefinitionElement("shared static this()", 37, "S", [
 					"access": "public"
 				], [238, 240])
