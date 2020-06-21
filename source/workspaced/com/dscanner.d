@@ -619,8 +619,10 @@ final class DefinitionFinder : ASTVisitor
 		}
 		else if (attribute.deprecated_ !is null)
 		{
-			// TODO: find out how to get deprecation message
-			context.attr["deprecation"] = "";
+			string reason;
+			if (attribute.deprecated_.assignExpression)
+				reason = evaluateExpressionString(attribute.deprecated_.assignExpression);
+			context.attr["deprecation"] = reason.length ? reason : "";
 		}
 
 		attribute.accept(this);
