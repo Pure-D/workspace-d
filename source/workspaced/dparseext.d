@@ -50,11 +50,11 @@ string paramsToString(Dec)(const Dec dec)
 
 /// Other tokens
 private enum dynamicTokens = [
-		"specialTokenSequence", "comment", "identifier", "scriptLine", "whitespace",
-		"doubleLiteral", "floatLiteral", "idoubleLiteral", "ifloatLiteral",
-		"intLiteral", "longLiteral", "realLiteral", "irealLiteral", "uintLiteral",
-		"ulongLiteral", "characterLiteral", "dstringLiteral", "stringLiteral",
-		"wstringLiteral"
+		"specialTokenSequence", "comment", "identifier", "scriptLine",
+		"whitespace", "doubleLiteral", "floatLiteral", "idoubleLiteral",
+		"ifloatLiteral", "intLiteral", "longLiteral", "realLiteral",
+		"irealLiteral", "uintLiteral", "ulongLiteral", "characterLiteral",
+		"dstringLiteral", "stringLiteral", "wstringLiteral"
 	];
 
 string tokenText(const Token token)
@@ -92,7 +92,7 @@ string tokenText(const Token token)
 /// return tokens.length;
 /// ---
 size_t tokenIndexAtByteIndex(scope const(Token)[] tokens, size_t bytes)
-	out(v; v <= tokens.length)
+out (v; v <= tokens.length)
 {
 	if (!tokens.length || tokens[0].index >= bytes)
 		return 0;
@@ -164,4 +164,70 @@ void foo()
 	assert(get(20) == tok!";");
 
 	// assert(get(57) == tok!"comment");
+}
+
+/// Tries to evaluate an expression if it evaluates to a string.
+/// Returns: `null` if the resulting value is not a string or could not be
+/// evaluated.
+string evaluateExpressionString(const PrimaryExpression expr)
+in (expr !is null)
+{
+	switch (expr.primary.type)
+	{
+	case tok!"stringLiteral":
+	case tok!"wstringLiteral":
+	case tok!"dstringLiteral":
+		auto str = expr.primary.text;
+
+		// we want to unquote here
+		// foreach because implicit concatenation can combine multiple strings
+		auto ret = appender!string;
+		scope StringCache cache = StringCache(16);
+		LexerConfig config;
+		config.commentBehavior = CommentBehavior.noIntern;
+		config.stringBehavior = StringBehavior.compiler; // interpret literals
+		config.whitespaceBehavior = WhitespaceBehavior.skip;
+		config.fileName = "evaluate-string-stdin";
+		foreach (t; DLexer(str, config, &cache))
+		{
+			switch (t.type)
+			{
+			case tok!"stringLiteral":
+			case tok!"wstringLiteral":
+			case tok!"dstringLiteral":
+				ret ~= t.text;
+				break;
+			default:
+				// unexpected token, return input because it might already be
+				// unescaped
+				return str;
+			}
+		}
+
+		return ret.data;
+	default:
+		return null;
+	}
+}
+
+/// ditto
+string evaluateExpressionString(const UnaryExpression expr)
+in (expr !is null)
+{
+	if (expr.primaryExpression)
+		return evaluateExpressionString(expr.primaryExpression);
+	else
+		return null;
+}
+
+/// ditto
+string evaluateExpressionString(const ExpressionNode expr)
+in (expr !is null)
+{
+	// maybe we want to support simple concatenation here some time
+
+	if (auto unary = cast(UnaryExpression) expr)
+		return evaluateExpressionString(unary);
+	else
+		return null;
 }

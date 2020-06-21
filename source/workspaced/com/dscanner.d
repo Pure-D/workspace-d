@@ -315,6 +315,13 @@ struct DefinitionElement
 	string[string] attributes;
 	///
 	int[2] range;
+
+	bool isVerboseType() const
+	{
+		import std.ascii : isUpper;
+
+		return type.length == 1 && type[0] != 'T' && isUpper(type[0]);
+	}
 }
 
 private:
@@ -394,7 +401,7 @@ final class DefinitionFinder : ASTVisitor
 					cast(int) dec.structBody.endLocation
 				]);
 		auto c = context;
-		context = ContextType(["class": dec.name.text], "public");
+		context = ContextType(["class": dec.name.text], null, "public");
 		dec.accept(this);
 		context = c;
 	}
@@ -414,7 +421,7 @@ final class DefinitionFinder : ASTVisitor
 					cast(int) dec.structBody.endLocation
 				]);
 		auto c = context;
-		context = ContextType(["struct": dec.name.text], "public");
+		context = ContextType(["struct": dec.name.text], null, "public");
 		dec.accept(this);
 		context = c;
 	}
@@ -429,7 +436,7 @@ final class DefinitionFinder : ASTVisitor
 					cast(int) dec.structBody.endLocation
 				]);
 		auto c = context;
-		context = ContextType(["interface:": dec.name.text], context.access);
+		context = ContextType(["interface:": dec.name.text], null, context.access);
 		dec.accept(this);
 		context = c;
 	}
@@ -441,7 +448,7 @@ final class DefinitionFinder : ASTVisitor
 		def.attributes["signature"] = paramsToString(dec);
 		definitions ~= def;
 		auto c = context;
-		context = ContextType(["template": dec.name.text], context.access);
+		context = ContextType(["template": dec.name.text], null, context.access);
 		dec.accept(this);
 		context = c;
 	}
@@ -510,7 +517,7 @@ final class DefinitionFinder : ASTVisitor
 		definitions ~= makeDefinition(dec.name.text, dec.name.line, "g", context,
 				[cast(int) dec.enumBody.startLocation, cast(int) dec.enumBody.endLocation]);
 		auto c = context;
-		context = ContextType(["enum": dec.name.text], context.access);
+		context = ContextType(["enum": dec.name.text], null, context.access);
 		dec.accept(this);
 		context = c;
 	}
@@ -530,7 +537,7 @@ final class DefinitionFinder : ASTVisitor
 					cast(int) dec.structBody.endLocation
 				]);
 		auto c = context;
-		context = ContextType(["union": dec.name.text], context.access);
+		context = ContextType(["union": dec.name.text], null, context.access);
 		dec.accept(this);
 		context = c;
 	}
@@ -582,7 +589,7 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const ModuleDeclaration dec)
 	{
-		context = ContextType(null, "public");
+		context = ContextType(null, null, "public");
 		dec.accept(this);
 	}
 
@@ -617,6 +624,21 @@ final class DefinitionFinder : ASTVisitor
 		}
 
 		attribute.accept(this);
+	}
+
+	override void visit(const AtAttribute atAttribute)
+	{
+		if (atAttribute.argumentList)
+		{
+			foreach (item; atAttribute.argumentList.items)
+			{
+				auto str = evaluateExpressionString(item);
+
+				if (str !is null)
+					context.privateAttr["utName"] = str;
+			}
+		}
+		atAttribute.accept(this);
 	}
 
 	override void visit(const AttributeDeclaration dec)
@@ -680,13 +702,12 @@ final class DefinitionFinder : ASTVisitor
 
 		if (!dec.blockStatement)
 			return;
-		string testName;
-		testName = text("__unittest_L", dec.line, "_C", dec.column);
+		string testName = text("__unittest_L", dec.line, "_C", dec.column);
 		definitions ~= makeDefinition(testName, dec.line, "U", context,
 				[
 					cast(int) dec.blockStatement.startLocation,
 					cast(int) dec.blockStatement.endLocation
-				]);
+				], "U");
 
 		// TODO: decide if we want to include types nested in unittests
 		// dec.accept(this);
@@ -756,11 +777,17 @@ final class DefinitionFinder : ASTVisitor
 }
 
 DefinitionElement makeDefinition(string name, size_t line, string type,
-		ContextType context, int[2] range)
+		ContextType context, int[2] range, string forType = null)
 {
 	string[string] attr = context.attr.dup;
 	if (context.access.length)
 		attr["access"] = context.access;
+
+	if (forType == "U")
+	{
+		if (auto utName = "utName" in context.privateAttr)
+			attr["name"] = *utName;
+	}
 	return DefinitionElement(name, cast(int) line, type, attr, range);
 }
 
@@ -773,6 +800,7 @@ enum AccessState
 struct ContextType
 {
 	string[string] attr;
+	string[string] privateAttr;
 	string access;
 }
 
@@ -880,7 +908,7 @@ shared static this()
 				["access": "public"], [112,
 					114]),
 			DefinitionElement("__unittest_L22_C1", 22, "U",
-				["access": "public"],
+				["access": "public", "name": "named"],
 				[139, 141]),
 			DefinitionElement("X", 26, "c", ["access": "public"], [152,
 					214]),
