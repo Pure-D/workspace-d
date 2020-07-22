@@ -1,6 +1,7 @@
 module workspaced.com.dfmt;
 
 import fs = std.file;
+import std.algorithm;
 import std.array;
 import std.conv;
 import std.getopt;
@@ -42,25 +43,14 @@ class DfmtComponent : ComponentWrapper
 			try
 			{
 				auto json = parseJSON(fs.readText(configPath));
-				json.tryFetchProperty(config.dfmt_align_switch_statements, "align_switch_statements");
-				json.tryFetchProperty(config.dfmt_brace_style, "brace_style");
-				json.tryFetchProperty(config.end_of_line, "end_of_line");
-				json.tryFetchProperty(config.indent_size, "indent_size");
-				json.tryFetchProperty(config.indent_style, "indent_style");
-				json.tryFetchProperty(config.max_line_length, "max_line_length");
-				json.tryFetchProperty(config.dfmt_soft_max_line_length, "soft_max_line_length");
-				json.tryFetchProperty(config.dfmt_outdent_attributes, "outdent_attributes");
-				json.tryFetchProperty(config.dfmt_space_after_cast, "space_after_cast");
-				json.tryFetchProperty(config.dfmt_space_after_keywords, "space_after_keywords");
-				json.tryFetchProperty(config.dfmt_space_before_function_parameters, "space_before_function_parameters");
-				json.tryFetchProperty(config.dfmt_split_operator_at_line_end, "split_operator_at_line_end");
-				json.tryFetchProperty(config.tab_width, "tab_width");
-				json.tryFetchProperty(config.dfmt_selective_import_space, "selective_import_space");
-				json.tryFetchProperty(config.dfmt_compact_labeled_statements, "compact_labeled_statements");
-				json.tryFetchProperty(config.dfmt_template_constraint_style, "template_constraint_style");
-				json.tryFetchProperty(config.dfmt_single_template_constraint_indent, "single_template_constraint_indent");
-				json.tryFetchProperty(config.dfmt_space_before_aa_colon, "space_before_aa_colon");
-				json.tryFetchProperty(config.dfmt_keep_line_breaks, "keep_line_breaks");
+				foreach (i, ref member; config.tupleof)
+				{
+					enum name = __traits(identifier, config.tupleof[i]);
+					if (name.startsWith("dfmt_"))
+						json.tryFetchProperty(member, name["dfmt_".length .. $]);
+					else
+						json.tryFetchProperty(member, name);
+				}
 			}
 			catch (Exception e)
 			{
