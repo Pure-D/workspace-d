@@ -29,7 +29,7 @@ class DCDComponent : ComponentWrapper
 {
 	mixin DefaultComponentWrapper;
 
-	enum latestKnownVersion = [0, 11, 1];
+	enum latestKnownVersion = [0, 13, 0];
 	void load()
 	{
 		installedVersion = workspaced.globalConfiguration.get("dcd", "_installedVersion", "");
