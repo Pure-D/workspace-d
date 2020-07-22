@@ -134,6 +134,27 @@ class DCDComponent : ComponentWrapper
 			BuiltinDCDClient.clientVersion ~ "-workspaced-builtin";
 	}
 
+	/// Returns: The current detected installed version of dcd-server. `null` if
+	///          none is installed.
+	string serverInstalledVersion() const
+	{
+		if (!installedVersion)
+		{
+			string serverPath = this.serverPath;
+
+			try
+			{
+				return serverPath.getVersionAndFixPath;
+			}
+			catch (ProcessException)
+			{
+				return null;
+			}
+		}
+
+		return installedVersion;
+	}
+
 	private auto serverThreads()
 	{
 		return threads(1, 2);
