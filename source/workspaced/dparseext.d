@@ -172,6 +172,8 @@ void foo()
 string evaluateExpressionString(const PrimaryExpression expr)
 in (expr !is null)
 {
+	import dparse.strings : unescapeString;
+
 	switch (expr.primary.type)
 	{
 	case tok!"stringLiteral":
@@ -195,7 +197,7 @@ in (expr !is null)
 			case tok!"stringLiteral":
 			case tok!"wstringLiteral":
 			case tok!"dstringLiteral":
-				ret ~= t.text;
+				ret ~= unescapeString(t.text);
 				break;
 			default:
 				// unexpected token, return input because it might already be
