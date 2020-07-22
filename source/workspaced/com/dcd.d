@@ -341,17 +341,17 @@ class DCDComponent : ComponentWrapper
 		updateImports();
 	}
 
-	string clientPath() @property @ignoredFunc
+	string clientPath() @property @ignoredFunc const
 	{
 		return config.get("dcd", "clientPath", "dcd-client");
 	}
 
-	string serverPath() @property @ignoredFunc
+	string serverPath() @property @ignoredFunc const
 	{
 		return config.get("dcd", "serverPath", "dcd-server");
 	}
 
-	ushort port() @property @ignoredFunc
+	ushort port() @property @ignoredFunc const
 	{
 		return cast(ushort) config.get!int("dcd", "port", 9166);
 	}

@@ -94,7 +94,7 @@ class DMDComponent : ComponentWrapper
 		return ret;
 	}
 
-	string path() @property @ignoredFunc
+	string path() @property @ignoredFunc const
 	{
 		return config.get("dmd", "path", "dmd");
 	}

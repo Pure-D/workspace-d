@@ -102,10 +102,10 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 			return _threads;
 		}
 
-		WorkspaceD.Instance instance() const @property
+		inout(WorkspaceD.Instance) instance() inout @property
 		{
 			if (refInstance)
-				return cast() refInstance;
+				return refInstance;
 			else
 				throw new Exception("Attempted to access instance in a global context");
 		}
@@ -130,22 +130,22 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 			return instance.importFilesProvider ? instance.importFilesProvider() : [];
 		}
 
-		ref ImportPathProvider importPathProvider() @property
+		ref inout(ImportPathProvider) importPathProvider() @property inout
 		{
 			return instance.importPathProvider;
 		}
 
-		ref ImportPathProvider stringImportPathProvider() @property
+		ref inout(ImportPathProvider) stringImportPathProvider() @property inout
 		{
 			return instance.stringImportPathProvider;
 		}
 
-		ref ImportPathProvider importFilesProvider() @property
+		ref inout(ImportPathProvider) importFilesProvider() @property inout
 		{
 			return instance.importFilesProvider;
 		}
 
-		ref Configuration config() @property
+		ref inout(Configuration) config() @property inout
 		{
 			if (refInstance)
 				return refInstance.config;

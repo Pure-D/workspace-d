@@ -19,8 +19,9 @@ struct Configuration
 	/// JSON containing base configuration formatted as {[component]:{key:value pairs}}
 	JSONValue base;
 
-	bool get(string component, string key, out JSONValue val)
+	bool get(string component, string key, out JSONValue val) const
 	{
+		JSONValue base = this.base;
 		if (base.type != JSONType.object)
 		{
 			JSONValue[string] tmp;
@@ -36,7 +37,7 @@ struct Configuration
 		return true;
 	}
 
-	T get(T)(string component, string key, T defaultValue = T.init)
+	T get(T)(string component, string key, T defaultValue = T.init) inout
 	{
 		JSONValue ret;
 		if (!get(component, key, ret))
