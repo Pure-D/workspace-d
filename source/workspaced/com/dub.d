@@ -315,6 +315,15 @@ class DubComponent : ComponentWrapper
 		return _dub.project.configurations;
 	}
 
+	PackageBuildSettings rootPackageBuildSettings() @property
+	{
+		auto pkg = _dub.project.rootPackage;
+		BuildSettings settings = pkg.getBuildSettings(_platform, _configuration);
+		return PackageBuildSettings(settings,
+			pkg.path.toString,
+			pkg.name);
+	}
+
 	/// Lists all build types defined in the package description AND the predefined ones from dub ("plain", "debug", "release", "release-debug", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov")
 	string[] buildTypes() @property
 	{
@@ -607,6 +616,52 @@ struct BuildIssue
 	string text;
 	/// true if this is additional error information for the last error.
 	bool cont;
+}
+
+/// returned by rootPackageBuildSettings
+struct PackageBuildSettings
+{
+	/// construct from dub build settings
+	this(BuildSettings dubBuildSettings, string packagePath, string packageName)
+	{
+		foreach (i, ref val; this.tupleof)
+		{
+			enum name = __traits(identifier, this.tupleof[i]);
+			static if (__traits(hasMember, dubBuildSettings, name))
+				val = __traits(getMember, dubBuildSettings, name);
+		}
+		this.packagePath = packagePath;
+		this.packageName = packageName;
+	}
+
+	string packagePath;
+	string packageName;
+
+	string targetPath; /// same as dub BuildSettings
+	string targetName; /// same as dub BuildSettings
+	string workingDirectory; /// same as dub BuildSettings
+	string mainSourceFile; /// same as dub BuildSettings
+	string[] dflags; /// same as dub BuildSettings
+	string[] lflags; /// same as dub BuildSettings
+	string[] libs; /// same as dub BuildSettings
+	string[] linkerFiles; /// same as dub BuildSettings
+	string[] sourceFiles; /// same as dub BuildSettings
+	string[] copyFiles; /// same as dub BuildSettings
+	string[] extraDependencyFiles; /// same as dub BuildSettings
+	string[] versions; /// same as dub BuildSettings
+	string[] debugVersions; /// same as dub BuildSettings
+	string[] versionFilters; /// same as dub BuildSettings
+	string[] debugVersionFilters; /// same as dub BuildSettings
+	string[] importPaths; /// same as dub BuildSettings
+	string[] stringImportPaths; /// same as dub BuildSettings
+	string[] importFiles; /// same as dub BuildSettings
+	string[] stringImportFiles; /// same as dub BuildSettings
+	string[] preGenerateCommands; /// same as dub BuildSettings
+	string[] postGenerateCommands; /// same as dub BuildSettings
+	string[] preBuildCommands; /// same as dub BuildSettings
+	string[] postBuildCommands; /// same as dub BuildSettings
+	string[] preRunCommands; /// same as dub BuildSettings
+	string[] postRunCommands; /// same as dub BuildSettings
 }
 
 private:
