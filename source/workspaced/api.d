@@ -47,15 +47,23 @@ alias ComponentBindFailCallback = void delegate(WorkspaceD.Instance instance,
 enum ignoredFunc;
 
 /// Component call
-struct ComponentInfo
+struct ComponentInfoParams
 {
 	/// Name of the component
 	string name;
 }
 
-ComponentInfo component(string name)
+ComponentInfoParams component(string name)
 {
-	return ComponentInfo(name);
+	return ComponentInfoParams(name);
+}
+
+struct ComponentInfo
+{
+	ComponentInfoParams params;
+	TypeInfo type;
+
+	alias params this;
 }
 
 void traceTaskLog(lazy string msg)
@@ -336,8 +344,8 @@ interface ComponentWrapper
 
 interface ComponentFactory
 {
-	ComponentWrapper create(WorkspaceD workspaced, WorkspaceD.Instance instance, out Exception error);
-	ComponentInfo info() @property;
+	ComponentWrapper create(WorkspaceD workspaced, WorkspaceD.Instance instance, out Exception error) nothrow;
+	ComponentInfo info() @property const nothrow;
 }
 
 struct ComponentFactoryInstance
@@ -355,7 +363,7 @@ struct ComponentWrapperInstance
 
 class DefaultComponentFactory(T : ComponentWrapper) : ComponentFactory
 {
-	ComponentWrapper create(WorkspaceD workspaced, WorkspaceD.Instance instance, out Exception error)
+	ComponentWrapper create(WorkspaceD workspaced, WorkspaceD.Instance instance, out Exception error) nothrow
 	{
 		auto wrapper = new T();
 		try
@@ -370,12 +378,12 @@ class DefaultComponentFactory(T : ComponentWrapper) : ComponentFactory
 		}
 	}
 
-	ComponentInfo info() @property
+	ComponentInfo info() @property const nothrow
 	{
-		alias udas = getUDAs!(T, ComponentInfo);
+		alias udas = getUDAs!(T, ComponentInfoParams);
 		static assert(udas.length == 1, "Can't construct default component factory for "
-				~ T.stringof ~ ", expected exactly 1 ComponentInfo instance attached to the type");
-		return udas[0];
+				~ T.stringof ~ ", expected exactly 1 ComponentInfoParams instance attached to the type");
+		return ComponentInfo(udas[0], typeid(T));
 	}
 }
 

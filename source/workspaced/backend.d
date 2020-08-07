@@ -146,6 +146,20 @@ class WorkspaceD
 		ImportPathProvider stringImportPathProvider;
 		ImportPathProvider importFilesProvider;
 
+		/* virtual */
+		void onBeforeAccessComponent(ComponentInfo) const
+		{
+		}
+
+		/* virtual */
+		bool checkHasComponent(ComponentInfo info) const nothrow
+		{
+			foreach (com; instanceComponents)
+				if (com.info.name == info.name)
+					return true;
+			return false;
+		}
+
 		Future!JSONValue run(WorkspaceD workspaced, string component,
 				string method, JSONValue[] args)
 		{
@@ -157,22 +171,20 @@ class WorkspaceD
 
 		inout(T) get(T)() inout
 		{
-			auto name = getUDAs!(T, ComponentInfo)[0].name;
+			auto info = getUDAs!(T, ComponentInfoParams)[0];
+			onBeforeAccessComponent(ComponentInfo(info, typeid(T)));
 			foreach (com; instanceComponents)
-				if (com.info.name == name)
+				if (com.info.name == info.name)
 					return cast(inout T) com.wrapper;
 			throw new Exception(
 					"Attempted to get unknown instance component " ~ T.stringof
 					~ " in instance cwd:" ~ cwd);
 		}
 
-		bool has(T)() const
+		bool has(T)() const nothrow
 		{
-			auto name = getUDAs!(T, ComponentInfo)[0].name;
-			foreach (com; instanceComponents)
-				if (com.info.name == name)
-					return true;
-			return false;
+			auto info = getUDAs!(T, ComponentInfoParams)[0];
+			return checkHasComponent(ComponentInfo(info, typeid(T)));
 		}
 
 		/// Shuts down an attached component and removes it from this component
@@ -182,9 +194,15 @@ class WorkspaceD
 		///          removed or `false` if the component wasn't found.
 		bool detach(T)()
 		{
-			auto name = getUDAs!(T, ComponentInfo)[0].name;
+			auto info = getUDAs!(T, ComponentInfoParams)[0];
+			return detach(ComponentInfo(info, typeid(T)));
+		}
+
+		/// ditto
+		bool detach(ComponentInfo info)
+		{
 			foreach (i, com; instanceComponents)
-				if (com.info.name == name)
+				if (com.info.name == info.name)
 				{
 					instanceComponents = instanceComponents.remove(i);
 					com.wrapper.shutdown(false);
@@ -198,15 +216,22 @@ class WorkspaceD
 		/// Throws: Exception if component was not registered in workspaced.
 		bool attach(T)(WorkspaceD workspaced)
 		{
-			string name = getUDAs!(T, ComponentInfo)[0].name;
+			string info = getUDAs!(T, ComponentInfoParams)[0];
+			return attach(workspaced, ComponentInfo(info, typeid(T)));
+		}
+
+		/// ditto
+		bool attach(WorkspaceD workspaced, ComponentInfo info)
+		{
 			foreach (factory; workspaced.components)
 			{
-				if (factory.info.name == name)
+				if (factory.info.name == info.name)
 				{
-					auto inst = factory.create(workspaced, this);
+					Exception e;
+					auto inst = factory.create(workspaced, this, e);
 					if (inst)
 					{
-						instanceComponents ~= ComponentWrapperInstance(inst, info);
+						attachComponent(ComponentWrapperInstance(inst, info));
 						return true;
 					}
 					else
@@ -214,6 +239,11 @@ class WorkspaceD
 				}
 			}
 			throw new Exception("Component not found");
+		}
+
+		void attachComponent(ComponentWrapperInstance component)
+		{
+			instanceComponents ~= component;
 		}
 	}
 
@@ -358,22 +388,34 @@ class WorkspaceD
 		return ret;
 	}
 
+	/* virtual */
+	void onBeforeAccessGlobalComponent(ComponentInfo) const
+	{
+	}
+
+	/* virtual */
+	bool checkHasGlobalComponent(ComponentInfo info) const
+	{
+		foreach (com; globalComponents)
+			if (com.info.name == info.name)
+				return true;
+		return false;
+	}
+
 	T get(T)()
 	{
-		auto name = getUDAs!(T, ComponentInfo)[0].name;
+		auto info = getUDAs!(T, ComponentInfoParams)[0];
+		onBeforeAccessGlobalComponent(ComponentInfo(info, typeid(T)));
 		foreach (com; globalComponents)
-			if (com.info.name == name)
+			if (com.info.name == info.name)
 				return cast(T) com.wrapper;
 		throw new Exception("Attempted to get unknown global component " ~ T.stringof);
 	}
 
 	bool has(T)()
 	{
-		auto name = getUDAs!(T, ComponentInfo)[0].name;
-		foreach (com; globalComponents)
-			if (com.info.name == name)
-				return true;
-		return false;
+		auto info = getUDAs!(T, ComponentInfoParams)[0];
+		return checkHasGlobalComponent(ComponentInfo(info, typeid(T)));
 	}
 
 	T get(T)(string cwd)
@@ -428,14 +470,8 @@ class WorkspaceD
 		throw new Exception("Global component '" ~ component ~ "' not found");
 	}
 
-	ComponentFactory register(T)(bool autoRegister = true)
+	void onRegisterComponent(ref ComponentFactory factory, bool autoRegister)
 	{
-		ComponentFactory factory;
-		static foreach (attr; __traits(getAttributes, T))
-			static if (is(attr == class) && is(attr : ComponentFactory))
-				factory = new attr;
-		if (factory is null)
-			factory = new DefaultComponentFactory!T;
 		components ~= ComponentFactoryInstance(factory, autoRegister);
 		auto info = factory.info;
 		Exception error;
@@ -450,15 +486,72 @@ class WorkspaceD
 			{
 				auto inst = factory.create(this, instance, error);
 				if (inst)
-					instance.instanceComponents ~= ComponentWrapperInstance(inst, info);
+					instance.attachComponent(ComponentWrapperInstance(inst, info));
 				else if (onBindFail)
 					onBindFail(instance, factory, error);
 			}
+	}
+
+	ComponentFactory register(T)(bool autoRegister = true)
+	{
+		ComponentFactory factory;
+		static foreach (attr; __traits(getAttributes, T))
+			static if (is(attr == class) && is(attr : ComponentFactory))
+				factory = new attr;
+		if (factory is null)
+			factory = new DefaultComponentFactory!T;
+
+		onRegisterComponent(factory, autoRegister);
+
 		static if (__traits(compiles, T.registered(this)))
 			T.registered(this);
 		else static if (__traits(compiles, T.registered()))
 			T.registered();
 		return factory;
+	}
+
+	protected Instance createInstance(string cwd, Configuration config)
+	{
+		auto inst = new Instance();
+		inst.cwd = cwd;
+		inst.config = config;
+		return inst;
+	}
+
+	protected void preloadComponents(Instance inst, string[] preloadComponents)
+	{
+		foreach (name; preloadComponents)
+		{
+			foreach (factory; components)
+			{
+				if (!factory.autoRegister && factory.info.name == name)
+				{
+					Exception error;
+					auto wrap = factory.create(this, inst, error);
+					if (wrap)
+						inst.attachComponent(ComponentWrapperInstance(wrap, factory.info));
+					else if (onBindFail)
+						onBindFail(inst, factory, error);
+					break;
+				}
+			}
+		}
+	}
+
+	protected void autoRegisterComponents(Instance inst)
+	{
+		foreach (factory; components)
+		{
+			if (factory.autoRegister)
+			{
+				Exception error;
+				auto wrap = factory.create(this, inst, error);
+				if (wrap)
+					inst.attachComponent(ComponentWrapperInstance(wrap, factory.info));
+				else if (onBindFail)
+					onBindFail(inst, factory, error);
+			}
+		}
 	}
 
 	/// Creates a new workspace with the given cwd with optional config overrides and preload components for non-autoRegister components.
@@ -469,39 +562,11 @@ class WorkspaceD
 		cwd = buildNormalizedPath(cwd);
 		if (instances.canFind!(a => a.cwd == cwd))
 			throw new Exception("Instance with cwd '" ~ cwd ~ "' already exists!");
-		auto inst = new Instance();
-		inst.cwd = cwd;
 		configOverrides.loadBase(globalConfiguration);
-		inst.config = configOverrides;
+		auto inst = createInstance(cwd, configOverrides);
+		this.preloadComponents(inst, preloadComponents);
+		this.autoRegisterComponents(inst);
 		instances ~= inst;
-		foreach (name; preloadComponents)
-		{
-			foreach (factory; components)
-			{
-				if (!factory.autoRegister && factory.info.name == name)
-				{
-					Exception error;
-					auto wrap = factory.create(this, inst, error);
-					if (wrap)
-						inst.instanceComponents ~= ComponentWrapperInstance(wrap, factory.info);
-					else if (onBindFail)
-						onBindFail(inst, factory, error);
-					break;
-				}
-			}
-		}
-		foreach (factory; components)
-		{
-			if (factory.autoRegister)
-			{
-				Exception error;
-				auto wrap = factory.create(this, inst, error);
-				if (wrap)
-					inst.instanceComponents ~= ComponentWrapperInstance(wrap, factory.info);
-				else if (onBindFail)
-					onBindFail(inst, factory, error);
-			}
-		}
 		return inst;
 	}
 
@@ -520,13 +585,13 @@ class WorkspaceD
 		return false;
 	}
 
-	deprecated("Use overload taking an out Exception error or attachSilent instead") bool attach(
-			Instance instance, string component)
+	deprecated("Use overload taking an out Exception error or attachSilent instead")
+	final bool attach(Instance instance, string component)
 	{
 		return attachSilent(instance, component);
 	}
 
-	bool attachSilent(Instance instance, string component)
+	final bool attachSilent(Instance instance, string component)
 	{
 		Exception error;
 		return attach(instance, component, error);
@@ -541,7 +606,7 @@ class WorkspaceD
 				auto wrap = factory.create(this, instance, error);
 				if (wrap)
 				{
-					instance.instanceComponents ~= ComponentWrapperInstance(wrap, factory.info);
+					instance.attachComponent(ComponentWrapperInstance(wrap, factory.info));
 					return true;
 				}
 				else
