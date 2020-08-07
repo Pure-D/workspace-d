@@ -187,7 +187,7 @@ in (expr !is null)
 		scope StringCache cache = StringCache(16);
 		LexerConfig config;
 		config.commentBehavior = CommentBehavior.noIntern;
-		config.stringBehavior = StringBehavior.compiler; // interpret literals
+		config.stringBehavior = StringBehavior.source;
 		config.whitespaceBehavior = WhitespaceBehavior.skip;
 		config.fileName = "evaluate-string-stdin";
 		foreach (t; DLexer(str, config, &cache))
