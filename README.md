@@ -6,6 +6,14 @@ workspace-d wraps dcd, dfmt and dscanner to one unified environment managed by d
 
 It uses process pipes and json for communication.
 
+## Special Thanks
+
+**Thanks to the following big GitHub sponsors** financially supporting the code-d/serve-d tools:
+
+* Jaen (@jaens)
+
+_[become a sponsor](https://github.com/sponsors/WebFreak001)_
+
 ## Installation
 
 [Precompiled binaries for windows & linux](https://github.com/Pure-D/workspace-d/releases)
