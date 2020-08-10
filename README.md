@@ -10,7 +10,7 @@ It uses process pipes and json for communication.
 
 **Thanks to the following big GitHub sponsors** financially supporting the code-d/serve-d tools:
 
-* Jaen (@jaens)
+* Jaen ([@jaens](https://github.com/jaens))
 
 _[become a sponsor](https://github.com/sponsors/WebFreak001)_
 
