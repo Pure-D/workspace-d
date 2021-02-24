@@ -116,13 +116,13 @@ void handleRequest(int id, JSONValue request)
 				autoRegister = v.type != JSONType.false_;
 			string[] allComponents;
 			static foreach (Component; AllComponents)
-				allComponents ~= getUDAs!(Component, ComponentInfo)[0].name;
+				allComponents ~= getUDAs!(Component, ComponentInfoParams)[0].name;
 		ComponentSwitch:
 			switch (request["component"].str)
 			{
 				static foreach (Component; AllComponents)
 				{
-			case getUDAs!(Component, ComponentInfo)[0].name:
+			case getUDAs!(Component, ComponentInfoParams)[0].name:
 					engine.register!Component(autoRegister);
 					break ComponentSwitch;
 				}
