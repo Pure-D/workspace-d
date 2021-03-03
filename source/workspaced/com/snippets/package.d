@@ -317,7 +317,7 @@ class SnippetsComponent : ComponentWrapper
 					const wrapped = makeWrappingIfMayBeDelegate();
 
 					const placeholderMightBeIdentifier = str.length > 5
-						|| snippet[last .. $].stripLeft.startsWith(";", ".", "{");
+						|| snippet[last .. $].stripLeft.startsWith(";", ".", "{", "(", "[");
 
 					if (wrapped || placeholderMightBeIdentifier)
 					{
@@ -354,7 +354,7 @@ class SnippetsComponent : ComponentWrapper
 					makeWrappingIfMayBeDelegate();
 
 					const placeholderMightBeIdentifier = snippet[last .. $].stripLeft.startsWith(";",
-							".", "{");
+							".", "{", "(", "[");
 
 					if (placeholderMightBeIdentifier)
 					{

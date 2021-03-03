@@ -214,17 +214,68 @@ static immutable PlainSnippet[] plainSnippets = [
 		[SnippetLevel.type],
 		"toHash",
 		"size_t toHash() in struct",
-		"size_t toHash() const @safe pure nothrow {\n\t$0\n}",
+		"size_t toHash() const @nogc @safe pure nothrow {\n\t$0\n}",
 		"Hash generation for associative arrays.\n\n"
-			~ "Reference: [https://dlang.org/spec/hash-map.html#using_classes_as_key]"
+			~ "Reference: [https://dlang.org/spec/hash-map.html#using_struct_as_key]"
 	),
 	PlainSnippet(
 		[SnippetLevel.type],
 		"toHashClass",
 		"size_t toHash() in class",
-		"override size_t toHash() @safe nothrow {\n\t$0\n}",
+		"override size_t toHash() const @nogc @safe pure nothrow {\n\t$0\n}",
 		"Hash generation for associative arrays.\n\n"
-			~ "Reference: [https://dlang.org/spec/hash-map.html#using_struct_as_key]"
+			~ "Reference: [https://dlang.org/spec/hash-map.html#using_classes_as_key]"
+	),
+	PlainSnippet(
+		[SnippetLevel.type],
+		"toString",
+		"string toString() in struct",
+		"string toString() const @safe pure nothrow {\n\t$0\n}",
+		"Overriding how objects are serialized to strings with std.conv and writeln.\n\n"
+			~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
+	),
+	PlainSnippet(
+		[SnippetLevel.type],
+		"toStringText",
+		"string toString() in struct using std.conv:text",
+		"string toString() const @safe {\n\timport std.conv : text;\n\n\treturn text($0);\n}",
+		"Overriding how objects are serialized to strings with std.conv and writeln.\n\n"
+			~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
+	),
+	// these don't get added as they are too error-prone (get silently ignored when there is a compilation error inside of them)
+	// PlainSnippet(
+	// 	[SnippetLevel.type],
+	// 	"toStringApp",
+	// 	"toString(ref W w) in struct with appender",
+	// 	"void toString(W)(ref W w) {\n\t$0\n}",
+	// 	"Overriding how objects are serialized to strings with std.conv and writeln.\n\n"
+	// 		~ "This overload uses an appender as the first argument which allows the developer to avoid concatenation and GC use.\n\n"
+	// 		~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
+	// ),
+	// PlainSnippet(
+	// 	[SnippetLevel.type],
+	// 	"toStringAppSpec",
+	// 	"toString(ref W w, FormatSpec) in struct with appender and format spec",
+	// 	"void toString(W)(ref W w, scope const ref FormatSpec fmt) {\n\t$0\n}",
+	// 	"Overriding how objects are serialized to strings with std.conv and writeln.\n\n"
+	// 		~ "This overload uses an appender as the first argument which allows the developer to avoid concatenation and GC use.\n\n"
+	// 		~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
+	// ),
+	PlainSnippet(
+		[SnippetLevel.type],
+		"toStringClass",
+		"string toString() in class",
+		"override string toString() const @safe pure nothrow {\n\t$0\n}",
+		"Overriding how objects are serialized to strings with std.conv and writeln.\n\n"
+			~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
+	),
+	PlainSnippet(
+		[SnippetLevel.type],
+		"toStringTextClass",
+		"string toString() in class using std.conv:text",
+		"override string toString() const @safe {\n\timport std.conv : text;\n\n\treturn text($0);\n}",
+		"Overriding how objects are serialized to strings with std.conv and writeln.\n\n"
+			~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
 	),
 	PlainSnippet(
 		[SnippetLevel.type],
