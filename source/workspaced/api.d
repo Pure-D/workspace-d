@@ -11,7 +11,7 @@ import std.file : exists, thisExePath;
 import std.json : JSONType, JSONValue;
 import std.path : baseName, chainPath, dirName;
 import std.regex : ctRegex, matchFirst;
-import std.string : strip;
+import std.string : indexOf, indexOfAny, strip;
 import std.traits;
 
 public import workspaced.backend;
@@ -465,7 +465,7 @@ package string getVersionAndFixPath(ref string execPath)
 
 	try
 	{
-		return execute([execPath, "--version"]).output.strip;
+		return execute([execPath, "--version"]).output.strip.orDubFetchFallback(execPath);
 	}
 	catch (ProcessException e)
 	{
@@ -473,8 +473,123 @@ package string getVersionAndFixPath(ref string execPath)
 		if (exists(newPath))
 		{
 			execPath = newPath.array;
-			return execute([execPath, "--version"]).output.strip;
+			return execute([execPath, "--version"]).output.strip.orDubFetchFallback(execPath);
 		}
 		throw e;
 	}
+}
+
+/// returns the version that is given or the version extracted from dub path if path is a dub path
+package string orDubFetchFallback(string v, string path)
+{
+	if (v == "vbin" || v == "vdcd")
+	{
+		auto dub = path.indexOf(`dub/packages`);
+		if (dub == -1)
+			dub = path.indexOf(`dub\packages`);
+
+		if (dub != -1)
+		{
+			dub += `dub/packages/`.length;
+			auto end = path.indexOfAny(`\/`, dub);
+
+			if (end != -1)
+			{
+				path = path[dub .. end];
+				auto semver = extractPathSemver(path);
+				if (semver.length)
+					return semver;
+			}
+		}
+	}
+	return v;
+}
+
+unittest
+{
+	assert("vbin".orDubFetchFallback(`/path/to/home/.dub/packages/dcd-0.13.1/dcd/bin/dcd-server`) == "0.13.1");
+	assert("vbin".orDubFetchFallback(`/path/to/home/.dub/packages/dcd-0.13.1-beta.4/dcd/bin/dcd-server`) == "0.13.1-beta.4");
+	assert("vbin".orDubFetchFallback(`C:\path\to\appdata\dub\packages\dcd-0.13.1\dcd\bin\dcd-server`) == "0.13.1");
+	assert("vbin".orDubFetchFallback(`C:\path\to\appdata\dub\packages\dcd-0.13.1-beta.4\dcd\bin\dcd-server`) == "0.13.1-beta.4");
+	assert("vbin".orDubFetchFallback(`C:\path\to\appdata\dub\packages\dcd-master\dcd\bin\dcd-server`) == "vbin");
+}
+
+/// searches for a semver in the given string starting after a - character,
+/// returns everything until the end.
+package string extractPathSemver(string s)
+{
+	import std.ascii;
+
+	foreach (start; 0 .. s.length)
+	{
+		// states:
+		// -1 = error
+		// 0 = expect -
+		// 1 = expect major
+		// 2 = expect major or .
+		// 3 = expect minor
+		// 4 = expect minor or .
+		// 5 = expect patch
+		// 6 = expect patch or - or + (valid)
+		// 7 = skip (valid)
+		int state = 0;
+		foreach (i; start .. s.length)
+		{
+			auto c = s[i];
+			switch (state)
+			{
+			case 0:
+				if (c == '-')
+					state++;
+				else
+					state = -1;
+				break;
+			case 1:
+			case 3:
+			case 5:
+				if (c.isDigit)
+					state++;
+				else
+					state = -1;
+				break;
+			case 2:
+			case 4:
+				if (c == '.')
+					state++;
+				else if (!c.isDigit)
+					state = -1;
+				break;
+			case 6:
+				if (c == '+' || c == '-')
+					state = 7;
+				else if (!c.isDigit)
+					state = -1;
+				break;
+			default:
+				break;
+			}
+
+			if (state == -1)
+				break;
+		}
+
+		if (state >= 6)
+			return s[start + 1 .. $];
+	}
+
+	return null;
+}
+
+unittest
+{
+	assert(extractPathSemver("foo-v1.0.0") is null);
+	assert(extractPathSemver("foo-1.0.0") == "1.0.0");
+	assert(extractPathSemver("foo-1.0.0-alpha.1-x") == "1.0.0-alpha.1-x");
+	assert(extractPathSemver("foo-1.0.x") is null);
+	assert(extractPathSemver("foo-x.0.0") is null);
+	assert(extractPathSemver("foo-1.x.0") is null);
+	assert(extractPathSemver("foo-1x.0.0") is null);
+	assert(extractPathSemver("foo-1.0x.0") is null);
+	assert(extractPathSemver("foo-1.0.0x") is null);
+	assert(extractPathSemver("-1.0.0") == "1.0.0");
 }
