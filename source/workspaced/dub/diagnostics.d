@@ -83,5 +83,5 @@ unittest
 	auto range = resolveDubDiagnosticRange(code, tokens, parsed, 19,
 		"use `is` instead of `==` when comparing with `null`");
 
-	shouldEqual(range, [31, 33]);
+	assert(range == [31, 33]);
 }

@@ -19,8 +19,6 @@ public import workspaced.future;
 
 version (unittest)
 {
-	version (Have_unit_threaded) package import unit_threaded.assertions;
-
 	package import std.experimental.logger : trace;
 }
 else

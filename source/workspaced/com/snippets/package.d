@@ -594,25 +594,25 @@ unittest
 	auto args = ["--indent_style", "tab"];
 
 	auto res = snippets.formatSync("void main(${1:string[] args}) {\n\t$0\n}", args);
-	shouldEqual(res, "void main(${1:string[] args})\n{\n\t$0\n}");
+	assert(res == "void main(${1:string[] args})\n{\n\t$0\n}");
 
 	res = snippets.formatSync("class ${1:MyClass} {\n\t$0\n}", args);
-	shouldEqual(res, "class ${1:MyClass}\n{\n\t$0\n}");
+	assert(res == "class ${1:MyClass}\n{\n\t$0\n}");
 
 	res = snippets.formatSync("enum ${1:MyEnum} = $2;\n$0", args);
-	shouldEqual(res, "enum ${1:MyEnum} = $2;\n$0");
+	assert(res == "enum ${1:MyEnum} = $2;\n$0");
 
 	res = snippets.formatSync("import ${1:std};\n$0", args);
-	shouldEqual(res, "import ${1:std};\n$0");
+	assert(res == "import ${1:std};\n$0");
 
 	res = snippets.formatSync("import ${1:std};\n$0", args, SnippetLevel.method);
-	shouldEqual(res, "import ${1:std};\n$0");
+	assert(res == "import ${1:std};\n$0");
 
 	res = snippets.formatSync("foo(delegate() {\n${1:// foo}\n});", args, SnippetLevel.method);
-	shouldEqual(res, "foo(delegate() {\n\t${1:// foo}\n});");
+	assert(res == "foo(delegate() {\n\t${1:// foo}\n});");
 
 	res = snippets.formatSync(`auto ${1:window} = new SimpleWindow(Size(${2:800, 600}), "$3");`, args, SnippetLevel.method);
-	shouldEqual(res, `auto ${1:window} = new SimpleWindow(Size(${2:800, 600}), "$3");`);
+	assert(res == `auto ${1:window} = new SimpleWindow(Size(${2:800, 600}), "$3");`);
 }
 
 unittest

@@ -864,7 +864,7 @@ shared static this()
 
 	auto defs = dscanner.listDefinitions("stdin", code, false).getBlocking();
 
-	shouldEqual(defs, [
+	assert(defs == [
 			DefinitionElement("hello", 6, "f", [
 					"signature": "()",
 					"access": "public",
@@ -892,7 +892,7 @@ shared static this()
 	// verbose definitions
 	defs = dscanner.listDefinitions("stdin", code, true).getBlocking();
 
-	shouldEqual(defs, [
+	assert(defs == [
 			DefinitionElement("Foo", 3, "V", ["access": "public"], [27, 30]),
 			DefinitionElement("Bar", 4, "D", ["access": "public"], [40, 43]),
 			DefinitionElement("hello", 6, "f", [

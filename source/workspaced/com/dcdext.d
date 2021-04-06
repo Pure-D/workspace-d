@@ -1853,7 +1853,7 @@ class ImplB : MyInterface
 
 	auto info = dcdext.getInterfaceDetails("stdin", testCode, 72);
 
-	shouldEqual(info.blockRange, [81, 85]);
+	assert(info.blockRange == [81, 85]);
 }
 
 unittest
@@ -1864,16 +1864,16 @@ unittest
 	backend.register!DCDExtComponent;
 	DCDExtComponent dcdext = instance.get!DCDExtComponent;
 
-	shouldEqual(dcdext.formatDefinitionBlock("Foo!(int, string) x"), "Foo!(int, string) x");
-	shouldEqual(dcdext.formatDefinitionBlock("void foo()"), "void foo()");
-	shouldEqual(dcdext.formatDefinitionBlock("void foo(string x)"), "void foo(\n\tstring x\n)");
-	shouldEqual(dcdext.formatDefinitionBlock("void foo(string x,)"), "void foo(\n\tstring x\n)");
-	shouldEqual(dcdext.formatDefinitionBlock("void foo(string x, int y)"), "void foo(\n\tstring x,\n\tint y\n)");
-	shouldEqual(dcdext.formatDefinitionBlock("void foo(string, int)"), "void foo(\n\tstring,\n\tint\n)");
-	shouldEqual(dcdext.formatDefinitionBlock("this(string, int)"), "this(\n\tstring,\n\tint\n)");
-	shouldEqual(dcdext.formatDefinitionBlock("auto foo(string, int)"), "auto foo(\n\tstring,\n\tint\n)");
-	shouldEqual(dcdext.formatDefinitionBlock("ComplexTemplate!(int, 'a', string, Nested!(Foo)) foo(string, int)"),
-		"ComplexTemplate!(int, 'a', string, Nested!(Foo)) foo(\n\tstring,\n\tint\n)");
-	shouldEqual(dcdext.formatDefinitionBlock("auto foo(T, V)(string, int)"), "auto foo(\n\tT,\n\tV\n)(\n\tstring,\n\tint\n)");
-	shouldEqual(dcdext.formatDefinitionBlock("auto foo(string, int f, ...)"), "auto foo(\n\tstring,\n\tint f,\n\t...\n)");
+	assert(dcdext.formatDefinitionBlock("Foo!(int, string) x") == "Foo!(int, string) x");
+	assert(dcdext.formatDefinitionBlock("void foo()") == "void foo()");
+	assert(dcdext.formatDefinitionBlock("void foo(string x)") == "void foo(\n\tstring x\n)");
+	assert(dcdext.formatDefinitionBlock("void foo(string x,)") == "void foo(\n\tstring x\n)");
+	assert(dcdext.formatDefinitionBlock("void foo(string x, int y)") == "void foo(\n\tstring x,\n\tint y\n)");
+	assert(dcdext.formatDefinitionBlock("void foo(string, int)") == "void foo(\n\tstring,\n\tint\n)");
+	assert(dcdext.formatDefinitionBlock("this(string, int)") == "this(\n\tstring,\n\tint\n)");
+	assert(dcdext.formatDefinitionBlock("auto foo(string, int)") == "auto foo(\n\tstring,\n\tint\n)");
+	assert(dcdext.formatDefinitionBlock("ComplexTemplate!(int, 'a', string, Nested!(Foo)) foo(string, int)")
+		== "ComplexTemplate!(int, 'a', string, Nested!(Foo)) foo(\n\tstring,\n\tint\n)");
+	assert(dcdext.formatDefinitionBlock("auto foo(T, V)(string, int)") == "auto foo(\n\tT,\n\tV\n)(\n\tstring,\n\tint\n)");
+	assert(dcdext.formatDefinitionBlock("auto foo(string, int f, ...)") == "auto foo(\n\tstring,\n\tint f,\n\t...\n)");
 }

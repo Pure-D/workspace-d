@@ -368,18 +368,18 @@ unittest
 	assert(nrm == [CodeReplacement([0, 0], "module pkg.test;\n\n")]);
 
 	auto fetched = mod.describeModule("/* hello world */ module\nfoo . \nbar  ;\n\nvoid foo() {");
-	shouldEqual(fetched, FileModuleInfo(["foo", "bar"], "foo.bar", 25, 35, 18, 38));
+	assert(fetched == FileModuleInfo(["foo", "bar"], "foo.bar", 25, 35, 18, 38));
 
 	fetched = mod.describeModule(`#!/usr/bin/env dub
 /+ dub.sdl:
 	name "hello"
 +/
 void main() {}`);
-	shouldEqual(fetched, FileModuleInfo([], "", 48, 48, 48, 48));
+	assert(fetched == FileModuleInfo([], "", 48, 48, 48, 48));
 
 	fetched = mod.describeModule("#!/usr/bin/rdmd\r\n");
-	shouldEqual(fetched, FileModuleInfo([], "", 17, 17, 17, 17));
+	assert(fetched == FileModuleInfo([], "", 17, 17, 17, 17));
 
 	fetched = mod.describeModule("#!/usr/bin/rdmd\n");
-	shouldEqual(fetched, FileModuleInfo([], "", 16, 16, 16, 16));
+	assert(fetched == FileModuleInfo([], "", 16, 16, 16, 16));
 }

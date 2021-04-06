@@ -287,37 +287,37 @@ LocationInfo getLocationInfo(scope const(char)[] code, int pos)
 unittest
 {
 	auto info = getLocationInfo(" ", 0);
-	shouldEqual(info.type, LocationType.RootMember);
+	assert(info.type == LocationType.RootMember);
 	info = getLocationInfo(`TableLayout { mar }`, 17);
-	shouldEqual(info.itemScope, ["TableLayout", "mar"]);
-	shouldEqual(info.type, LocationType.Member);
+	assert(info.itemScope == ["TableLayout", "mar"]);
+	assert(info.type == LocationType.Member);
 	info = getLocationInfo(`TableLayout { margins: 20; paddin }`, 33);
-	shouldEqual(info.itemScope, ["TableLayout", "paddin"]);
-	shouldEqual(info.type, LocationType.Member);
+	assert(info.itemScope == ["TableLayout", "paddin"]);
+	assert(info.type == LocationType.Member);
 	info = getLocationInfo(
 			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foo } }", 70);
-	shouldEqual(info.itemScope, ["TableLayout", "TextWidget", "text"]);
-	shouldEqual(info.type, LocationType.PropertyValue);
+	assert(info.itemScope == ["TableLayout", "TextWidget", "text"]);
+	assert(info.type == LocationType.PropertyValue);
 	info = getLocationInfo(`TableLayout { margins: 2 }`, 24);
-	shouldEqual(info.itemScope, ["TableLayout", "margins"]);
-	shouldEqual(info.type, LocationType.PropertyValue);
+	assert(info.itemScope == ["TableLayout", "margins"]);
+	assert(info.type == LocationType.PropertyValue);
 	info = getLocationInfo(
 			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\" } } ", int.max);
-	shouldEqual(info.itemScope, [""]);
-	shouldEqual(info.type, LocationType.RootMember);
+	assert(info.itemScope == [""]);
+	assert(info.type == LocationType.RootMember);
 	info = getLocationInfo(
 			"TableLayout { margins: 20; padding : 10\n\t\tTextWidget { text: \"} foobar\"; } }", 69);
-	shouldEqual(info.itemScope, ["TableLayout", "TextWidget", "text"]);
-	shouldEqual(info.type, LocationType.PropertyValue);
+	assert(info.itemScope == ["TableLayout", "TextWidget", "text"]);
+	assert(info.type == LocationType.PropertyValue);
 	info = getLocationInfo("TableLayout {\n\t", int.max);
-	shouldEqual(info.itemScope, ["TableLayout", ""]);
-	shouldEqual(info.type, LocationType.Member);
+	assert(info.itemScope == ["TableLayout", ""]);
+	assert(info.type == LocationType.Member);
 	info = getLocationInfo(`TableLayout {
 	colCount: 2
 	margins: 20; padding: 10
 	backgroundColor: "#FFFFE0"
 	TextWidget {
 		t`, int.max);
-	shouldEqual(info.itemScope, ["TableLayout", "TextWidget", "t"]);
-	shouldEqual(info.type, LocationType.Member);
+	assert(info.itemScope == ["TableLayout", "TextWidget", "t"]);
+	assert(info.type == LocationType.Member);
 }

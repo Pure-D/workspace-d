@@ -166,14 +166,14 @@ void map()
 	SnippetLoopScope s;
 
 	i = snippets.determineSnippetInfo(null, loopCode, 18);
-	shouldEqual(i.level, SnippetLevel.global);
+	assert(i.level == SnippetLevel.global);
 	s = i.loopScope; // empty
-	shouldEqual(s, SnippetLoopScope.init);
+	assert(s == SnippetLoopScope.init);
 
 	i = snippets.determineSnippetInfo(null, loopCode, 30);
 	assert(i.level == SnippetLevel.other, i.stack.to!string);
 	s = i.loopScope; // empty
-	shouldEqual(s, SnippetLoopScope.init);
+	assert(s == SnippetLoopScope.init);
 
 	i = snippets.determineSnippetInfo(null, loopCode, 31);
 	assert(i.level == SnippetLevel.method, i.stack.to!string);
@@ -183,58 +183,58 @@ void map()
 	assert(i.level == SnippetLevel.global, i.stack.to!string);
 
 	i = snippets.determineSnippetInfo(null, loopCode, 43);
-	shouldEqual(i.level, SnippetLevel.value);
+	assert(i.level == SnippetLevel.value);
 	s = i.loopScope; // in value
-	shouldEqual(s, SnippetLoopScope.init);
+	assert(s == SnippetLoopScope.init);
 
 	i = snippets.determineSnippetInfo(null, loopCode, 72);
-	shouldEqual(i.level, SnippetLevel.method);
+	assert(i.level == SnippetLevel.method);
 	s = i.loopScope; // trivial of x
 	assert(s.supported);
 	assert(!s.stringIterator);
-	shouldEqual(s.type, "int");
-	shouldEqual(s.iterator, "x");
+	assert(s.type == "int");
+	assert(s.iterator == "x");
 
 	i = snippets.determineSnippetInfo(null, loopCode, 150);
-	shouldEqual(i.level, SnippetLevel.method);
+	assert(i.level == SnippetLevel.method);
 	s = i.loopScope; // non-trivial of houseNumbers (should be named houseNumber)
 	assert(s.supported);
 	assert(!s.stringIterator);
-	shouldBeNull(s.type);
-	shouldEqual(s.iterator, "houseNumbers");
+	assert(null == s.type);
+	assert(s.iterator == "houseNumbers");
 
 	i = snippets.determineSnippetInfo(null, loopCode, 229);
-	shouldEqual(i.level, SnippetLevel.method);
+	assert(i.level == SnippetLevel.method);
 	s = i.loopScope; // non-trivial of items with existing variable name
 	assert(s.supported);
 	assert(!s.stringIterator);
-	shouldEqual(s.type, "int");
-	shouldEqual(s.iterator, "items");
+	assert(s.type == "int");
+	assert(s.iterator == "items");
 
 	i = snippets.determineSnippetInfo(null, loopCode, 290);
-	shouldEqual(i.level, SnippetLevel.method);
+	assert(i.level == SnippetLevel.method);
 	s = i.loopScope; // string iteration 
 	assert(s.supported);
 	assert(s.stringIterator);
-	shouldBeNull(s.type);
-	shouldEqual(s.iterator, "x");
+	assert(null == s.type);
+	assert(s.iterator == "x");
 
 	i = snippets.determineSnippetInfo(null, loopCode, 337);
-	shouldEqual(i.level, SnippetLevel.method);
+	assert(i.level == SnippetLevel.method);
 	s = i.loopScope; // no predefined variable 
 	assert(s.supported);
 	assert(!s.stringIterator);
-	shouldBeNull(s.type);
-	shouldBeNull(s.iterator);
+	assert(null == s.type);
+	assert(null == s.iterator);
 
 	i = snippets.determineSnippetInfo(null, loopCode, 418);
-	shouldEqual(i.level, SnippetLevel.method);
+	assert(i.level == SnippetLevel.method);
 	s = i.loopScope; // hash map
 	assert(s.supported);
 	assert(!s.stringIterator);
-	shouldBeNull(s.type);
-	shouldEqual(s.iterator, "map");
-	shouldEqual(s.numItems, 2);
+	assert(null == s.type);
+	assert(s.iterator == "map");
+	assert(s.numItems == 2);
 }
 
 enum StackStorageScope(string val) = "if (done) return; auto __" ~ val

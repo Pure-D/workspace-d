@@ -36,21 +36,10 @@
 		},
 		{
 			"name": "unittest",
-			"targetType": "executable",
-			"preBuildCommands-notwindows": [
-				"$DUB run --compiler=%DC% unit-threaded -c gen_ut_main -- -f bin\\ut.d"
-			],
-			"preBuildCommands-notposix": [
-				"$DUB run --compiler=$$DC unit-threaded -c gen_ut_main -- -f bin/ut.d"
-			],
-			"mainSourceFile": "bin/ut.d",
-			"excludedSourceFiles": [
-				"source/app.d",
-				"source/workspaced/info.d"
-			],
-			"buildRequirements": ["allowWarnings"],
+			"mainSourceFile": "source/app.d",
+			"dflags": ["-checkaction=context"],
 			"dependencies": {
-				"unit-threaded": "*"
+				"silly": "~>1.1.1"
 			}
 		}
 	]
