@@ -2,7 +2,7 @@
 	"name": "workspace-d",
 	"description": "Provides functions for IDEs for managing DCD, Dscanner and Dfmt. Usable as application and library",
 	"license": "MIT",
-	"copyright": "Copyright © 2017-2019, webfreak",
+	"copyright": "Copyright © 2017-2021, webfreak",
 	"authors": [
 		"webfreak"
 	],
