@@ -321,7 +321,8 @@ class DubComponent : ComponentWrapper
 		BuildSettings settings = pkg.getBuildSettings(_platform, _configuration);
 		return PackageBuildSettings(settings,
 			pkg.path.toString,
-			pkg.name);
+			pkg.name,
+			_dub.project.rootPackage.recipePath.toNativeString());
 	}
 
 	/// Lists all build types defined in the package description AND the predefined ones from dub ("plain", "debug", "release", "release-debug", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov")
@@ -622,9 +623,9 @@ struct BuildIssue
 struct PackageBuildSettings
 {
 	/// construct from dub build settings
-	this(BuildSettings dubBuildSettings, string packagePath, string packageName)
+	this(BuildSettings dubBuildSettings, string packagePath, string packageName, string recipePath)
 	{
-		foreach (i, ref val; this.tupleof)
+		foreach (i, ref val; this.tupleof[0 .. __IGNORE_TRAIL])
 		{
 			enum name = __traits(identifier, this.tupleof[i]);
 			static if (__traits(hasMember, dubBuildSettings, name))
@@ -632,10 +633,32 @@ struct PackageBuildSettings
 		}
 		this.packagePath = packagePath;
 		this.packageName = packageName;
+		this.recipePath = recipePath;
+
+		if (!targetName.length)
+			targetName = packageName;
+
+		version (Windows)
+			targetName ~= ".exe";
+
+		this.targetType = dubBuildSettings.targetType.to!string;
+		foreach (enumMember; __traits(allMembers, BuildOption))
+		{
+			enum value = __traits(getMember, BuildOption, enumMember);
+			if (value != 0 && dubBuildSettings.options.opDispatch!enumMember)
+				this.buildOptions ~= enumMember;
+		}
+		foreach (enumMember; __traits(allMembers, BuildRequirement))
+		{
+			enum value = __traits(getMember, BuildRequirement, enumMember);
+			if (value != 0 && dubBuildSettings.requirements.opDispatch!enumMember)
+				this.buildRequirements ~= enumMember;
+		}
 	}
 
 	string packagePath;
 	string packageName;
+	string recipePath;
 
 	string targetPath; /// same as dub BuildSettings
 	string targetName; /// same as dub BuildSettings
@@ -662,6 +685,12 @@ struct PackageBuildSettings
 	string[] postBuildCommands; /// same as dub BuildSettings
 	string[] preRunCommands; /// same as dub BuildSettings
 	string[] postRunCommands; /// same as dub BuildSettings
+
+	private enum __IGNORE_TRAIL = 2; // number of ignored settings below this line
+
+	string targetType; /// same as dub BuildSettings
+	string[] buildOptions; /// same as dub BuildSettings
+	string[] buildRequirements; /// same as dub BuildSettings
 }
 
 private:
