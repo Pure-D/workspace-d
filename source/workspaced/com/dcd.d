@@ -619,17 +619,37 @@ private:
 	}
 }
 
-private string NullDCDClientGenerator(Base, alias fun)()
+class NullDCDClient : IDCDClient
 {
-	return q{
-		import std.experimental.logger : warningf;
-		warningf("Trying to use DCD function %s on uninitialized client!", __FUNCTION__);
-		static if (!is(typeof(return) == void))
-			return typeof(return).init;
-	};
-}
+	enum Methods = [
+		"string socketFile() const @property",
+		"void socketFile(string) @property",
+		"ushort runningPort() const @property",
+		"void runningPort(ushort) @property",
+		"bool usingUnixDomainSockets() const @property",
+		"bool queryRunning()",
+		"bool shutdown()",
+		"bool clearCache()",
+		"bool addImportPaths(string[] importPaths)",
+		"bool removeImportPaths(string[] importPaths)",
+		"string[] listImportPaths()",
+		"SymbolInformation requestSymbolInfo(CodeRequest loc)",
+		"string[] requestDocumentation(CodeRequest loc)",
+		"DCDResponse.Completion[] requestSymbolSearch(string query)",
+		"LocalUse requestLocalUse(CodeRequest loc)",
+		"Completion requestAutocomplete(CodeRequest loc)",
+	];
 
-alias NullDCDClient = AutoImplement!(IDCDClient, NullDCDClientGenerator);
+	static foreach (method; Methods)
+	{
+		mixin(method, " {
+			import std.experimental.logger : warningf;
+			warningf(\"Trying to use DCD function %s on uninitialized client!\", __FUNCTION__);
+			static if (!is(typeof(return) == void))
+				return typeof(return).init;
+		}");
+	}
+}
 
 bool supportsUnixDomainSockets(string ver)
 {
