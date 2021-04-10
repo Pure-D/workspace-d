@@ -520,6 +520,33 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/object.html#.Exception]"
 	),
 
+	// Block keywords
+	PlainSnippet(
+		[SnippetLevel.global, SnippetLevel.type],
+		"unittest",
+		"unittest",
+		"unittest {\n\t$0\n}",
+		"Defines a unittest block, which is a method that tests a part of the code in isolation. Unittests can be run with DUB using `dub test`. "
+			~ "Unittests most often contain calls to assert to test results or throw exceptions for code that is not working as expected.\n\n"
+			~ "Do NOT use inside templates / templated types (classes, structs, etc.) as they will not be run!\n\n"
+			~ "Reference: [https://dlang.org/spec/unittest.html]"
+	),
+	PlainSnippet(
+		[SnippetLevel.method],
+		"assert",
+		"assert",
+		"assert($0);",
+		"Enforces that the given expression in the first argument evaluates to `true`. "
+			~ "If it does not evaluate to `true`, an AssertError will be thrown and an optional second argument may be passed as explanation message what went wrong.\n\n"
+			~ "Asserts are not emitted at all in DUB release builds. Therefore **expressions in the first argument may not be run**. "
+			~ "Don't use expressions like ~~`assert(i++)`~~ outside unittests and contracts as they might introduce bugs when building in release mode.\n\n"
+			~ "```d\n"
+			~ "assert(complexAlgorithm() == 4, \"an error message\");\n"
+			~ "```\n\n"
+			~ "Reference: [https://dlang.org/spec/expression.html#AssertExpression]",
+		null, true
+	),
+
 	// Builtin Types (keywords)
 	PlainSnippet(
 		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
