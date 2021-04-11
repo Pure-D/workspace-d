@@ -193,15 +193,15 @@ int main(string[] args)
 				"--init", "--recursive"], ["dub", "upgrade"],
 				["dub", "build", "--compiler=" ~ winCompiler, "--combined", "--build=release"]]))
 			return 1;
-		if (dcd && !dubInstall!(false, true)("DCD", "https://github.com/Hackerpilot/DCD.git",
+		if (dcd && !dubInstall!(false, true)("DCD", "https://github.com/dlang-community/DCD.git",
 				[".\\dcd-client.exe", ".\\dcd-server.exe"], [["dub", "upgrade"], ["dub", "build", "--build=release",
 				"--config=client"], ["dub", "build", "--build=release", "--config=server"]]))
 			return 1;
-		if (dscanner && !dubInstall("Dscanner", "https://github.com/Hackerpilot/Dscanner.git",
+		if (dscanner && !dubInstall("Dscanner", "https://github.com/dlang-community/Dscanner.git",
 				[".\\bin\\dscanner.exe"], [["git", "submodule", "update", "--init",
 				"--recursive"], ["cmd", "/c", "build.bat"]]))
 			return 1;
-		if (dfmt && !dubInstall("dfmt", "https://github.com/Hackerpilot/dfmt.git", [".\\dfmt.exe"]))
+		if (dfmt && !dubInstall("dfmt", "https://github.com/dlang-community/dfmt.git", [".\\dfmt.exe"]))
 			return 1;
 	}
 	else
@@ -214,14 +214,14 @@ int main(string[] args)
 		else if (!dubInstall("workspace-d",
 				"https://github.com/Pure-D/workspace-d.git", ["./workspace-d"]))
 			return 1;
-		if (dcd && !dubInstall!(false, true)("DCD", "https://github.com/Hackerpilot/DCD.git",
+		if (dcd && !dubInstall!(false, true)("DCD", "https://github.com/dlang-community/DCD.git",
 				["./dcd-client", "./dcd-server"], [["dub", "upgrade"], ["dub", "build", "--build=release",
 				"--config=client"], ["dub", "build", "--build=release", "--config=server"]]))
 			return 1;
-		if (dscanner && !dubInstall("Dscanner", "https://github.com/Hackerpilot/Dscanner.git",
+		if (dscanner && !dubInstall("Dscanner", "https://github.com/dlang-community/Dscanner.git",
 				["./bin/dscanner"], [["git", "submodule", "update", "--init", "--recursive"], ["make"]]))
 			return 1;
-		if (dfmt && !dubInstall("dfmt", "https://github.com/Hackerpilot/dfmt.git", ["./dfmt"]))
+		if (dfmt && !dubInstall("dfmt", "https://github.com/dlang-community/dfmt.git", ["./dfmt"]))
 			return 1;
 	}
 	writeln();
