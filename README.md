@@ -30,9 +30,9 @@ sh install.sh
 
 First, install the dependencies:
  
-* [dcd](https://github.com/Hackerpilot/DCD) - Used for auto completion
-* [dfmt](https://github.com/Hackerpilot/dfmt) - Used for code formatting
-* [dscanner](https://github.com/Hackerpilot/Dscanner) - Used for static code linting
+* [dcd](https://github.com/dlang-community/DCD) - Used for auto completion
+* [dfmt](https://github.com/dlang-community/dfmt) - Used for code formatting
+* [dscanner](https://github.com/dlang-community/Dscanner) - Used for static code linting
 
 Then, run:
 
