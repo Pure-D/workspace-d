@@ -71,6 +71,14 @@ string tokenText(const Token token)
 	}
 }
 
+bool isLikeIdentifier(const Token token)
+{
+	import workspaced.helpers;
+
+	auto text = token.tokenText;
+	return text.length && text[0].isIdentifierChar;
+}
+
 /// Performs a binary search to find the token containing the search location.
 /// Params:
 ///   tokens = the token array to search in.
@@ -116,6 +124,47 @@ out (v; v <= tokens.length)
 		if (tok.index == bytes)
 			return start + i;
 		else if (tok.index > bytes)
+			return start + i - 1;
+	}
+	return tokens.length;
+}
+
+/// ditto
+size_t tokenIndexAtPosition(scope const(Token)[] tokens, uint line, uint column)
+out (v; v <= tokens.length)
+{
+	int cmp(Token token)
+	{
+		if (token.line != line)
+			return token.line < line ? -1 : 1;
+		else if (token.column != column)
+			return token.column < column ? -1 : 1;
+		else
+			return 0;
+	}
+
+	if (!tokens.length || cmp(tokens[0]) >= 0)
+		return 0;
+
+	// find where to start using binary search
+	size_t l = 0;
+	size_t r = tokens.length - 1;
+	while (l < r)
+	{
+		size_t m = (l + r) / 2;
+		if (cmp(tokens[m]) < 0)
+			l = m + 1;
+		else
+			r = m - 1;
+	}
+	size_t start = r;
+
+	// search remaining with linear search
+	foreach (i, tok; tokens[start .. $])
+	{
+		if (cmp(tok) == 0)
+			return start + i;
+		else if (cmp(tok) > 0)
 			return start + i - 1;
 	}
 	return tokens.length;
