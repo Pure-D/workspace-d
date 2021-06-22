@@ -112,6 +112,14 @@ class SnippetsComponent : ComponentWrapper
 					return SnippetInfo([SnippetLevel.strings, SnippetLevel.other]);
 				else
 					return SnippetInfo([SnippetLevel.strings]);
+			case tok!"(":
+				if (leading.length >= 2)
+				{
+					auto beforeLast = leading[$ - 2];
+					if (beforeLast.type.among(tok!"__traits", tok!"version", tok!"debug"))
+						return SnippetInfo([SnippetLevel.other]);
+				}
+				break;
 			default:
 				break;
 			}
