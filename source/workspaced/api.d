@@ -208,15 +208,19 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 		override Future!JSONValue run(string method, JSONValue[] args)
 		{
 			static foreach (member; __traits(derivedMembers, typeof(this)))
-				static if (member[0] != '_' && __traits(compiles, __traits(getMember,
-						typeof(this).init, member)) && __traits(getProtection, __traits(getMember, typeof(this).init,
-						member)) == "public" && __traits(compiles, isFunction!(__traits(getMember, typeof(this)
-						.init, member))) && isFunction!(__traits(getMember, typeof(this).init,
-						member)) && !hasUDA!(__traits(getMember, typeof(this).init, member),
-						ignoredFunc) && !__traits(isTemplate,
-						__traits(getMember, typeof(this).init, member)))
+			{
+				static if (member[0] != '_'
+						&& __traits(compiles, __traits(getMember, typeof(this).init, member))
+						&& __traits(getProtection, __traits(getMember, typeof(this).init, member)) == "public"
+						&& __traits(compiles, isFunction!(__traits(getMember, typeof(this) .init, member)))
+						&& isFunction!(__traits(getMember, typeof(this).init, member))
+						&& !hasUDA!(__traits(getMember, typeof(this).init, member), ignoredFunc)
+						&& !__traits(isTemplate, __traits(getMember, typeof(this).init, member)))
+				{
 					if (method == member)
 						return runMethod!member(args);
+				}
+			}
 			throw new Exception("Method " ~ method ~ " not found.");
 		}
 
@@ -247,31 +251,64 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 
 		static string generateOverloadCall(alias fun)()
 		{
+			string retarg;
+			string decl;
 			string call = "fun(";
+			string arg;
 			static foreach (i, T; Parameters!fun)
 			{
 				static if (is(T : const(char)[]))
-					call ~= "args[" ~ i.to!string ~ "].str, ";
+					arg = "args[" ~ i.to!string ~ "].str";
 				else
-					call ~= "args[" ~ i.to!string ~ "].fromJSON!(" ~ T.stringof ~ "), ";
+					arg = "args[" ~ i.to!string ~ "].fromJSON!(" ~ T.stringof ~ ")";
+
+				static if (isRefOrOutParam!(fun, i))
+				{
+					decl ~= "auto arg_" ~ i.stringof ~ " = " ~ arg ~ ";";
+					if (retarg.length)
+						assert(false, "only a single ref/out parameter is allowed");
+					retarg = "arg_" ~ i.stringof;
+					call ~= "arg_" ~ i.stringof ~ ", ";
+				}
+				else
+				{
+					call ~= arg ~ ", ";
+				}
 			}
 			call ~= ")";
 			static if (is(ReturnType!fun : Future!T, T))
 			{
+				assert(!retarg.length, "async functions may not use ref/out parameters");
 				static if (is(T == void))
 					string conv = "ret.finish(JSONValue(null));";
 				else
 					string conv = "ret.finish(v.value.toJSON);";
-				return "auto ret = new Future!JSONValue; auto v = " ~ call
+				return decl ~ "auto ret = new Future!JSONValue; auto v = " ~ call
 					~ "; v.onDone = { if (v.exception) ret.error(v.exception); else "
 					~ conv ~ " }; return ret;";
 			}
 			else static if (is(ReturnType!fun == void))
-				return call ~ "; return Future!JSONValue.fromResult(JSONValue(null));";
+			{
+				if (retarg.length)
+					return decl ~ call ~ "; return Future!JSONValue.fromResult(" ~ retarg ~ ".toJSON);";
+				else
+					return decl ~ call ~ "; return Future!JSONValue.fromResult(JSONValue(null));";
+			}
 			else
-				return "return Future!JSONValue.fromResult(" ~ call ~ ".toJSON);";
+			{
+				assert(!retarg.length, "functions with ref/out parameter may not return any value");
+				return decl ~ "return Future!JSONValue.fromResult(" ~ call ~ ".toJSON);";
+			}
 		}
 	}
+}
+
+bool isRefOrOutParam(alias fun, size_t i)()
+{
+	static foreach (sc; __traits(getParameterStorageClasses, fun, i))
+		if (sc == "ref" || sc == "out")
+			return true;
+	return false;
 }
 
 bool matchesOverload(alias fun)(JSONValue[] args)
