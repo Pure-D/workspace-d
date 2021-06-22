@@ -1,5 +1,8 @@
 module workspaced.com.dscanner;
 
+version (unittest)
+debug = ResolveRange;
+
 import std.algorithm;
 import std.array;
 import std.conv;
@@ -31,6 +34,10 @@ import painlessjson;
 
 import workspaced.api;
 import workspaced.dparseext;
+import workspaced.helpers;
+
+static immutable LocalImportCheckKEY = "dscanner.suspicious.local_imports";
+static immutable LongLineCheckKEY = "dscanner.style.long_line";
 
 @component("dscanner")
 class DscannerComponent : ComponentWrapper
@@ -42,7 +49,8 @@ class DscannerComponent : ComponentWrapper
 	/// See_Also: $(LREF getConfig)
 	Future!(DScannerIssue[]) lint(string file = "", string ini = "dscanner.ini",
 			scope const(char)[] code = "", bool skipWorkspacedPaths = false,
-			const StaticAnalysisConfig defaultConfig = StaticAnalysisConfig.init)
+			const StaticAnalysisConfig defaultConfig = StaticAnalysisConfig.init,
+			bool resolveRanges = false)
 	{
 		auto ret = new Future!(DScannerIssue[]);
 		gthreads.create({
@@ -67,6 +75,17 @@ class DscannerComponent : ComponentWrapper
 				if (!m)
 					throw new Exception(text("parseModule returned null?! - file: '",
 						file, "', code: '", code, "'"));
+
+				// resolve syntax errors (immediately set by parseModule)
+				if (resolveRanges)
+				{
+					foreach_reverse (i, ref issue; issues)
+					{
+						if (!resolveRange(tokens, issue))
+							issues = issues.remove(i);
+					}
+				}
+
 				MessageSet results;
 				auto alloc = scoped!ASTAllocator();
 				auto moduleCache = ModuleCache(alloc);
@@ -85,6 +104,11 @@ class DscannerComponent : ComponentWrapper
 					issue.type = typeForWarning(msg.key);
 					issue.description = msg.message;
 					issue.key = msg.key;
+					if (resolveRanges)
+					{
+						if (!this.resolveRange(tokens, issue))
+							continue;
+					}
 					issues ~= issue;
 				}
 				ret.finish(issues);
@@ -95,6 +119,217 @@ class DscannerComponent : ComponentWrapper
 			}
 		});
 		return ret;
+	}
+
+	/// Takes line & column from the D-Scanner issue array and resolves the
+	/// start & end locations for the issues by changing the values in-place.
+	/// In the JSON RPC this returns the modified array, in workspace-d as a
+	/// library this changes the parameter values in place.
+	void resolveRanges(scope const(char)[] code, scope ref DScannerIssue[] issues)
+	{
+		LexerConfig config;
+		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		if (!tokens.length)
+			return;
+
+		foreach_reverse (i, ref issue; issues)
+		{
+			if (!resolveRange(tokens, issue))
+				issues = issues.remove(i);
+		}
+	}
+
+	/// Adjusts a D-Scanner line:column location to a start & end range, potentially
+	/// improving the error message through tokens nearby.
+	/// Returns: `false` if this issue should be discarded (handled by other issues)
+	private bool resolveRange(scope const(Token)[] tokens, ref DScannerIssue issue)
+	out
+	{
+		debug (ResolveRange) if (issue.range != typeof(issue.range).init)
+		{
+			assert(issue.range[0].line > 0);
+			assert(issue.range[0].column > 0);
+			assert(issue.range[1].line > 0);
+			assert(issue.range[1].column > 0);
+		}
+	}
+	do
+	{
+		auto tokenIndex = tokens.tokenIndexAtPosition(issue.line, issue.column);
+		if (tokenIndex >= tokens.length)
+		{
+			if (tokens.length)
+				issue.range = makeTokenRange(tokens[$ - 1]);
+			else
+				issue.range = typeof(issue.range).init;
+			return true;
+		}
+
+		switch (issue.key)
+		{
+		case null:
+			// syntax errors
+			if (!adjustRangeForSyntaxError(tokens, tokenIndex, issue))
+				return false;
+			improveErrorMessage(issue);
+			return true;
+		case LocalImportCheckKEY:
+			if (adjustRangeForLocalImportsError(tokens, tokenIndex, issue))
+				return true;
+			goto default;
+		case LongLineCheckKEY:
+			issue.range = makeTokenRange(tokens[tokenIndex], tokens[min($ - 1, tokens.tokenIndexAtPosition(issue.line, 1000))]);
+			return true;
+		default:
+			issue.range = makeTokenRange(tokens[tokenIndex]);
+			return true;
+		}
+	}
+
+	private void improveErrorMessage(ref DScannerIssue issue)
+	{
+		// identifier is not literally expected
+		issue.description = issue.description.replace("`identifier`", "identifier");
+
+		static immutable expectedIdentifierStart = "Expected identifier instead of `";
+		static immutable keywordReplacement = "Expected identifier instead of reserved keyword `";
+		if (issue.description.startsWith(expectedIdentifierStart))
+		{
+			if (issue.description.length > expectedIdentifierStart.length + 1
+				&& issue.description[expectedIdentifierStart.length].isIdentifierChar)
+			{
+				// expected identifier instead of keyword (probably) here because
+				// first character of "instead of `..." is an identifier character.
+				issue.description = keywordReplacement ~ issue.description[expectedIdentifierStart.length .. $];
+			}
+		}
+	}
+
+	private bool adjustRangeForSyntaxError(scope const(Token)[] tokens, size_t currentToken, ref DScannerIssue issue)
+	{
+		auto s = issue.description;
+
+		if (s.startsWith("Expected `"))
+		{
+			s = s["Expected ".length .. $];
+			if (s.startsWith("`;`"))
+			{
+				// span after last word
+				size_t issueStartExclusive = currentToken;
+				foreach_reverse (i, token; tokens[0 .. currentToken])
+				{
+					if (token.type == tok!";")
+					{
+						// this ain't right, expected semicolon issue but
+						// semicolon is the first thing before this token
+						// happens when syntax before is broken, let's discard!
+						// for example in `foo.foreach(a;b)`
+						return false;
+					}
+					issueStartExclusive = i;
+					if (token.isLikeIdentifier)
+						break;
+				}
+
+				size_t issueEnd = issueStartExclusive;
+				auto line = tokens[issueEnd].line;
+
+				// span until newline or next word character
+				foreach (i, token; tokens[issueStartExclusive + 1 .. $])
+				{
+					if (token.line != line || token.isLikeIdentifier)
+						break;
+					issueEnd = issueStartExclusive + 1 + i;
+				}
+
+				issue.range = [makeTokenEnd(tokens[issueStartExclusive]), makeTokenEnd(tokens[issueEnd])];
+				return true;
+			}
+			else if (s.startsWith("`identifier` instead of `"))
+			{
+				auto wanted = s["`identifier` instead of `".length .. $];
+				if (wanted.length && wanted[0].isIdentifierChar)
+				{
+					// wants identifier instead of some keyword (probably)
+					// happens e.g. after a . and then nothing written and next line contains a keyword
+					// want to remove the "instead of" in case it's not in the same line
+					if (currentToken > 0 && tokens[currentToken - 1].line != tokens[currentToken].line)
+					{
+						issue.description = "Expected identifier";
+						issue.range = [makeTokenEnd(tokens[currentToken - 1]), makeTokenStart(tokens[currentToken])];
+						return true;
+					}
+				}
+			}
+
+			// span from start of last word
+			size_t issueStart = min(max(0, cast(ptrdiff_t)tokens.length - 1), currentToken + 1);
+			// if a non-identifier was expected, include word before
+			if (issueStart > 0 && s.length > 2 && s[1].isIdentifierSeparatingChar)
+				issueStart--;
+			foreach_reverse (i, token; tokens[0 .. issueStart])
+			{
+				issueStart = i;
+				if (token.isLikeIdentifier)
+					break;
+			}
+
+			// span to end of next word
+			size_t searchStart = issueStart;
+			if (tokens[searchStart].column + tokens[searchStart].tokenText.length <= issue.column)
+				searchStart++;
+			size_t issueEnd = min(max(0, cast(ptrdiff_t)tokens.length - 1), searchStart);
+			foreach (i, token; tokens[searchStart .. $])
+			{
+				if (token.isLikeIdentifier)
+					break;
+				issueEnd = searchStart + i;
+			}
+
+			issue.range = makeTokenRange(tokens[issueStart], tokens[issueEnd]);
+		}
+		else
+		{
+			if (tokens[currentToken].type == tok!"auto")
+			{
+				// syntax error on the word "auto"
+				// check for foreach (auto key; value)
+
+				if (currentToken >= 2
+					&& tokens[currentToken - 1].type == tok!"("
+					&& (tokens[currentToken - 2].type == tok!"foreach" || tokens[currentToken - 2].type == tok!"foreach_reverse"))
+				{
+					// this is foreach (auto
+					issue.key = "workspaced.foreach-auto";
+					issue.description = "foreach (auto key; value) is not valid D "
+						~ "syntax. Use foreach (key; value) instead.";
+					// range is used in code_actions to remove auto
+					issue.range = makeTokenRange(tokens[currentToken]);
+					return true;
+				}
+			}
+
+			issue.range = makeTokenRange(tokens[currentToken]);
+		}
+		return true;
+	}
+
+	// adjusts error location of
+	// import |std.stdio;
+	// to
+	// ~import std.stdio;~
+	private bool adjustRangeForLocalImportsError(scope const(Token)[] tokens, size_t currentToken, ref DScannerIssue issue)
+	{
+		size_t startIndex = currentToken;
+		size_t endIndex = currentToken;
+
+		while (startIndex > 0 && tokens[startIndex].type != tok!"import")
+			startIndex--;
+		while (endIndex < tokens.length && tokens[endIndex].type != tok!";")
+			endIndex++;
+
+		issue.range = makeTokenRange(tokens[startIndex], tokens[endIndex]);
+		return true;
 	}
 
 	/// Gets the used D-Scanner config, optionally reading from a given
@@ -265,7 +500,7 @@ struct DScannerIssue
 {
 	///
 	string file;
-	///
+	/// one-based line & column (in bytes) of this diagnostic location
 	int line, column;
 	///
 	string type;
@@ -273,6 +508,86 @@ struct DScannerIssue
 	string description;
 	///
 	string key;
+	/// Resolved range for content that can be filled with a call to resolveRanges
+	ResolvedLocation[2] range;
+
+	/// Converts this object to a JSONValue
+	JSONValue _toJSON() const
+	{
+		JSONValue[] rangeObj = [
+			range[0].toJSON,
+			range[1].toJSON
+		];
+		//dfmt off
+		return JSONValue([
+			"file": JSONValue(file),
+			"line": JSONValue(line),
+			"column": JSONValue(column),
+			"type": JSONValue(type),
+			"description": JSONValue(description),
+			"key": JSONValue(key),
+			"range": JSONValue(rangeObj),
+		]);
+		//dfmt on
+	}
+}
+
+/// Describes a code location in exact byte offset, line number and column for a
+/// given source code this was resolved against.
+struct ResolvedLocation
+{
+	/// byte offset of the character in question - may be 0 if line and column are set
+	ulong index;
+	/// one-based line
+	uint line;
+	/// one-based character offset inside the line in bytes
+	uint column;
+}
+
+ResolvedLocation[2] makeTokenRange(const Token token)
+{
+	return makeTokenRange(token, token);
+}
+
+ResolvedLocation[2] makeTokenRange(const Token start, const Token end)
+{
+	return [makeTokenStart(start), makeTokenEnd(end)];
+}
+
+ResolvedLocation makeTokenStart(const Token token)
+{
+	ResolvedLocation ret;
+	ret.index = cast(uint) token.index;
+	ret.line = cast(uint) token.line;
+	ret.column = cast(uint) token.column;
+	return ret;
+}
+
+ResolvedLocation makeTokenEnd(const Token token)
+{
+	import std.string : lineSplitter;
+
+	ResolvedLocation ret;
+	auto text = tokenText(token);
+	ret.index = token.index + text.length;
+	int numLines;
+	size_t lastLength;
+	foreach (line; lineSplitter(text))
+	{
+		numLines++;
+		lastLength = line.length;
+	}
+	if (numLines > 1)
+	{
+		ret.line = cast(uint)(token.line + numLines - 1);
+		ret.column = cast(uint)(lastLength + 1);
+	}
+	else
+	{
+		ret.line = cast(uint)(token.line);
+		ret.column = cast(uint)(token.column + text.length);
+	}
+	return ret;
 }
 
 /// Returned by find-symbol
