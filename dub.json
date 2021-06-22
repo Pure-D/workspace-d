@@ -25,7 +25,8 @@
 	"configurations": [
 		{
 			"name": "executable",
-			"targetType": "executable"
+			"targetType": "executable",
+			"mainSourceFile": "source/app.d"
 		},
 		{
 			"name": "library",
