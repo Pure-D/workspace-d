@@ -7,10 +7,13 @@ import std.conv;
 import std.getopt;
 import std.json;
 import std.stdio : stderr;
+import std.string;
 
 import dfmt.config;
 import dfmt.editorconfig;
 import dfmt.formatter : fmt = format;
+
+import dparse.lexer;
 
 import core.thread;
 
@@ -141,9 +144,95 @@ class DfmtComponent : ComponentWrapper
 		else
 			return code.idup;
 	}
+
+	/// Finds dfmt instruction comments (dfmt off, dfmt on)
+	/// Returns: a list of dfmt instructions, sorted in appearing (source code)
+	/// order
+	DfmtInstruction[] findDfmtInstructions(scope const(char)[] code)
+	{
+		LexerConfig config;
+		config.whitespaceBehavior = WhitespaceBehavior.skip;
+		config.commentBehavior = CommentBehavior.noIntern;
+		auto lexer = DLexer(code, config, &workspaced.stringCache);
+		auto ret = appender!(DfmtInstruction[]);
+		Search: foreach (token; lexer)
+		{
+			if (token.type == tok!"comment")
+			{
+				auto text = dfmtCommentText(token.text);
+				DfmtInstruction instruction;
+				switch (text)
+				{
+				case "dfmt on":
+					instruction.type = DfmtInstruction.Type.dfmtOn;
+					break;
+				case "dfmt off":
+					instruction.type = DfmtInstruction.Type.dfmtOff;
+					break;
+				default:
+					text = text.chompPrefix("/").strip; // make doc comments (///) appear as unknown because only first 2 // are stripped.
+					if (text.startsWith("dfmt", "dmft", "dftm")) // include some typos
+					{
+						instruction.type = DfmtInstruction.Type.unknown;
+						break;
+					}
+					continue Search;
+				}
+				instruction.index = token.index;
+				instruction.line = token.line;
+				instruction.column = token.column;
+				instruction.length = token.text.length;
+				ret.put(instruction);
+			}
+			else if (token.type == tok!"__EOF__")
+				break;
+		}
+		return ret.data;
+	}
+}
+
+///
+struct DfmtInstruction
+{
+	/// Known instruction types
+	enum Type
+	{
+		/// Instruction to turn off formatting from here
+		dfmtOff,
+		/// Instruction to turn on formatting again from here
+		dfmtOn,
+		/// Starts with dfmt, but unknown contents
+		unknown,
+	}
+
+	///
+	Type type;
+	/// libdparse Token location (byte based offset)
+	size_t index;
+	/// libdparse Token location (byte based, 1-based)
+	size_t line, column;
+	/// Comment length in bytes
+	size_t length;
 }
 
 private:
+
+// from dfmt/formatter.d TokenFormatter!T.commentText
+string dfmtCommentText(string commentText)
+{
+	import std.string : strip;
+
+	if (commentText[0 .. 2] == "//")
+		commentText = commentText[2 .. $];
+	else
+	{
+		if (commentText.length > 3)
+			commentText = commentText[2 .. $ - 2];
+		else
+			commentText = commentText[2 .. $];
+	}
+	return commentText.strip();
+}
 
 void tryFetchProperty(T = string)(ref JSONValue json, ref T ret, string name)
 {
@@ -183,4 +272,36 @@ void tryFetchProperty(T = string)(ref JSONValue json, ref T ret, string name)
 		else
 			static assert(false);
 	}
+}
+
+unittest
+{
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DfmtComponent;
+	DfmtComponent dfmt = instance.get!DfmtComponent;
+
+	assert(dfmt.findDfmtInstructions("void main() {}").length == 0);
+	assert(dfmt.findDfmtInstructions("void main() {\n\t// dfmt off\n}") == [
+		DfmtInstruction(DfmtInstruction.Type.dfmtOff, 15, 2, 2, 11)
+	]);
+	assert(dfmt.findDfmtInstructions(`import std.stdio;
+
+// dfmt on
+void main()
+{
+	// dfmt off
+	writeln("hello");
+	// dmft off
+	string[string] x = [
+		"a": "b"
+	];
+	// dfmt on
+}`) == [
+		DfmtInstruction(DfmtInstruction.Type.dfmtOn, 19, 3, 1, 10),
+		DfmtInstruction(DfmtInstruction.Type.dfmtOff, 45, 6, 2, 11),
+		DfmtInstruction(DfmtInstruction.Type.unknown, 77, 8, 2, 11),
+		DfmtInstruction(DfmtInstruction.Type.dfmtOn, 127, 12, 2, 10),
+	]);
 }
