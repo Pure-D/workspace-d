@@ -604,6 +604,13 @@ static immutable PlainSnippet[] plainSnippets = [
 		"enum ${1:EnumValue} = $2;\n$0",
 		"Defines a simple compile time constant using enum.\n\nReference: [https://dlang.org/spec/enum.html#manifest_constants]"
 	),
+	PlainSnippet(
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
+		"alias",
+		"alias Alias = ...",
+		"alias ${1:Alias} = $2;\n$0",
+		"Creates a symbol that is an alias for another type, and can be used anywhere that other type may appear.\n\nReference: [https://dlang.org/spec/declaration.html#alias]"
+	),
 
 	// Types using phobos or some code idioms
 	PlainSnippet(
