@@ -146,7 +146,7 @@ class SnippetsComponent : ComponentWrapper
 		RollbackAllocator rba;
 		scope parsed = parseModule(tokens, cast(string) file, &rba);
 
-		trace("determineSnippetInfo at ", position);
+		//trace("determineSnippetInfo at ", position);
 
 		scope gen = new SnippetInfoGenerator(position);
 		gen.variableStack.reserve(64);

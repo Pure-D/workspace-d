@@ -1,5 +1,7 @@
 module workspaced.com.snippets.generator;
 
+// debug = TraceGenerator;
+
 import dparse.ast;
 import dparse.lexer;
 
@@ -297,7 +299,7 @@ class SnippetInfoGenerator : ASTVisitor
 
 		foreach (t; dec.declarators)
 		{
-			trace("push variable ", variableStack.length, " ", t.name.text, " of type ",
+			debug(TraceGenerator) trace("push variable ", variableStack.length, " ", t.name.text, " of type ",
 					astToString(dec.type), " and value ", astToString(t.initializer));
 			variableStack.assumeSafeAppend ~= VariableUsage(dec.type, t.name,
 					t.initializer ? t.initializer.nonVoidInitializer : null);
@@ -306,7 +308,7 @@ class SnippetInfoGenerator : ASTVisitor
 		if (dec.autoDeclaration)
 			foreach (t; dec.autoDeclaration.parts)
 			{
-				trace("push variable ", variableStack.length, " ", t.identifier.text,
+				debug(TraceGenerator) trace("push variable ", variableStack.length, " ", t.identifier.text,
 						" of type auto and value ", astToString(t.initializer));
 				variableStack.assumeSafeAppend ~= VariableUsage(dec.type, t.identifier,
 						t.initializer ? t.initializer.nonVoidInitializer : null);
@@ -322,7 +324,7 @@ class SnippetInfoGenerator : ASTVisitor
 	{
 		if (done)
 			return;
-		trace("push ", level, " on ", typeid(node).name, " ", current, " -> ", node.tokens[0].index);
+		debug(TraceGenerator) trace("push ", level, " on ", typeid(node).name, " ", current, " -> ", node.tokens[0].index);
 
 		if (node.tokens.length)
 		{
@@ -330,7 +332,7 @@ class SnippetInfoGenerator : ASTVisitor
 			if (current >= position)
 			{
 				done = true;
-				trace("done");
+				debug(TraceGenerator) trace("done");
 				return;
 			}
 		}
@@ -341,7 +343,7 @@ class SnippetInfoGenerator : ASTVisitor
 	{
 		if (done)
 			return;
-		trace("pop from ", typeid(node).name, " ", current, " -> ",
+		debug(TraceGenerator) trace("pop from ", typeid(node).name, " ", current, " -> ",
 				node.tokens[$ - 1].index + node.tokens[$ - 1].tokenText.length);
 
 		if (node.tokens.length)
@@ -350,7 +352,7 @@ class SnippetInfoGenerator : ASTVisitor
 			if (current > position)
 			{
 				done = true;
-				trace("done");
+				debug(TraceGenerator) trace("done");
 				return;
 			}
 		}
