@@ -48,28 +48,28 @@ static immutable PlainSnippet[] plainSnippets = [
 	// entry points
 
 	PlainSnippet(
-		[SnippetLevel.global],
+		[SnippetLevel.global, SnippetLevel.mixinTemplate],
 		"main",
 		"void main(string[] args)",
 		"void main(string[] args) {\n\t$0\n}",
 		"Normal D entry point main function with arguments and no return value"
 	),
 	PlainSnippet(
-		[SnippetLevel.global],
+		[SnippetLevel.global, SnippetLevel.mixinTemplate],
 		"maini",
 		"int main(string[] args)",
 		"int main(string[] args) {\n\t${0:return 0;}\n}",
 		"Normal D entry point main function with arguments and integer status return value"
 	),
 	PlainSnippet(
-		[SnippetLevel.global],
+		[SnippetLevel.global, SnippetLevel.mixinTemplate],
 		"mainc",
 		"-betterC void main(int argc, const(char)** argv)",
 		"void main(int argc, const(char)** argv) {\n\t$0\n}",
 		"C entry point when using D with -betterC with no return value"
 	),
 	PlainSnippet(
-		[SnippetLevel.global],
+		[SnippetLevel.global, SnippetLevel.mixinTemplate],
 		"mainci",
 		"-betterC int main(int argc, const(char)** argv)",
 		"int main(int argc, const(char)** argv) {\n\t${0:return 0;}\n}",
@@ -79,7 +79,7 @@ static immutable PlainSnippet[] plainSnippets = [
 	// properties
 
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"refproperty",
 		"ref property as getter + setter",
 		"ref ${3:auto} ${1:value}() @property { return ${2:_${1:value}}; }",
@@ -87,7 +87,7 @@ static immutable PlainSnippet[] plainSnippets = [
 		"ref auto value() @property { return _value; }"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"getset",
 		"getter + setter",
 		"void ${1:value}(${3:auto} value) @property { ${2:_${1:value}} = value; }\n" ~
@@ -97,7 +97,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			"auto value() @property const { return _value; }"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"get",
 		"getter property",
 		"${3:auto} ${1:value}() @property const { return ${2:_${1:value}}; }",
@@ -105,7 +105,7 @@ static immutable PlainSnippet[] plainSnippets = [
 		"auto value() @property const { return _value; }"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"set",
 		"setter property",
 		"void ${1:value}(${3:auto} value) @property { ${2:_${1:value}} = value; }",
@@ -117,7 +117,7 @@ static immutable PlainSnippet[] plainSnippets = [
 	// todo: automatic generation of types and differences in classes
 
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opUnary",
 		"auto opUnary!(op)()",
 		"${1:auto} opUnary(string op)() {\n\t$0\n}",
@@ -126,7 +126,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#unary]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opIndexUnary",
 		"auto opIndexUnary!(op)(index)",
 		"${1:auto} opIndexUnary(string op)(${2:size_t index}) {\n\t$0\n}",
@@ -135,7 +135,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#index_unary_operators]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opIndexUnarySlice",
 		"auto opIndexUnary!(op)(slice)",
 		"${1:auto} opIndexUnary(string op)($2) {\n\t$0\n}",
@@ -146,7 +146,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#slice_unary_operators]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opSliceUnary",
 		"auto opSliceUnary!(op)(slice)",
 		"${1:auto} opSliceUnary(string op)(${2:size_t start, size_t end}) {\n\t$0\n}",
@@ -157,7 +157,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#slice_unary_operators]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opCast",
 		"T opCast!(T)()",
 		"${1:T} opCast(${1:T})() const {\n\t$0\n}",
@@ -166,7 +166,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#cast]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opCastBool",
 		"bool opCast!(T : bool)()",
 		"bool opCast(T : bool)() const {\n\t$0\n}",
@@ -175,7 +175,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#boolean_operators]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opBinary",
 		"auto opBinary(rhs)",
 		"${1:auto} opBinary(string op, R)(${2:const R rhs}) const {\n\t$0\n}",
@@ -184,7 +184,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#binary]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opBinaryRight",
 		"auto opBinaryRight(lhs)",
 		"${1:auto} opBinaryRight(string op, L)(${2:const L lhs}) const {\n\t$0\n}",
@@ -195,7 +195,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#binary]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opEquals",
 		"bool opEquals(other) in struct",
 		"bool opEquals(R)(${1:const R other}) const {\n\t$0\n}",
@@ -203,7 +203,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#equals]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opEqualsClass",
 		"bool opEquals(other) in class",
 		"override bool opEquals(${1:Object other}) {\n\t$0\n}",
@@ -211,7 +211,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#equals]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"toHash",
 		"size_t toHash() in struct",
 		"size_t toHash() const @nogc @safe pure nothrow {\n\t$0\n}",
@@ -219,7 +219,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/hash-map.html#using_struct_as_key]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"toHashClass",
 		"size_t toHash() in class",
 		"override size_t toHash() const @nogc @safe pure nothrow {\n\t$0\n}",
@@ -227,7 +227,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/hash-map.html#using_classes_as_key]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"toString",
 		"string toString() in struct",
 		"string toString() const @safe pure nothrow {\n\t$0\n}",
@@ -235,7 +235,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"toStringText",
 		"string toString() in struct using std.conv:text",
 		"string toString() const @safe {\n\timport std.conv : text;\n\n\treturn text($0);\n}",
@@ -244,7 +244,7 @@ static immutable PlainSnippet[] plainSnippets = [
 	),
 	// these don't get added as they are too error-prone (get silently ignored when there is a compilation error inside of them)
 	// PlainSnippet(
-	// 	[SnippetLevel.type],
+	// 	[SnippetLevel.type, SnippetLevel.mixinTemplate],
 	// 	"toStringApp",
 	// 	"toString(ref W w) in struct with appender",
 	// 	"void toString(W)(ref W w) {\n\t$0\n}",
@@ -253,7 +253,7 @@ static immutable PlainSnippet[] plainSnippets = [
 	// 		~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
 	// ),
 	// PlainSnippet(
-	// 	[SnippetLevel.type],
+	// 	[SnippetLevel.type, SnippetLevel.mixinTemplate],
 	// 	"toStringAppSpec",
 	// 	"toString(ref W w, FormatSpec) in struct with appender and format spec",
 	// 	"void toString(W)(ref W w, scope const ref FormatSpec fmt) {\n\t$0\n}",
@@ -262,7 +262,7 @@ static immutable PlainSnippet[] plainSnippets = [
 	// 		~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
 	// ),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"toStringClass",
 		"string toString() in class",
 		"override string toString() const @safe pure nothrow {\n\t$0\n}",
@@ -270,7 +270,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"toStringTextClass",
 		"string toString() in class using std.conv:text",
 		"override string toString() const @safe {\n\timport std.conv : text;\n\n\treturn text($0);\n}",
@@ -278,7 +278,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/std_format.html#.formatValue]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opCmp",
 		"int opCmp(other) in struct",
 		"int opCmp(R)(${1:const R other}) const {\n\t$0\n}",
@@ -286,7 +286,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#compare]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opCmpClass",
 		"int opCmp(other) in class",
 		"override int opCmp(${1:Object other}) {\n\t$0\n}",
@@ -294,7 +294,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#compare]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opCall",
 		"auto opCall(args)",
 		"${1:auto} opCall($2) {\n\t$0\n}",
@@ -305,7 +305,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#function-call]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opAssign",
 		"auto opAssign(value)",
 		"auto opAssign(T)(${1:T value}) {\n\t$0\n\treturn this;\n}",
@@ -315,7 +315,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#assignment]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opIndexAssign",
 		"auto opIndexAssign(value, indices...)",
 		"auto opIndexAssign(T)(${1:T value}, ${2:size_t index}) {\n\t${0:return value;}\n}",
@@ -323,7 +323,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#index_assignment_operator]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opIndexAssignSlice",
 		"auto opIndexAssign(value, slice)",
 		"auto opIndexAssign(T)(${1:T value}) {\n\t${0:return value;}\n}",
@@ -333,7 +333,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#index_assignment_operator]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opSliceAssign",
 		"auto opSliceAssign(value, slice)",
 		"auto opSliceAssign(T)(${1:T value}, ${2:size_t start, size_t end}) {\n\t${0:return value;}\n}",
@@ -343,7 +343,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#index_assignment_operator]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opOpAssign",
 		"auto opOpAssign!(op)(value)",
 		"auto opOpAssign(string op, T)(${1:T value}) {\n\t$0;\n\treturn this;\n}",
@@ -352,7 +352,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#op-assign]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opIndexOpAssign",
 		"auto opIndexOpAssign!(op)(value, index)",
 		"auto opIndexOpAssign(string op, T)(${1:T value}, ${2:size_t index}) {\n\t${0:return value;}\n}",
@@ -361,7 +361,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#index_op_assignment]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opIndexOpAssignSlice",
 		"auto opIndexOpAssign!(op)(value, slice)",
 		"auto opIndexOpAssign(string op, T)(${1:T value}) {\n\t${0:return value;}\n}",
@@ -372,7 +372,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#slice_op_assignment]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opSliceOpAssign",
 		"auto opSliceOpAssign!(op)(value, start, end)",
 		"auto opSliceOpAssign(string op, T)(${1:T value}, ${2:size_t start, size_t end}) {\n\t${0:return value;}\n}",
@@ -383,7 +383,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#slice_op_assignment]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opIndex",
 		"auto opIndex(index)",
 		"${1:ref auto} opIndex(${2:size_t index}) {\n\t$0\n}",
@@ -393,7 +393,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#array-ops]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opSlice",
 		"auto opSlice(index)",
 		"${1:size_t[2]} opSlice(${2:size_t start, size_t end}) {\n\t${0:return [start, end];}\n}",
@@ -405,7 +405,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#array-ops]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opSliceN",
 		"auto opSlice!(n)(index)",
 		"${1:size_t[2]} opSlice(size_t dim : ${2:0})(${3:size_t start, size_t end}) {\n\t${0:return [start, end];}\n}",
@@ -417,7 +417,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#array-ops]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opDollar",
 		"auto opDollar()",
 		"${1:size_t} opDollar() {\n\t${0:return length;}\n}",
@@ -429,7 +429,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#array-ops]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opDollarN",
 		"auto opDollar!(n)()",
 		"${1:size_t} opDollar(size_t dim : ${2:0})() {\n\t${0:return length;}\n}",
@@ -441,7 +441,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#array-ops]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opDispatch",
 		"auto opDispatch!(member)()",
 		"${1:auto} opDispatch(${2:string member})() {\n\t$0\n}",
@@ -453,7 +453,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/operatoroverloading.html#dispatch]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opApply",
 		"int opApply(dg)",
 		"int opApply(scope int delegate(${1:ref Item}) ${2:dg}) {\n"
@@ -473,7 +473,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/spec/statement.html#foreach_over_struct_and_classes]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"opApplyReverse",
 		"int opApplyReverse(dg)",
 		"int opApplyReverse(scope int delegate(${1:ref Item}) ${2:dg}) {\n"
@@ -496,7 +496,7 @@ static immutable PlainSnippet[] plainSnippets = [
 	// Exception snippets
 
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"Exception",
 		"class MyException : Exception",
 		"class ${1:MyException} : ${2:Exception} {\n"
@@ -508,7 +508,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/object.html#.Exception]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"Error",
 		"class MyError : Error",
 		"class ${1:MyError} : ${2:Error} {\n"
@@ -522,7 +522,7 @@ static immutable PlainSnippet[] plainSnippets = [
 
 	// Block keywords
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"unittest",
 		"unittest",
 		"unittest {\n\t$0\n}",
@@ -549,56 +549,56 @@ static immutable PlainSnippet[] plainSnippets = [
 
 	// Builtin Types (keywords)
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
 		"import",
 		"import module",
 		"import ${1:std};\n$0",
 		"Imports a module given a name.\n\nReference: [https://dlang.org/spec/module.html#import-declaration]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
 		"class",
 		"class MyClass",
 		"class ${1:MyClass} {\n\t$0\n}",
 		"Defines a simple class type.\n\nReference: [https://dlang.org/spec/class.html]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
 		"interface",
 		"interface MyInterface",
 		"interface ${1:MyInterface} {\n\t$0\n}",
 		"Defines a simple interface type.\n\nReference: [https://dlang.org/spec/interface.html]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
 		"struct",
 		"struct MyStruct",
 		"struct ${1:MyStruct} {\n\t$0\n}",
 		"Defines a simple struct type.\n\nReference: [https://dlang.org/spec/struct.html]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
 		"union",
 		"union MyUnion",
 		"union ${1:MyUnion} {\n\t$0\n}",
 		"Defines a simple union type.\n\nReference: [https://dlang.org/spec/struct.html]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
 		"template",
 		"template MyTemplate()",
 		"template ${1:MyTemplate}($2) {\n\t$0\n}",
 		"Defines a simple union type.\n\nReference: [https://dlang.org/spec/struct.html]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
 		"enums",
 		"enum MyEnum { ... }",
 		"enum ${1:MyEnum} {\n\t${0:init,}\n}",
 		"Defines a simple enumeration.\n\nReference: [https://dlang.org/spec/enum.html]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
 		"enumv",
 		"enum EnumValue = ...",
 		"enum ${1:EnumValue} = $2;\n$0",
@@ -607,7 +607,7 @@ static immutable PlainSnippet[] plainSnippets = [
 
 	// Types using phobos or some code idioms
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
 		"typedef",
 		"typedef MyType : BaseType",
 		"enum ${1:MyType} : ${2:BaseType} {\n\t${0:init = 0}\n}",
@@ -616,7 +616,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: (17.1.5) [https://dlang.org/spec/enum.html#named_enums]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method],
+		[SnippetLevel.global, SnippetLevel.type, SnippetLevel.method, SnippetLevel.mixinTemplate],
 		"Proxy",
 		"struct MyType { mixin Proxy }",
 		"struct ${1:MyType} {\n\t${2:BaseType} base;\n\tmixin Proxy!(${2:BaseType});\n}",
@@ -626,7 +626,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/std_typecons.html#Proxy]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global],
+		[SnippetLevel.global, SnippetLevel.mixinTemplate],
 		"IUnknown",
 		"interface COMInterface : IUnknown",
 		"interface ${1:COMInterface} : IUnknown {\nextern(Windows):\n\t$0\n}",
@@ -634,7 +634,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://wiki.dlang.org/COM_Programming]"
 	),
 	PlainSnippet(
-		[SnippetLevel.global],
+		[SnippetLevel.global, SnippetLevel.mixinTemplate],
 		"ComObject",
 		"class MyObject : ComObject",
 		"class ${1:MyObject} : ComObject {\nextern(Windows):\n\t$0\n}",
@@ -645,7 +645,7 @@ static immutable PlainSnippet[] plainSnippets = [
 	// range methods
 
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"InputRange",
 		"InputRange (popFront, empty, front)",
 		"${1:auto} front() @property { ${2:return myElement;} }\n"
@@ -656,7 +656,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/std_range_primitives.html#isInputRange]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"OutputRange",
 		"OutputRange (put)",
 		"void put(${1:Item} item) {\n\t$2\n}\n$0",
@@ -664,7 +664,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/std_range_primitives.html#isOutputRange]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"ForwardRange",
 		"ForwardRange (InputRange, save)",
 		"${1:auto} front() @property { ${2:return myElement;} }\n"
@@ -676,7 +676,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/std_range_primitives.html#isForwardRange]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"InfiniteRange",
 		"InfiniteRange (empty = false)",
 		"enum bool empty = false;\n$0",
@@ -684,7 +684,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/std_range_primitives.html#isInfinite]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"BidirectionalRange",
 		"BidirectionalRange (InputRange, back, popBack)",
 		"${1:auto} front() @property { ${2:return myElement;} }\n"
@@ -696,7 +696,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/std_range_primitives.html#isBidirectionalRange]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"RandomAccessRange",
 		"RandomAccessRange (BidirectionalRange, opIndex, length)",
 		"${1:auto} front() @property { ${2:return myElement;} }\n"
@@ -711,7 +711,7 @@ static immutable PlainSnippet[] plainSnippets = [
 			~ "Reference: [https://dlang.org/phobos/std_range_primitives.html#isBidirectionalRange]"
 	),
 	PlainSnippet(
-		[SnippetLevel.type],
+		[SnippetLevel.type, SnippetLevel.mixinTemplate],
 		"RandomAccessRangeInf",
 		"RandomAccessRange (InfiniteForwardRange, opIndex)",
 		"${1:auto} front() @property { ${2:return myElement;} }\n"

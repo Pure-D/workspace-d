@@ -258,6 +258,14 @@ class SnippetInfoGenerator : ASTVisitor
 			mixin(FullSnippetLevelWrapper!(SnippetLevel.other));
 		}
 
+	override void visit(const MixinTemplateDeclaration dec)
+	{
+		mixin(SnippetLevelWrapper!(SnippetLevel.mixinTemplate));
+		// avoid TemplateDeclaration overriding scope, immediately iterate over children
+		if (dec.templateDeclaration)
+			dec.templateDeclaration.accept(this);
+	}
+
 	override void visit(const StructBody dec)
 	{
 		mixin(FullSnippetLevelWrapper!(SnippetLevel.type));

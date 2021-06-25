@@ -233,6 +233,7 @@ class SnippetsComponent : ComponentWrapper
 		case SnippetLevel.comment:
 		case SnippetLevel.docComment:
 		case SnippetLevel.strings:
+		case SnippetLevel.mixinTemplate:
 			break;
 		case SnippetLevel.type:
 			tmp.put("struct FORMAT_HELPER {\n");
@@ -387,6 +388,7 @@ class SnippetsComponent : ComponentWrapper
 		case SnippetLevel.comment:
 		case SnippetLevel.docComment:
 		case SnippetLevel.strings:
+		case SnippetLevel.mixinTemplate:
 			break;
 		case SnippetLevel.type:
 		case SnippetLevel.method:
@@ -408,6 +410,7 @@ class SnippetsComponent : ComponentWrapper
 		case SnippetLevel.comment:
 		case SnippetLevel.docComment:
 		case SnippetLevel.strings:
+		case SnippetLevel.mixinTemplate:
 			break;
 		case SnippetLevel.type:
 		case SnippetLevel.method:
@@ -515,6 +518,8 @@ enum SnippetLevel
 	comment,
 	/// Inside a documentation comment
 	docComment,
+	/// Inside explicitly declared mixin templates
+	mixinTemplate,
 }
 
 ///
