@@ -510,7 +510,9 @@ package string getVersionAndFixPath(ref string execPath)
 			execPath = newPath.array;
 			return execute([execPath, "--version"]).output.strip.orDubFetchFallback(execPath);
 		}
-		throw e;
+		throw new Exception("Failed running program ['"
+			~ execPath ~ "' '--version'] and no alternative existed in '"
+			~ newPath.array.idup ~ "'.", e);
 	}
 }
 
