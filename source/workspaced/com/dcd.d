@@ -456,6 +456,36 @@ class DCDComponent : ComponentWrapper
 		return ret;
 	}
 
+	/// Finds declaration and usage of the token at position `pos` within the
+	/// current document.
+	Future!DCDLocalUse findLocalUse(scope const(char)[] code, int pos)
+	{
+		auto ret = new Future!DCDLocalUse;
+		gthreads.create({
+			mixin(traceTask);
+			try
+			{
+				if (!running)
+				{
+					ret.finish(DCDLocalUse.init);
+					return;
+				}
+
+				// We need to move by one character on identifier characters to ensure the start character fits.
+				if (!isIdentifierSeparatingChar(code[pos]))
+					pos++;
+
+				auto localUse = client.requestLocalUse(CodeRequest("stdin", code, pos));
+				ret.finish(DCDLocalUse(localUse));
+			}
+			catch (Throwable t)
+			{
+				ret.error(t);
+			}
+		});
+		return ret;
+	}
+
 	/// Returns the used socket file. Only available on OSX, linux and BSD with DCD >= 0.8.0
 	/// Throws an error if not available.
 	string getSocketFile()
@@ -733,6 +763,23 @@ struct DCDCompletions
 		if (type != Type.calltips)
 			throw new Exception("Type is not calltips but attempted to access symbols");
 		return _symbols;
+	}
+}
+
+/// Returned by findLocalUse
+struct DCDLocalUse
+{
+	/// File path of the declaration or stdin for input
+	string declarationFilePath;
+	/// Byte location of the declaration inside the declarationFilePath
+	size_t declarationLocation;
+	/// Array of uses within stdin / given document.
+	size_t[] uses;
+
+	this(LocalUse localUse)
+	{
+		foreach (i, ref v; localUse.tupleof)
+			this.tupleof[i] = v;
 	}
 }
 
