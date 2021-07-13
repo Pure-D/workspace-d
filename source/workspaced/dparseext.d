@@ -215,20 +215,61 @@ void foo()
 	// assert(get(57) == tok!"comment");
 }
 
+bool isSomeString(const IdType type)
+{
+	switch (type)
+	{
+	case tok!"stringLiteral":
+	case tok!"wstringLiteral":
+	case tok!"dstringLiteral":
+		return true;
+	default:
+		return false;
+	}
+}
+
 /// Tries to evaluate an expression if it evaluates to a string.
 /// Returns: `null` if the resulting value is not a string or could not be
 /// evaluated.
 string evaluateExpressionString(const PrimaryExpression expr)
 in (expr !is null)
 {
+	return evaluateExpressionString(expr.primary);
+}
+
+/// ditto
+string evaluateExpressionString(const UnaryExpression expr)
+in (expr !is null)
+{
+	if (expr.primaryExpression)
+		return evaluateExpressionString(expr.primaryExpression);
+	else
+		return null;
+}
+
+/// ditto
+string evaluateExpressionString(const ExpressionNode expr)
+in (expr !is null)
+{
+	// maybe we want to support simple concatenation here some time
+
+	if (auto unary = cast(UnaryExpression) expr)
+		return evaluateExpressionString(unary);
+	else
+		return null;
+}
+
+/// ditto
+string evaluateExpressionString(const Token token)
+{
 	import dparse.strings : unescapeString;
 
-	switch (expr.primary.type)
+	switch (token.type)
 	{
 	case tok!"stringLiteral":
 	case tok!"wstringLiteral":
 	case tok!"dstringLiteral":
-		auto str = expr.primary.text;
+		auto str = token.text;
 
 		// we want to unquote here
 		// foreach because implicit concatenation can combine multiple strings
@@ -259,26 +300,4 @@ in (expr !is null)
 	default:
 		return null;
 	}
-}
-
-/// ditto
-string evaluateExpressionString(const UnaryExpression expr)
-in (expr !is null)
-{
-	if (expr.primaryExpression)
-		return evaluateExpressionString(expr.primaryExpression);
-	else
-		return null;
-}
-
-/// ditto
-string evaluateExpressionString(const ExpressionNode expr)
-in (expr !is null)
-{
-	// maybe we want to support simple concatenation here some time
-
-	if (auto unary = cast(UnaryExpression) expr)
-		return evaluateExpressionString(unary);
-	else
-		return null;
 }
