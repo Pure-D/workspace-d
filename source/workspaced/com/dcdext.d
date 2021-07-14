@@ -14,6 +14,7 @@ import std.conv;
 import std.file;
 import std.functional;
 import std.json;
+import std.meta;
 import std.range;
 import std.string;
 
@@ -68,6 +69,7 @@ class DCDExtComponent : ComponentWrapper
 		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		if (!tokens.length)
 			return CalltipsSupport.init;
+		// TODO: can probably use tokenIndexAtByteIndex here
 		auto queuedToken = tokens.countUntil!(a => a.index >= position) - 1;
 		if (queuedToken == -2)
 			queuedToken = cast(ptrdiff_t) tokens.length - 1;
@@ -845,6 +847,114 @@ class DCDExtComponent : ComponentWrapper
 		return tree;
 	}
 
+	Related[] highlightRelated(scope const(char)[] code, int position)
+	{
+		auto tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
+		if (!tokens.length)
+			return null;
+		auto token = tokens.tokenIndexAtByteIndex(position);
+		if (token >= tokens.length || !tokens[token].isLikeIdentifier)
+			return null;
+
+		Related[] ret;
+
+		switch (tokens[token].type)
+		{
+		case tok!"static":
+			if (token + 1 < tokens.length)
+			{
+				if (tokens[token + 1].type == tok!"if")
+				{
+					token++;
+					goto case tok!"if";
+				}
+				else if (tokens[token + 1].type == tok!"foreach" || tokens[token + 1].type == tok!"foreach_reverse")
+				{
+					token++;
+					goto case tok!"for";
+				}
+			}
+			goto default;
+		case tok!"if":
+		case tok!"else":
+			// if lister
+			auto finder = new IfFinder();
+			finder.target = tokens[token].index;
+			RollbackAllocator rba;
+			auto parsed = parseModule(tokens, "stdin", &rba);
+			finder.visit(parsed);
+			foreach (ifToken; finder.foundIf)
+				ret ~= Related(Related.Type.controlFlow, [ifToken.index, ifToken.index + ifToken.tokenText.length]);
+			break;
+		case tok!"for":
+		case tok!"foreach":
+		case tok!"foreach_reverse":
+		case tok!"while":
+		case tok!"do":
+		case tok!"break":
+		case tok!"continue":
+			// loop and switch matcher
+			// special case for switch
+			auto finder = new BreakFinder();
+			finder.target = tokens[token].index;
+			finder.isBreak = tokens[token].type == tok!"break";
+			finder.isLoop = !(tokens[token].type == tok!"break" || tokens[token].type == tok!"continue");
+			if (token + 1 < tokens.length && tokens[token + 1].type == tok!"identifier")
+				finder.label = tokens[token + 1].text;
+			RollbackAllocator rba;
+			auto parsed = parseModule(tokens, "stdin", &rba);
+			finder.visit(parsed);
+
+			if (finder.isLoop && finder.foundBlock.length)
+			{
+				auto retFinder = new ReverseReturnFinder();
+				retFinder.target = finder.target;
+				retFinder.visit(parsed);
+				finder.foundBlock ~= retFinder.returns;
+				finder.foundBlock.sort!"a.index < b.index";
+			}
+
+			foreach (blockToken; finder.foundBlock)
+				ret ~= Related(Related.Type.controlFlow, [blockToken.index, blockToken.index + blockToken.tokenText.length]);
+			break;
+		case tok!"switch":
+		case tok!"case":
+		case tok!"default":
+			// switch/case lister
+			auto finder = new SwitchFinder();
+			finder.target = tokens[token].index;
+			RollbackAllocator rba;
+			auto parsed = parseModule(tokens, "stdin", &rba);
+			finder.visit(parsed);
+			foreach (switchToken; finder.foundSwitch)
+				ret ~= Related(Related.Type.controlFlow, [switchToken.index, switchToken.index + switchToken.tokenText.length]);
+			break;
+		case tok!"return":
+			// return effect lister
+			auto finder = new ReturnFinder();
+			finder.target = tokens[token].index;
+			RollbackAllocator rba;
+			auto parsed = parseModule(tokens, "stdin", &rba);
+			finder.visit(parsed);
+			foreach (switchToken; finder.related)
+				ret ~= Related(Related.Type.controlFlow, [switchToken.index, switchToken.index + switchToken.tokenText.length]);
+			break;
+		default:
+			// exact token / string matcher
+			auto currentText = tokens[token].tokenText;
+			foreach (i, tok; tokens)
+			{
+				if (tok.type == tokens[token].type && tok.text == tokens[token].text)
+					ret ~= Related(Related.Type.exactToken, [tok.index, tok.index + currentText.length]);
+				else if (tok.type.isSomeString && tok.evaluateExpressionString == currentText)
+					ret ~= Related(Related.Type.exactString, [tok.index, tok.index + tok.text.length]);
+			}
+			break;
+		}
+
+		return ret;
+	}
+
 	/// Formats DCD definitions (symbol declarations) in a readable format.
 	/// For functions this formats each argument in a separate line.
 	/// For other symbols the definition is returned as-is.
@@ -1142,6 +1252,28 @@ struct InterfaceTree
 
 		return ret.data;
 	}
+}
+
+/// Represents one selection for things related to the queried cursor position.
+struct Related
+{
+	///
+	enum Type
+	{
+		/// token is the same as the selected token (except for non-text tokens)
+		exactToken,
+		/// string content is exactly equal to identifier text
+		exactString,
+		/// token is related to control flow:
+		/// - all if/else keywords when checking any of them
+		/// - loop/switch keyword when checking a break/continue
+		controlFlow
+	}
+
+	/// The type of the related selection.
+	Type type;
+	/// Byte range [from-inclusive, to-exclusive] of the related selection.
+	size_t[2] range;
 }
 
 private:
@@ -1876,4 +2008,699 @@ unittest
 		== "ComplexTemplate!(int, 'a', string, Nested!(Foo)) foo(\n\tstring,\n\tint\n)");
 	assert(dcdext.formatDefinitionBlock("auto foo(T, V)(string, int)") == "auto foo(\n\tT,\n\tV\n)(\n\tstring,\n\tint\n)");
 	assert(dcdext.formatDefinitionBlock("auto foo(string, int f, ...)") == "auto foo(\n\tstring,\n\tint f,\n\t...\n)");
+}
+
+final class IfFinder : ASTVisitor
+{
+	Token[] currentIf, foundIf;
+
+	size_t target;
+
+	alias visit = ASTVisitor.visit;
+
+	static foreach (If; AliasSeq!(IfStatement, ConditionalStatement))
+	override void visit(const If ifStatement)
+	{
+		if (foundIf.length)
+			return;
+
+		auto lastIf = currentIf;
+		scope (exit)
+			currentIf = lastIf;
+
+		currentIf = [ifStatement.tokens[0]];
+
+		static auto thenStatement(const If v)
+		{
+			static if (is(If == IfStatement))
+				return v.thenStatement;
+			else
+				return v.trueStatement;
+		}
+
+		static auto elseStatement(const If v)
+		{
+			static if (is(If == IfStatement))
+				return v.elseStatement;
+			else
+				return v.falseStatement;
+		}
+
+		if (thenStatement(ifStatement))
+			thenStatement(ifStatement).accept(this);
+
+		const(BaseNode) elseStmt = elseStatement(ifStatement);
+		while (elseStmt)
+		{
+			auto elseToken = elseStmt.tokens.ptr - 1;
+
+			// possible from if declarations
+			if (elseToken.type == tok!"{" || elseToken.type == tok!":")
+				elseToken--;
+
+			if (elseToken.type == tok!"else")
+			{
+				if (!currentIf.length || currentIf[$ - 1] != *elseToken)
+					currentIf ~= *elseToken;
+			}
+
+			if (auto elseIf = cast(IfStatement) elseStmt)
+			{
+				currentIf ~= elseIf.tokens[0];
+				elseIf.accept(this);
+				cast()elseStmt = elseIf.elseStatement;
+			}
+			else if (auto elseStaticIf = cast(ConditionalStatement) elseStmt)
+			{
+				currentIf ~= elseStaticIf.tokens[0];
+				currentIf ~= elseStaticIf.tokens[1];
+				elseStaticIf.accept(this);
+				cast()elseStmt = elseStaticIf.falseStatement;
+			}
+			else if (auto declOrStatement = cast(DeclarationOrStatement) elseStmt)
+			{
+				if (declOrStatement.statement && declOrStatement.statement.statementNoCaseNoDefault)
+				{
+					if (declOrStatement.statement.statementNoCaseNoDefault.conditionalStatement)
+					{
+						cast()elseStmt = declOrStatement.statement.statementNoCaseNoDefault.conditionalStatement;
+					}
+					else if (declOrStatement.statement.statementNoCaseNoDefault.ifStatement)
+					{
+						cast()elseStmt = declOrStatement.statement.statementNoCaseNoDefault.ifStatement;
+					}
+					else
+					{
+						elseStmt.accept(this);
+						cast()elseStmt = null;
+					}
+				}
+				else if (declOrStatement.declaration && declOrStatement.declaration.conditionalDeclaration)
+				{
+					auto cond = declOrStatement.declaration.conditionalDeclaration;
+					if (cond.trueDeclarations.length)
+					{
+						auto ifSearch = cond.trueDeclarations[0].tokens.ptr;
+						while (!ifSearch.type.among!(tok!"if", tok!";", tok!"}", tok!"module"))
+							ifSearch--;
+
+						if (ifSearch.type == tok!"if")
+						{
+							if ((ifSearch - 1).type == tok!"static")
+								currentIf ~= *(ifSearch - 1);
+							currentIf ~= *ifSearch;
+						}
+					}
+
+					if (cond.hasElse && cond.falseDeclarations.length == 1)
+					{
+						elseStmt.accept(this);
+						cast()elseStmt = cast()cond.falseDeclarations[0];
+					}
+					else
+					{
+						elseStmt.accept(this);
+						cast()elseStmt = null;
+					}
+				}
+				else
+				{
+					elseStmt.accept(this);
+					cast()elseStmt = null;
+				}
+			}
+			else
+			{
+				elseStmt.accept(this);
+				cast()elseStmt = null;
+			}
+		}
+
+		saveIfMatching();
+	}
+
+	void saveIfMatching()
+	{
+		if (foundIf.length)
+			return;
+
+		foreach (v; currentIf)
+			if (v.index == target)
+			{
+				foundIf = currentIf;
+				return;
+			}
+	}
+}
+
+unittest
+{
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DCDExtComponent;
+	DCDExtComponent dcdext = instance.get!DCDExtComponent;
+
+	assert(dcdext.highlightRelated(`void foo()
+{
+	if (true) {}
+	else static if (true) {}
+	else if (true) {}
+	else {}
+
+	if (true) {}
+	else static if (true) {}
+	else {}
+}`, 35) == [
+	Related(Related.Type.controlFlow, [14, 16]),
+	Related(Related.Type.controlFlow, [28, 32]),
+	Related(Related.Type.controlFlow, [33, 39]),
+	Related(Related.Type.controlFlow, [40, 42]),
+	Related(Related.Type.controlFlow, [54, 58]),
+	Related(Related.Type.controlFlow, [59, 61]),
+	Related(Related.Type.controlFlow, [73, 77]),
+]);
+
+	assert(dcdext.highlightRelated(`void foo()
+{
+	if (true) {}
+	else static if (true) {}
+	else if (true) {}
+	else {}
+
+	if (true) {}
+	else static if (true) { int a; }
+	else { int b;}
+}`, 83) == [
+	Related(Related.Type.controlFlow, [83, 85]),
+	Related(Related.Type.controlFlow, [97, 101]),
+	Related(Related.Type.controlFlow, [102, 108]),
+	Related(Related.Type.controlFlow, [109, 111]),
+	Related(Related.Type.controlFlow, [131, 135]),
+]);
+}
+
+final class SwitchFinder : ASTVisitor
+{
+	Token[] currentSwitch, foundSwitch;
+	const(Statement) currentStatement;
+
+	size_t target;
+
+	alias visit = ASTVisitor.visit;
+
+	override void visit(const SwitchStatement stmt)
+	{
+		if (foundSwitch.length)
+			return;
+
+		auto lastSwitch = currentSwitch;
+		scope (exit)
+			currentSwitch = lastSwitch;
+
+		currentSwitch = [stmt.tokens[0]];
+		stmt.accept(this);
+
+		saveIfMatching();
+	}
+
+	override void visit(const CaseRangeStatement stmt)
+	{
+		if (currentStatement)
+		{
+			auto curr = currentStatement.tokens[0];
+			if (curr.type == tok!"case")
+				currentSwitch ~= curr;
+		}
+		auto last = *(stmt.high.tokens.ptr - 1);
+		if (last.type == tok!"case")
+			currentSwitch ~= last;
+		stmt.accept(this);
+	}
+
+	override void visit(const CaseStatement stmt)
+	{
+		if (currentStatement)
+		{
+			auto curr = currentStatement.tokens[0];
+			if (curr.type == tok!"case")
+				currentSwitch ~= curr;
+		}
+		stmt.accept(this);
+	}
+
+	override void visit(const DefaultStatement stmt)
+	{
+		currentSwitch ~= stmt.tokens[0];
+		stmt.accept(this);
+	}
+
+	override void visit(const Statement stmt)
+	{
+		auto last = currentStatement;
+		scope (exit)
+			cast()currentStatement = cast()last;
+		cast()currentStatement = cast()stmt;
+		stmt.accept(this);
+	}
+
+	void saveIfMatching()
+	{
+		if (foundSwitch.length)
+			return;
+
+		foreach (v; currentSwitch)
+			if (v.index == target)
+			{
+				foundSwitch = currentSwitch;
+				return;
+			}
+	}
+}
+
+unittest
+{
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DCDExtComponent;
+	DCDExtComponent dcdext = instance.get!DCDExtComponent;
+
+	assert(dcdext.highlightRelated(`void foo()
+{
+	switch (foo)
+	{
+		case 1: .. case 3:
+			break;
+		case 5:
+			switch (bar)
+			{
+			case 6:
+				break;
+			default:
+				break;
+			}
+			break;
+		default:
+			break;
+	}
+}`, 35) == [
+	Related(Related.Type.controlFlow, [14, 20]),
+	Related(Related.Type.controlFlow, [32, 36]),
+	Related(Related.Type.controlFlow, [43, 47]),
+	Related(Related.Type.controlFlow, [63, 67]),
+	Related(Related.Type.controlFlow, [154, 161]),
+]);
+}
+
+final class BreakFinder : ASTVisitor
+{
+	Token[] currentBlock, foundBlock;
+	const(Statement) currentStatement;
+	bool inSwitch;
+
+	size_t target;
+	bool isBreak; // else continue if not loop
+	bool isLoop; // checking loop token (instead of break/continue)
+	string label;
+
+	alias visit = ASTVisitor.visit;
+
+	override void visit(const LabeledStatement stmt)
+	{
+		if (foundBlock.length)
+			return;
+
+		if (label.length && label == stmt.identifier.text)
+		{
+			foundBlock = [stmt.identifier];
+			return;
+		}
+
+		stmt.accept(this);
+	}
+
+	override void visit(const SwitchStatement stmt)
+	{
+		if (foundBlock.length)
+			return;
+
+		bool wasSwitch = inSwitch;
+		scope (exit)
+			inSwitch = wasSwitch;
+		inSwitch = true;
+
+		if (isBreak)
+		{
+			auto lastSwitch = currentBlock;
+			scope (exit)
+				currentBlock = lastSwitch;
+
+			currentBlock = [stmt.tokens[0]];
+			stmt.accept(this);
+
+			saveIfMatching();
+		}
+		else
+		{
+			stmt.accept(this);
+		}
+	}
+
+	static foreach (LoopT; AliasSeq!(ForeachStatement, StaticForeachDeclaration,
+		StaticForeachStatement, ForStatement, WhileStatement))
+	override void visit(const LoopT stmt)
+	{
+		if (foundBlock.length)
+			return;
+
+		auto lastSwitch = currentBlock;
+		scope (exit)
+			currentBlock = lastSwitch;
+
+		currentBlock = [stmt.tokens[0]];
+		stmt.accept(this);
+
+		saveIfMatching();
+	}
+
+	override void visit(const DoStatement stmt)
+	{
+		if (foundBlock.length)
+			return;
+
+		auto lastSwitch = currentBlock;
+		scope (exit)
+			currentBlock = lastSwitch;
+
+		currentBlock = [stmt.tokens[0]];
+		auto whileTok = *(stmt.expression.tokens.ptr - 2);
+		stmt.accept(this);
+		if (whileTok.type == tok!"while")
+			currentBlock ~= whileTok;
+
+		saveIfMatching();
+	}
+
+	static foreach (IgnoreT; AliasSeq!(FunctionBody, FunctionDeclaration, StructBody))
+	override void visit(const IgnoreT stmt)
+	{
+		if (foundBlock.length)
+			return;
+
+		auto lastSwitch = currentBlock;
+		scope (exit)
+			currentBlock = lastSwitch;
+
+		currentBlock = null;
+		stmt.accept(this);
+	}
+
+	override void visit(const CaseRangeStatement stmt)
+	{
+		if (isBreak)
+		{
+			if (currentStatement)
+			{
+				auto curr = currentStatement.tokens[0];
+				if (curr.type == tok!"case")
+					currentBlock ~= curr;
+			}
+			auto last = *(stmt.high.tokens.ptr - 1);
+			if (last.type == tok!"case")
+				currentBlock ~= last;
+		}
+		stmt.accept(this);
+	}
+
+	override void visit(const CaseStatement stmt)
+	{
+		if (currentStatement && isBreak)
+		{
+			auto curr = currentStatement.tokens[0];
+			if (curr.type == tok!"case")
+				currentBlock ~= curr;
+		}
+		stmt.accept(this);
+	}
+
+	override void visit(const DefaultStatement stmt)
+	{
+		if (isBreak)
+			currentBlock ~= stmt.tokens[0];
+		stmt.accept(this);
+	}
+
+	override void visit(const Statement stmt)
+	{
+		auto last = currentStatement;
+		scope (exit)
+			cast()currentStatement = cast()last;
+		cast()currentStatement = cast()stmt;
+		stmt.accept(this);
+	}
+
+	override void visit(const BreakStatement stmt)
+	{
+		if (stmt.tokens[0].index == target || isLoop)
+			if (isBreak)
+				currentBlock ~= stmt.tokens[0];
+		stmt.accept(this);
+	}
+
+	override void visit(const ContinueStatement stmt)
+	{
+		// break token:
+		//   continue in switch: ignore
+		//   continue outside switch: include
+		// other token:
+		//   continue in switch: include
+		//   continue outside switch: include
+		if (stmt.tokens[0].index == target || isLoop)
+			if (!(isBreak && inSwitch))
+				currentBlock ~= stmt.tokens[0];
+		stmt.accept(this);
+	}
+
+	void saveIfMatching()
+	{
+		if (foundBlock.length || label.length)
+			return;
+
+		foreach (v; currentBlock)
+			if (v.index == target)
+			{
+				foundBlock = currentBlock;
+				return;
+			}
+	}
+}
+
+class ReverseReturnFinder : ASTVisitor
+{
+	Token[] returns;
+	size_t target;
+	bool record;
+
+	alias visit = ASTVisitor.visit;
+
+	static foreach (DeclT; AliasSeq!(Declaration, Statement))
+	override void visit(const DeclT stmt)
+	{
+		if (returns.length && !record)
+			return;
+
+		bool matches = stmt.tokens.length && stmt.tokens[0].index == target;
+		if (matches)
+			record = true;
+		stmt.accept(this);
+		if (matches)
+			record = false;
+	}
+
+	override void visit(const ReturnStatement ret)
+	{
+		if (record)
+			returns ~= ret.tokens[0];
+		ret.accept(this);
+	}
+}
+
+unittest
+{
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DCDExtComponent;
+	DCDExtComponent dcdext = instance.get!DCDExtComponent;
+
+	assert(dcdext.highlightRelated(`void foo()
+{
+	while (true)
+	{
+		foreach (a; b)
+		{
+			switch (a)
+			{
+			case 1:
+				break;
+			case 2:
+				continue;
+			default:
+				return;
+			}
+		}
+	}
+}`, 88) == [
+	Related(Related.Type.controlFlow, [54, 60]),
+	Related(Related.Type.controlFlow, [73, 77]),
+	Related(Related.Type.controlFlow, [85, 90]),
+	Related(Related.Type.controlFlow, [95, 99]),
+	Related(Related.Type.controlFlow, [120, 127]),
+]);
+
+	assert(dcdext.highlightRelated(`void foo()
+{
+	while (true)
+	{
+		foreach (a; b)
+		{
+			switch (a)
+			{
+			case 1:
+				break;
+			case 2:
+				continue;
+			default:
+				return;
+			}
+		}
+	}
+}`, 111) == [
+	Related(Related.Type.controlFlow, [32, 39]),
+	Related(Related.Type.controlFlow, [107, 115]),
+]);
+
+	assert(dcdext.highlightRelated(`void foo()
+{
+	while (true)
+	{
+		foreach (a; b)
+		{
+			switch (a)
+			{
+			case 1:
+				break;
+			case 2:
+				continue;
+			default:
+				return;
+			}
+		}
+	}
+}`, 15) == [
+	Related(Related.Type.controlFlow, [14, 19]),
+	Related(Related.Type.controlFlow, [133, 139]),
+]);
+}
+
+class ReturnFinder : ASTVisitor
+{
+	Token[] returns;
+	Token[] currentScope;
+	bool inTargetBlock;
+	Token[] related;
+	size_t target;
+
+	alias visit = ASTVisitor.visit;
+
+	static foreach (DeclT; AliasSeq!(FunctionBody))
+	override void visit(const DeclT stmt)
+	{
+		if (inTargetBlock || related.length)
+			return;
+
+		auto lastScope = currentScope;
+		scope (exit)
+			currentScope = lastScope;
+		currentScope = null;
+
+		auto lastReturns = returns;
+		scope (exit)
+			returns = lastReturns;
+		returns = null;
+
+		stmt.accept(this);
+		if (inTargetBlock)
+		{
+			related ~= returns;
+
+			related.sort!"a.index < b.index";
+		}
+	}
+
+	static foreach (ScopeT; AliasSeq!(SwitchStatement, ForeachStatement,
+		StaticForeachDeclaration, StaticForeachStatement, ForStatement, WhileStatement))
+	override void visit(const ScopeT stmt)
+	{
+		auto lastScope = currentScope;
+		scope (exit)
+			currentScope = lastScope;
+		currentScope ~= stmt.tokens[0];
+
+		stmt.accept(this);
+	}
+
+	override void visit(const DoStatement stmt)
+	{
+		auto lastScope = currentScope;
+		scope (exit)
+			currentScope = lastScope;
+		currentScope ~= stmt.tokens[0];
+
+		auto whileTok = *(stmt.expression.tokens.ptr - 2);
+		if (whileTok.type == tok!"while")
+			currentScope ~= whileTok;
+
+		stmt.accept(this);
+	}
+
+	override void visit(const ReturnStatement ret)
+	{
+		returns ~= ret.tokens[0];
+		if (target == ret.tokens[0].index)
+		{
+			inTargetBlock = true;
+			related ~= currentScope;
+		}
+		ret.accept(this);
+	}
+}
+
+unittest
+{
+	scope backend = new WorkspaceD();
+	auto workspace = makeTemporaryTestingWorkspace;
+	auto instance = backend.addInstance(workspace.directory);
+	backend.register!DCDExtComponent;
+	DCDExtComponent dcdext = instance.get!DCDExtComponent;
+
+	assert(dcdext.highlightRelated(`void foo()
+{
+	foreach (a; b)
+		return;
+
+	void bar()
+	{
+		return;
+	}
+
+	bar();
+
+	return;
+}`, 33) == [
+	Related(Related.Type.controlFlow, [14, 21]),
+	Related(Related.Type.controlFlow, [31, 37]),
+	Related(Related.Type.controlFlow, [79, 85]),
+]);
 }
