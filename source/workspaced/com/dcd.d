@@ -417,7 +417,7 @@ class DCDComponent : ComponentWrapper
 				}
 
 				// We need to move by one character on identifier characters to ensure the start character fits.
-				if (pos < code.length && !isIdentifierSeparatingChar(code[pos]))
+				if (!isIdentifierSeparatingChar(code[pos]))
 					pos++;
 
 				auto info = client.requestSymbolInfo(CodeRequest("stdin", code, pos));
@@ -465,14 +465,14 @@ class DCDComponent : ComponentWrapper
 			mixin(traceTask);
 			try
 			{
-				if (!running)
+				if (!running || pos >= code.length)
 				{
 					ret.finish(DCDLocalUse.init);
 					return;
 				}
 
 				// We need to move by one character on identifier characters to ensure the start character fits.
-				if (pos < code.length && !isIdentifierSeparatingChar(code[pos]))
+				if (!isIdentifierSeparatingChar(code[pos]))
 					pos++;
 
 				auto localUse = client.requestLocalUse(CodeRequest("stdin", code, pos));
