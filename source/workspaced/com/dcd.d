@@ -190,9 +190,9 @@ class DCDComponent : ComponentWrapper
 
 		string[] serverArgs;
 		static if (platformSupportsDCDUnixSockets)
-			serverArgs = [serverPath, "--socketFile", client.socketFile];
+			serverArgs = [serverPath, "--socketFile", client.socketFile, "--forceScan"];
 		else
-			serverArgs = [serverPath, "--port", client.runningPort.to!string];
+			serverArgs = [serverPath, "--port", client.runningPort.to!string, "--forceScan"];
 
 		serverPipes = raw(serverArgs ~ imports,
 				Redirect.stdin | Redirect.stderr | Redirect.stdoutToStderr);
