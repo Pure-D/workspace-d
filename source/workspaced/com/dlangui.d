@@ -22,7 +22,7 @@ class DlanguiComponent : ComponentWrapper
 	/// Where type is an integer
 	Future!(CompletionItem[]) complete(scope const(char)[] code, int pos)
 	{
-		auto ret = new Future!(CompletionItem[]);
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try

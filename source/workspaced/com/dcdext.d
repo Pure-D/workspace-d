@@ -500,7 +500,7 @@ class DCDExtComponent : ComponentWrapper
 	Future!string implement(scope const(char)[] code, int position,
 			bool formatCode = true, string[] formatArgs = [])
 	{
-		auto ret = new Future!string;
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try

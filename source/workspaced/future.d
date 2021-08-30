@@ -35,14 +35,14 @@ class Future(T)
 	static if (is(T == void))
 		static Future!void finished()
 		{
-			auto ret = new Future!void;
+			auto ret = new typeof(return);
 			ret.has = true;
 			return ret;
 		}
 	else
 		static Future!T fromResult(T value)
 		{
-			auto ret = new Future!T;
+			auto ret = new typeof(return);
 			ret.value = value;
 			ret.has = true;
 			return ret;
@@ -50,7 +50,7 @@ class Future(T)
 
 	static Future!T async(T delegate() cb)
 	{
-		auto ret = new Future!T;
+		auto ret = new typeof(return);
 		ret._worker = new Thread({
 			try
 			{
@@ -72,7 +72,7 @@ class Future(T)
 
 	static Future!T fromError(T)(Throwable error)
 	{
-		auto ret = new Future!T;
+		auto ret = new typeof(return);
 		ret.error = error;
 		ret.has = true;
 		return ret;

@@ -32,6 +32,8 @@ else
 ///
 alias ImportPathProvider = string[] delegate() nothrow;
 ///
+alias IdentifierListProvider = string[] delegate() nothrow;
+///
 alias BroadcastCallback = void delegate(WorkspaceD, WorkspaceD.Instance, JSONValue);
 /// Called when ComponentFactory.create is called and errored (when the .bind call on a component fails)
 /// Params:
@@ -136,6 +138,18 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 			return instance.importFilesProvider ? instance.importFilesProvider() : [];
 		}
 
+		/// Lists the project defined version identifiers, if provided by any identifier
+		string[] projectVersions() const @property
+		{
+			return instance.projectVersionsProvider ? instance.projectVersionsProvider() : [];
+		}
+
+		/// Lists the project defined debug specification identifiers, if provided by any provider 
+		string[] debugSpecifications() const @property
+		{
+			return instance.debugSpecificationsProvider ? instance.debugSpecificationsProvider() : [];
+		}
+
 		ref inout(ImportPathProvider) importPathProvider() @property inout
 		{
 			return instance.importPathProvider;
@@ -149,6 +163,16 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 		ref inout(ImportPathProvider) importFilesProvider() @property inout
 		{
 			return instance.importFilesProvider;
+		}
+
+		ref inout(IdentifierListProvider) projectVersionsProvider() @property inout
+		{
+			return instance.projectVersionsProvider;
+		}
+
+		ref inout(IdentifierListProvider) debugSpecificationsProvider() @property inout
+		{
+			return instance.debugSpecificationsProvider;
 		}
 
 		ref inout(Configuration) config() @property inout

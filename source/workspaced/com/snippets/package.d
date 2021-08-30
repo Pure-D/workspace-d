@@ -205,7 +205,7 @@ class SnippetsComponent : ComponentWrapper
 			}
 		}
 
-		return Future!Snippet.fromResult(snippet);
+		return typeof(return).fromResult(snippet);
 	}
 
 	Future!string format(scope const(char)[] snippet, string[] arguments = [],

@@ -54,6 +54,10 @@ class DubComponent : ComponentWrapper
 			stringImportPathProvider = &stringImports;
 		if (config.get!bool("dub", "registerImportFilesProvider", false))
 			importFilesProvider = &fileImports;
+		if (config.get!bool("dub", "registerProjectVersionsProvider", true))
+			projectVersionsProvider = &versions;
+		if (config.get!bool("dub", "registerDebugSpecificationsProvider", true))
+			debugSpecificationsProvider = &debugVersions;
 
 		try
 		{
@@ -200,11 +204,13 @@ class DubComponent : ComponentWrapper
 		try
 		{
 			auto paths = _dub.project.listBuildSettings(settings, [
-					"import-paths", "string-import-paths", "source-files"
+					"import-paths", "string-import-paths", "source-files", "versions", "debug-versions"
 					], ListBuildSettingsFormat.listNul);
 			_importPaths = paths[0].split('\0');
 			_stringImportPaths = paths[1].split('\0');
 			_importFiles = paths[2].split('\0');
+			_versions = paths[3].split('\0');
+			_debugVersions = paths[4].split('\0');
 			return _importPaths.length > 0 || _importFiles.length > 0;
 		}
 		catch (Exception e)
@@ -307,6 +313,18 @@ class DubComponent : ComponentWrapper
 	string[] fileImports() @property nothrow
 	{
 		return _importFiles;
+	}
+
+	/// Lists the currently defined versions
+	string[] versions() @property nothrow
+	{
+		return _versions;
+	}
+
+	/// Lists the currently defined debug versions (debug specifications)
+	string[] debugVersions() @property nothrow
+	{
+		return _debugVersions;
 	}
 
 	/// Lists all configurations defined in the package description
@@ -487,7 +505,7 @@ class DubComponent : ComponentWrapper
 		settings.compiler = compiler;
 		settings.buildSettings = _settings;
 
-		auto ret = new Future!(BuildIssue[]);
+		auto ret = new typeof(return);
 		new Thread({
 			try
 			{
@@ -590,7 +608,7 @@ private:
 	BuildSettingsTemplate _settingsTemplate;
 	BuildSettings _settings;
 	BuildPlatform _platform;
-	string[] _importPaths, _stringImportPaths, _importFiles;
+	string[] _importPaths, _stringImportPaths, _importFiles, _versions, _debugVersions;
 }
 
 ///

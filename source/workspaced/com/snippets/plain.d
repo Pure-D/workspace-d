@@ -779,7 +779,7 @@ class PlainSnippetProvider : SnippetProvider
 		Snippet[] ret;
 		if (auto p = info.level in prebuilt)
 			ret = *p;
-		return Future!(Snippet[]).fromResult(ret);
+		return typeof(return).fromResult(ret);
 	}
 
 	Future!Snippet resolveSnippet(scope const WorkspaceD.Instance instance,
@@ -787,6 +787,6 @@ class PlainSnippetProvider : SnippetProvider
 			const SnippetInfo info, Snippet snippet)
 	{
 		snippet.resolved = true;
-		return Future!Snippet.fromResult(snippet);
+		return typeof(return).fromResult(snippet);
 	}
 }

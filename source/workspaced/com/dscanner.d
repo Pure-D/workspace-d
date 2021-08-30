@@ -52,7 +52,7 @@ class DscannerComponent : ComponentWrapper
 			const StaticAnalysisConfig defaultConfig = StaticAnalysisConfig.init,
 			bool resolveRanges = false)
 	{
-		auto ret = new Future!(DScannerIssue[]);
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try
@@ -404,7 +404,7 @@ class DscannerComponent : ComponentWrapper
 	Future!(DefinitionElement[]) listDefinitions(string file,
 		scope const(char)[] code = "", bool verbose = false)
 	{
-		auto ret = new Future!(DefinitionElement[]);
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try
@@ -443,7 +443,7 @@ class DscannerComponent : ComponentWrapper
 	/// Asynchronously finds all definitions of a symbol in the import paths.
 	Future!(FileLocation[]) findSymbol(string symbol)
 	{
-		auto ret = new Future!(FileLocation[]);
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try

@@ -76,12 +76,12 @@ class DependencyBasedSnippetProvider : SnippetProvider
 			scope const(char)[] file, scope const(char)[] code, int position, const SnippetInfo info)
 	{
 		if (!instance.has!DubComponent)
-			return Future!(Snippet[]).fromResult(null);
+			return typeof(return).fromResult(null);
 		else
 		{
 			string id = typeid(this).name;
 			auto dub = instance.get!DubComponent;
-			return Future!(Snippet[]).async(delegate() {
+			return typeof(return).async(delegate() {
 				string[] deps;
 				foreach (dep; dub.dependencies)
 				{
@@ -108,7 +108,7 @@ class DependencyBasedSnippetProvider : SnippetProvider
 			const SnippetInfo info, Snippet snippet)
 	{
 		snippet.resolved = true;
-		return Future!Snippet.fromResult(snippet);
+		return typeof(return).fromResult(snippet);
 	}
 }
 

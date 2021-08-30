@@ -145,6 +145,8 @@ class WorkspaceD
 		ImportPathProvider importPathProvider;
 		ImportPathProvider stringImportPathProvider;
 		ImportPathProvider importFilesProvider;
+		IdentifierListProvider projectVersionsProvider;
+		IdentifierListProvider debugSpecificationsProvider;
 
 		/* virtual */
 		void onBeforeAccessComponent(ComponentInfo) const

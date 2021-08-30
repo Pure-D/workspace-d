@@ -31,7 +31,7 @@ class DMDComponent : ComponentWrapper
 	Future!DMDMeasureReturn measure(scope const(char)[] code,
 			string[] dmdArguments = [], int count = 1, int timeoutMsecs = 5000)
 	{
-		return Future!DMDMeasureReturn.async(() => measureSync(code, dmdArguments, count, timeoutMsecs));
+		return typeof(return).async(() => measureSync(code, dmdArguments, count, timeoutMsecs));
 	}
 
 	/// ditto

@@ -29,17 +29,17 @@ class SmartSnippetProvider : SnippetProvider
 				res ~= simpleForeach(info.loopScope.iterator, info.loopScope.type);
 				res ~= stringIterators();
 			}
-			return Future!(Snippet[]).fromResult(res);
+			return typeof(return).fromResult(res);
 		}
 		else
-			return Future!(Snippet[]).fromResult(null);
+			return typeof(return).fromResult(null);
 	}
 
 	Future!Snippet resolveSnippet(scope const WorkspaceD.Instance instance,
 			scope const(char)[] file, scope const(char)[] code, int position,
 			const SnippetInfo info, Snippet snippet)
 	{
-		return Future!Snippet.fromResult(snippet);
+		return typeof(return).fromResult(snippet);
 	}
 
 	Snippet ndForeach(int n, string name = null)

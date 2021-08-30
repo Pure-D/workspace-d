@@ -253,7 +253,7 @@ class DCDComponent : ComponentWrapper
 	/// Returns: null
 	Future!void stopServer()
 	{
-		auto ret = new Future!void();
+		auto ret = new typeof(return)();
 		gthreads.create({
 			mixin(traceTask);
 			try
@@ -280,7 +280,7 @@ class DCDComponent : ComponentWrapper
 	/// Returns: null
 	Future!void restartServer(bool quiet = false)
 	{
-		auto ret = new Future!void;
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try
@@ -316,7 +316,7 @@ class DCDComponent : ComponentWrapper
 	/// Searches for a symbol across all files using `dcd-client --search`
 	Future!(DCDSearchResult[]) searchSymbol(string query)
 	{
-		auto ret = new Future!(DCDSearchResult[]);
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try
@@ -383,9 +383,9 @@ class DCDComponent : ComponentWrapper
 	{
 		if (client.usingUnixDomainSockets)
 		{
-			return Future!ushort.fromResult(0);
+			return typeof(return).fromResult(0);
 		}
-		auto ret = new Future!ushort;
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try
@@ -405,7 +405,7 @@ class DCDComponent : ComponentWrapper
 	/// Finds the declaration of the symbol at position `pos` in the code
 	Future!DCDDeclaration findDeclaration(scope const(char)[] code, int pos)
 	{
-		auto ret = new Future!DCDDeclaration;
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try
@@ -435,7 +435,7 @@ class DCDComponent : ComponentWrapper
 	/// Finds the documentation of the symbol at position `pos` in the code
 	Future!string getDocumentation(scope const(char)[] code, int pos)
 	{
-		auto ret = new Future!string;
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try
@@ -460,7 +460,7 @@ class DCDComponent : ComponentWrapper
 	/// current document.
 	Future!DCDLocalUse findLocalUse(scope const(char)[] code, int pos)
 	{
-		auto ret = new Future!DCDLocalUse;
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try
@@ -508,7 +508,7 @@ class DCDComponent : ComponentWrapper
 	/// calltips.symbols and identifiers.definition, identifiers.file, identifiers.location and identifiers.documentation are only available with dcd ~master as of now.
 	Future!DCDCompletions listCompletion(scope const(char)[] code, int pos)
 	{
-		auto ret = new Future!DCDCompletions;
+		auto ret = new typeof(return);
 		gthreads.create({
 			mixin(traceTask);
 			try
