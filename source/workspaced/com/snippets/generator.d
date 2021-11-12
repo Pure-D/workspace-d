@@ -273,11 +273,12 @@ class SnippetInfoGenerator : ASTVisitor
 		mixin(FullSnippetLevelWrapper!(SnippetLevel.type));
 	}
 
-	override void visit(const SpecifiedFunctionBody dec)
-	{
-		mixin(StackStorageScope!"variableStack");
-		mixin(FullSnippetLevelWrapper!(SnippetLevel.method));
-	}
+	static foreach (T; AliasSeq!(SpecifiedFunctionBody, Unittest))
+		override void visit(const T dec)
+		{
+			mixin(StackStorageScope!"variableStack");
+			mixin(FullSnippetLevelWrapper!(SnippetLevel.method));
+		}
 
 	override void visit(const StatementNoCaseNoDefault dec)
 	{
