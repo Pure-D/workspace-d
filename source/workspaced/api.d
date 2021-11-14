@@ -540,10 +540,20 @@ package string getVersionAndFixPath(ref string execPath)
 	}
 }
 
+/// Set for some reason when compiling with `dub fetch` / `dub run` or sometimes
+/// on self compilation.
+/// Known strings: vbin, vdcd, vDCD
+package bool isLocallyCompiledDCD(string v)
+{
+	import std.uni : sicmp;
+
+	return sicmp(v, "vbin") == 0 || sicmp(v, "vdcd") == 0;
+}
+
 /// returns the version that is given or the version extracted from dub path if path is a dub path
 package string orDubFetchFallback(string v, string path)
 {
-	if (v == "vbin" || v == "vdcd")
+	if (v.isLocallyCompiledDCD)
 	{
 		auto dub = path.indexOf(`dub/packages`);
 		if (dub == -1)

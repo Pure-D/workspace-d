@@ -119,7 +119,7 @@ class DCDComponent : ComponentWrapper
 			}
 		}
 
-		if (installedVersion == "vbin" || installedVersion == "vdcd") // locally compiled
+		if (installedVersion.isLocallyCompiledDCD)
 			return false;
 
 		return !checkVersion(installedVersion, latestKnownVersion);
