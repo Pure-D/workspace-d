@@ -1134,126 +1134,12 @@ unittest
 	backend.register!DscannerComponent;
 	DscannerComponent dscanner = instance.get!DscannerComponent;
 
-	string code = `module foo.bar;
-
-version = Foo;
-debug = Bar;
-
-void hello() {
-	int x = 1;
-}
-
-int y = 2;
-
-int
-bar()
-{
-}
-
-unittest
-{
-}
-
-@( "named" )
-unittest
-{
-}
-
-class X
-{
-	this(int x) {}
-	this(this) {}
-	~this() {}
-
-	unittest
-	{
-	}
-}
-
-shared static this()
-{
-}
-
-`;
-
-	auto defs = dscanner.listDefinitions("stdin", code, false).getBlocking();
-
-	assert(defs == [
-			DefinitionElement("hello", 6, "f", [
-					"signature": "()",
-					"access": "public",
-					"return": "void"
-				], [59, 73]),
-			DefinitionElement("y", 10, "v", ["access": "public"], [80, 81]),
-			DefinitionElement("bar", 13, "f", [
-					"signature": "()",
-					"access": "public",
-					"return": "int"
-				], [98, 100]),
-			DefinitionElement("X", 26, "c", ["access": "public"], [152,
-					214]),
-			DefinitionElement("this", 28, "f", [
-					"signature": "(int x)",
-					"access": "public",
-					"class": "X"
-				], [167, 168]),
-			DefinitionElement("~this", 30, "f", [
-					"access": "public",
-					"class": "X"
-				], [194, 195])
-			]);
-
-	// verbose definitions
-	defs = dscanner.listDefinitions("stdin", code, true).getBlocking();
-
-	assert(defs == [
-			DefinitionElement("Foo", 3, "V", ["access": "public"], [27, 30]),
-			DefinitionElement("Bar", 4, "D", ["access": "public"], [40, 43]),
-			DefinitionElement("hello", 6, "f", [
-					"signature": "()",
-					"access": "public",
-					"return": "void"
-				], [59, 73]),
-			DefinitionElement("y", 10, "v", ["access": "public"], [80, 81]),
-			DefinitionElement("bar", 13, "f", [
-					"signature": "()",
-					"access": "public",
-					"return": "int"
-				], [98, 100]),
-			DefinitionElement("__unittest_L17_C1", 17, "U",
-				["access": "public"], [103,
-					114]),
-			DefinitionElement("__unittest_L22_C1", 22, "U",
-				["access": "public", "name": "named"],
-				[130, 141]),
-			DefinitionElement("X", 26, "c", ["access": "public"], [152,
-					214]),
-			DefinitionElement("this", 28, "f", [
-					"signature": "(int x)",
-					"access": "public",
-					"class": "X"
-				], [167, 168]),
-			DefinitionElement("this(this)", 29, "f", [
-					"access": "public",
-					"class": "X"
-				], [182, 183]),
-			DefinitionElement("~this", 30, "f", [
-					"access": "public",
-					"class": "X"
-				], [194, 195]),
-			DefinitionElement("__unittest_L32_C2", 32, "U", [
-					"access": "public",
-					"class": "X"
-				], [199, 212]),
-			DefinitionElement("shared static this()", 37, "S", [
-					"access": "public"
-				], [238, 240])
-			]);
-
+	int noTested = 0;
 	foreach (testFile; dirEntries("test/data/list_definition", SpanMode.shallow))
 	{
 		auto testCode = appender!string;
 		bool inCode = true;
+		bool verbose;
 		DefinitionElement[] expectedDefinitions;
 		foreach (line; File(testFile, "r").byLine)
 		{
@@ -1267,6 +1153,18 @@ shared static this()
 			{
 				testCode ~= line;
 				testCode ~= '\n'; // normalize CRLF to LF
+			}
+			else if (line.length && line[0] == ':')
+			{
+				auto variable = line[1 .. $].findSplit("=");
+				switch (variable[0])
+				{
+				case "verbose":
+					verbose = parseJSON(variable[2]).boolean;
+					break;
+				default:
+					assert(false, "Unknown test variable " ~ variable[0]);
+				}
 			}
 			else if (line.length)
 			{
@@ -1287,7 +1185,10 @@ shared static this()
 			}
 		}
 
-		defs = dscanner.listDefinitions("stdin", testCode.data, true).getBlocking();
+		auto defs = dscanner.listDefinitions("stdin", testCode.data, verbose).getBlocking();
 		assert(defs == expectedDefinitions);
+		noTested++;
 	}
+
+	assert(noTested > 0);
 }

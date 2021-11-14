@@ -8,6 +8,7 @@ public class Foo : Bar {
 	int[256] arr;
 }
 __EOF__
+:verbose=true
 Foo	1	c	{"access":"public"}	23	110
 static this()	2	C	{"access": "public", "class": "Foo"}	40	92
 arr	8	v	{"access":"public","class":"Foo"}	105	108
