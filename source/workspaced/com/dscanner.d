@@ -1051,7 +1051,6 @@ final class DefinitionFinder : ASTVisitor
 					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
 					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
 				]);
-			dec.accept(this);
 		}
 	}
 
