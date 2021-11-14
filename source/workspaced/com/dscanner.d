@@ -1250,4 +1250,44 @@ shared static this()
 				], [238, 240])
 			]);
 
+	foreach (testFile; dirEntries("test/data/list_definition", SpanMode.shallow))
+	{
+		auto testCode = appender!string;
+		bool inCode = true;
+		DefinitionElement[] expectedDefinitions;
+		foreach (line; File(testFile, "r").byLine)
+		{
+			if (line == "__EOF__")
+			{
+				inCode = false;
+				continue;
+			}
+
+			if (inCode)
+			{
+				testCode ~= line;
+				testCode ~= '\n'; // normalize CRLF to LF
+			}
+			else if (line.length)
+			{
+				auto parts = line.idup.split("\t");
+				assert(parts.length == 6, "malformed definition test line: " ~ line);
+
+				string[string] dict;
+				foreach (k, v; parseJSON(parts[3]).object)
+					dict[k] = v.str;
+
+				expectedDefinitions ~= DefinitionElement(
+					parts[0],
+					parts[1].to!int,
+					parts[2],
+					dict,
+					[parts[4].to!int, parts[5].to!int]
+				);
+			}
+		}
+
+		defs = dscanner.listDefinitions("stdin", testCode.data, true).getBlocking();
+		assert(defs == expectedDefinitions);
+	}
 }
