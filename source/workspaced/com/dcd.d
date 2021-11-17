@@ -174,11 +174,29 @@ class DCDComponent : ComponentWrapper
 		startServer(importPaths ~ importFiles ~ additionalImports, quietServer);
 	}
 
-	/// This will start the dcd-server
-	void startServer(string[] additionalImports = [], bool quietServer = false)
+	/// This will start the dcd-server. If DCD does not support IPC sockets on
+	/// this platform, will use the TCP port specified with the `port` property
+	/// or init config.
+	///
+	/// Throws an exception if a TCP port is used and another server is already
+	/// running on it.
+	///
+	/// Params:
+	///   additionalImports = import paths to cache on the server on startup.
+	///   quietServer = if true: no output from DCD server is processed,
+	///                 if false: every line will be traced to the output.
+	///   selectPort = if true, increment port until an open one is found
+	///                instead of throwing an exception.
+	void startServer(string[] additionalImports = [], bool quietServer = false, bool selectPort = false)
 	{
-		if (isPortRunning(port))
-			throw new Exception("Already running dcd on port " ~ port.to!string);
+		ushort port = this.port;
+		while (port + 1 < ushort.max && isPortRunning(port))
+		{
+			if (selectPort)
+				port++;
+			else
+				throw new Exception("Already running dcd on port " ~ port.to!string);
+		}
 		string[] imports;
 		foreach (i; additionalImports)
 			if (i.length)
