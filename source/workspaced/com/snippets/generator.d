@@ -242,7 +242,8 @@ void map()
 enum StackStorageScope(string val) = "if (done) return; auto __" ~ val
 	~ "_scope = " ~ val ~ "; scope (exit) if (!done) " ~ val ~ " = __" ~ val ~ "_scope;";
 enum SnippetLevelWrapper(SnippetLevel level) = "if (done) return; pushLevel("
-	~ level.stringof ~ ", dec); scope (exit) popLevel(dec);";
+	~ level.stringof ~ ", dec); scope (exit) popLevel(dec); "
+	~ "if (!dec.tokens.length || dec.tokens[0].index <= position) lastStatement = null;";
 enum FullSnippetLevelWrapper(SnippetLevel level) = SnippetLevelWrapper!level ~ " super.visit(dec);";
 
 class SnippetInfoGenerator : ASTVisitor
@@ -284,6 +285,13 @@ class SnippetInfoGenerator : ASTVisitor
 	{
 		mixin(StackStorageScope!"variableStack");
 		super.visit(dec);
+	}
+
+	override void visit(const DeclarationOrStatement dec)
+	{
+		super.visit(dec);
+		if (!dec.tokens.length || dec.tokens[0].index <= position)
+			lastStatement = cast()dec;
 	}
 
 	static foreach (T; AliasSeq!(Arguments, ExpressionNode))
@@ -363,6 +371,7 @@ class SnippetInfoGenerator : ASTVisitor
 
 	bool done;
 	VariableUsage[] variableStack;
+	DeclarationOrStatement lastStatement;
 	size_t position, current;
 	SnippetInfo ret;
 }

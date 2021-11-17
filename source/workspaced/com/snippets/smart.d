@@ -1,18 +1,23 @@
 module workspaced.com.snippets.smart;
 
+// debug = SnippetScope;
+
 import workspaced.api;
 import workspaced.com.snippets;
 
+import std.algorithm;
 import std.conv;
+import std.string;
 
 class SmartSnippetProvider : SnippetProvider
 {
 	Future!(Snippet[]) provideSnippets(scope const WorkspaceD.Instance instance,
 			scope const(char)[] file, scope const(char)[] code, int position, const SnippetInfo info)
 	{
+		Snippet[] res;
+
 		if (info.loopScope.supported)
 		{
-			Snippet[] res;
 			if (info.loopScope.numItems > 1)
 			{
 				res ~= ndForeach(info.loopScope.numItems, info.loopScope.iterator);
@@ -29,10 +34,50 @@ class SmartSnippetProvider : SnippetProvider
 				res ~= simpleForeach(info.loopScope.iterator, info.loopScope.type);
 				res ~= stringIterators();
 			}
-			return typeof(return).fromResult(res);
 		}
-		else
-			return typeof(return).fromResult(null);
+
+		if (info.lastStatement.type == "IfStatement"
+			&& !info.lastStatement.ifHasElse)
+		{
+			int ifIndex = info.contextTokenIndex == 0 ? position : info.contextTokenIndex;
+			auto hasBraces = code[0 .. max(min(ifIndex, $), 0)].stripRight.endsWith("}");
+			Snippet snp;
+			snp.providerId = typeid(this).name;
+			snp.id = "else";
+			snp.title = "else";
+			snp.shortcut = "else";
+			snp.documentation = "else block";
+			if (hasBraces)
+			{
+				snp.plain = "else {\n\t\n}";
+				snp.snippet = "else {\n\t$0\n}";
+			}
+			else
+			{
+				snp.plain = "else\n\t";
+				snp.snippet = "else\n\t$0";
+			}
+			snp.unformatted = true;
+			snp.resolved = true;
+			res ~= snp;
+		}
+
+		debug (SnippetScope)
+		{
+			import painlessjson : toJSON;
+
+			Snippet ret;
+			ret.providerId = typeid(this).name;
+			ret.id = "workspaced-snippet-debug";
+			ret.title = "[DEBUG] Snippet";
+			ret.shortcut = "__debug_snippet";
+			ret.plain = ret.snippet = info.toJSON.toPrettyString;
+			ret.unformatted = true;
+			ret.resolved = true;
+			res ~= ret;
+		}
+
+		return typeof(return).fromResult(res.length ? res : null);
 	}
 
 	Future!Snippet resolveSnippet(scope const WorkspaceD.Instance instance,

@@ -73,9 +73,16 @@ class SnippetsComponent : ComponentWrapper
 		// nudge in next token if position is not exactly on the start of it
 		if (loc < tokens.length && tokens[loc].index < position)
 			loc++;
+		// determine info from before start of identifier (so you can start typing something and it still finds a snippet scope)
+		if (loc > 0 && loc < tokens.length && tokens[loc].type == tok!"identifier" && tokens[loc].index >= position)
+			loc--;
+
+		int contextIndex;
+		if (loc >= 0 && loc < tokens.length)
+			contextIndex = cast(int) tokens[loc].index;
 
 		if (loc == 0 || loc == tokens.length)
-			return SnippetInfo([SnippetLevel.global]);
+			return SnippetInfo(contextIndex, [SnippetLevel.global]);
 
 		auto leading = tokens[0 .. loc];
 
@@ -93,9 +100,9 @@ class SnippetsComponent : ComponentWrapper
 				// needs to be modified to check the exact trivia token instead
 				// of the associated token with it.
 				if (last.text[0 .. len].startsWith("///", "/++", "/**"))
-					return SnippetInfo([SnippetLevel.docComment]);
+					return SnippetInfo(contextIndex, [SnippetLevel.docComment]);
 				else if (len >= 2)
-					return SnippetInfo([SnippetLevel.comment]);
+					return SnippetInfo(contextIndex, [SnippetLevel.comment]);
 				else
 					break;
 			case tok!"dstringLiteral":
@@ -109,15 +116,15 @@ class SnippetsComponent : ComponentWrapper
 				// quote character
 				// TODO: properly check if this is an unescaped escape
 				if (textSoFar.endsWith('\\', last.text[0]))
-					return SnippetInfo([SnippetLevel.strings, SnippetLevel.other]);
+					return SnippetInfo(contextIndex, [SnippetLevel.strings, SnippetLevel.other]);
 				else
-					return SnippetInfo([SnippetLevel.strings]);
+					return SnippetInfo(contextIndex, [SnippetLevel.strings]);
 			case tok!"(":
 				if (leading.length >= 2)
 				{
 					auto beforeLast = leading[$ - 2];
 					if (beforeLast.type.among(tok!"__traits", tok!"version", tok!"debug"))
-						return SnippetInfo([SnippetLevel.other]);
+						return SnippetInfo(contextIndex, [SnippetLevel.other]);
 				}
 				break;
 			default:
@@ -133,13 +140,13 @@ class SnippetsComponent : ComponentWrapper
 			// test for tokens semicolon closed statements where we should abort to avoid incomplete syntax
 			if (t.type.among!(tok!"import", tok!"module"))
 			{
-				return SnippetInfo([SnippetLevel.global, SnippetLevel.other]);
+				return SnippetInfo(contextIndex, [SnippetLevel.global, SnippetLevel.other]);
 			}
 			else if (t.type.among!(tok!"=", tok!"+", tok!"-", tok!"*", tok!"/",
 					tok!"%", tok!"^^", tok!"&", tok!"|", tok!"^", tok!"<<",
 					tok!">>", tok!">>>", tok!"~", tok!"in"))
 			{
-				return SnippetInfo([SnippetLevel.global, SnippetLevel.value]);
+				return SnippetInfo(contextIndex, [SnippetLevel.global, SnippetLevel.value]);
 			}
 		}
 
@@ -149,6 +156,7 @@ class SnippetsComponent : ComponentWrapper
 		//trace("determineSnippetInfo at ", position);
 
 		scope gen = new SnippetInfoGenerator(position);
+		gen.value.contextTokenIndex = contextIndex;
 		gen.variableStack.reserve(64);
 		gen.visit(parsed);
 
@@ -163,6 +171,34 @@ class SnippetsComponent : ComponentWrapper
 				if (++cost > LoopVariableAnalyzeMaxCost)
 					break;
 			}
+		}
+
+		if (gen.lastStatement)
+		{
+			import dparse.ast;
+
+			LastStatementInfo info;
+			auto nodeType = gen.lastStatement.findDeepestNonBlockNode;
+			if (gen.lastStatement.tokens.length)
+				info.location = cast(int) nodeType.tokens[0].index;
+			info.type = typeid(nodeType).name;
+			auto lastDot = info.type.lastIndexOf('.');
+			if (lastDot != -1)
+				info.type = info.type[lastDot + 1 .. $];
+			if (auto ifStmt = cast(IfStatement)nodeType)
+			{
+				auto elseStmt = getIfElse(ifStmt);
+				if (cast(IfStatement)elseStmt)
+					info.ifHasElse = false;
+				else
+					info.ifHasElse = elseStmt !is null;
+			}
+			else if (auto ifStmt = cast(ConditionalDeclaration)nodeType)
+				info.ifHasElse = ifStmt.hasElse;
+			// if (auto ifStmt = cast(ConditionalStatement)nodeType)
+			// 	info.ifHasElse = !!getIfElse(ifStmt);
+
+			gen.value.lastStatement = info;
 		}
 
 		return gen.value;
@@ -540,16 +576,34 @@ struct SnippetLoopScope
 ///
 struct SnippetInfo
 {
+	/// Index in code which token was used to determine this snippet info.
+	int contextTokenIndex;
 	/// Levels this snippet location has gone through, latest one being the last
 	SnippetLevel[] stack = [SnippetLevel.global];
 	/// Information about snippets using loop context
 	SnippetLoopScope loopScope;
+	/// Information about the last parsable statement before the cursor. May be
+	/// `LastStatementInfo.init` at start of function or block.
+	LastStatementInfo lastStatement;
 
 	/// Current snippet scope level of the location
 	SnippetLevel level() const @property
 	{
 		return stack.length ? stack[$ - 1] : SnippetLevel.other;
 	}
+}
+
+struct LastStatementInfo
+{
+	/// The libdparse class name (typeid) of the last parsable statement before
+	/// the cursor, stripped of module name.
+	string type;
+	/// If type is set, this is the start location in bytes where
+	/// the first token was.
+	int location;
+	/// True if the type is (`IfStatement`, `ConditionalDeclaration` or
+	/// `ConditionalStatement`) and has a final `else` block defined.
+	bool ifHasElse;
 }
 
 /// A list of snippets resolved at a given position.

@@ -301,3 +301,82 @@ string evaluateExpressionString(const Token token)
 		return null;
 	}
 }
+
+/// Finds the deepest non-null node of any BaseNode. (like visiting the tree)
+/// Aborts on types that contain `DeclarationOrStatement` or `Declaration[]`
+/// fields.
+/// Useful for getting the IfStatement out of a DeclarationOrStatement without
+/// traversing its children.
+BaseNode findDeepestNonBlockNode(T : BaseNode)(T ast)
+{
+	static assert(!is(T == BaseNode), "Passed in a BaseNode, that's probably not what you wanted to do (pass in the most specific type you have)");
+	bool nonProcess = false;
+	foreach (member; ast.tupleof)
+	{
+		static if (is(typeof(member) : DeclarationOrStatement)
+			|| is(typeof(member) : Declaration[]))
+		{
+			nonProcess = true;
+		}
+	}
+
+	if (nonProcess)
+		return ast;
+
+	foreach (member; ast.tupleof)
+	{
+		static if (is(typeof(member) : BaseNode))
+		{
+			if (member !is null)
+			{
+				return findDeepestNonBlockNode(member);
+			}
+		}
+	}
+	return ast;
+}
+
+/// Gets the final `else` block of an if. Will return a node of type
+/// `IfStatement` if it's an `else if` block. Returns null if there is no single
+/// else statement.
+BaseNode getIfElse(IfStatement ifStmt)
+{
+	if (!ifStmt.elseStatement)
+		return null;
+
+	while (true)
+	{
+		auto elseStmt = ifStmt.elseStatement;
+		if (!elseStmt)
+			return ifStmt;
+
+		auto stmtInElse = elseStmt.findDeepestNonBlockNode;
+		assert(stmtInElse !is elseStmt);
+
+		if (cast(IfStatement)stmtInElse)
+			ifStmt = cast(IfStatement)stmtInElse;
+		else
+			return stmtInElse;
+	}
+}
+
+unittest
+{
+	StringCache stringCache = StringCache(StringCache.defaultBucketCount);
+	RollbackAllocator rba;
+	IfStatement parseIfStmt(string code)
+	{
+		const(Token)[] tokens = getTokensForParser(cast(ubyte[])code, LexerConfig.init, &stringCache);
+		auto parser = new Parser();
+		parser.tokens = tokens;
+		parser.allocator = &rba;
+		return parser.parseIfStatement();
+	}
+
+	alias p = parseIfStmt;
+	assert(getIfElse(p("if (x) {}")) is null);
+	assert(getIfElse(p("if (x) {} else if (y) {}")) !is null);
+	assert(cast(IfStatement)getIfElse(p("if (x) {} else if (y) {}")) !is null, typeid(getIfElse(p("if (x) {} else if (y) {}"))).name);
+	assert(getIfElse(p("if (x) {} else if (y) {} else {}")) !is null);
+	assert(cast(IfStatement)getIfElse(p("if (x) {} else if (y) {} else {}")) is null);
+}
