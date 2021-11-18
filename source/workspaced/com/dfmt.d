@@ -104,6 +104,9 @@ class DfmtComponent : ComponentWrapper
 				case "keep_line_breaks":
 					config.dfmt_keep_line_breaks = val;
 					break;
+				case "single_indent":
+					config.dfmt_single_indent = val;
+					break;
 				default:
 					throw new Exception("Invalid command-line switch");
 				}
@@ -133,7 +136,8 @@ class DfmtComponent : ComponentWrapper
 				"space_before_aa_colon", &handleBooleans,
 				"tab_width", &config.tab_width,
 				"template_constraint_style", &config.dfmt_template_constraint_style,
-				"keep_line_breaks", &handleBooleans
+				"keep_line_breaks", &handleBooleans,
+				"single_indent", &handleBooleans,
 			);
 			//dfmt on
 		}
