@@ -1134,61 +1134,40 @@ unittest
 	backend.register!DscannerComponent;
 	DscannerComponent dscanner = instance.get!DscannerComponent;
 
-	int noTested = 0;
-	foreach (testFile; dirEntries("test/data/list_definition", SpanMode.shallow))
-	{
-		auto testCode = appender!string;
-		bool inCode = true;
-		bool verbose;
-		DefinitionElement[] expectedDefinitions;
-		foreach (line; File(testFile, "r").byLine)
-		{
-			if (line == "__EOF__")
+	bool verbose;
+	DefinitionElement[] expectedDefinitions;
+	runTestDataFileTests("test/data/list_definition",
+		() {
+			verbose = false;
+			expectedDefinitions = null;
+		},
+		(code, variable, value) {
+			switch (variable)
 			{
-				inCode = false;
-				continue;
+			case "verbose":
+				verbose = value.boolean;
+				break;
+			default:
+				assert(false, "Unknown test variable " ~ variable);
 			}
+		},
+		(code, parts, line) {
+			assert(parts.length == 6, "malformed definition test line: " ~ line);
 
-			if (inCode)
-			{
-				testCode ~= line;
-				testCode ~= '\n'; // normalize CRLF to LF
-			}
-			else if (line.length && line[0] == ':')
-			{
-				auto variable = line[1 .. $].findSplit("=");
-				switch (variable[0])
-				{
-				case "verbose":
-					verbose = parseJSON(variable[2]).boolean;
-					break;
-				default:
-					assert(false, "Unknown test variable " ~ variable[0]);
-				}
-			}
-			else if (line.length)
-			{
-				auto parts = line.idup.split("\t");
-				assert(parts.length == 6, "malformed definition test line: " ~ line);
+			string[string] dict;
+			foreach (k, v; parseJSON(parts[3]).object)
+				dict[k] = v.str;
 
-				string[string] dict;
-				foreach (k, v; parseJSON(parts[3]).object)
-					dict[k] = v.str;
-
-				expectedDefinitions ~= DefinitionElement(
-					parts[0],
-					parts[1].to!int,
-					parts[2],
-					dict,
-					[parts[4].to!int, parts[5].to!int]
-				);
-			}
-		}
-
-		auto defs = dscanner.listDefinitions("stdin", testCode.data, verbose).getBlocking();
-		assert(defs == expectedDefinitions);
-		noTested++;
-	}
-
-	assert(noTested > 0);
+			expectedDefinitions ~= DefinitionElement(
+				parts[0],
+				parts[1].to!int,
+				parts[2],
+				dict,
+				[parts[4].to!int, parts[5].to!int]
+			);
+		},
+		(code) {
+			auto defs = dscanner.listDefinitions("stdin", code, verbose).getBlocking();
+			assert(defs == expectedDefinitions);
+		});
 }
