@@ -78,56 +78,72 @@ version (unittest)
 		void delegate() onFileStart,
 		void delegate(string code, string variable, JSONValue value) setVariable,
 		void delegate(string code, string[] parts, string line) onTestLine,
-		void delegate(string code) onFileFinished)
+		void delegate(string code) onFileFinished,
+		string __file = __FILE__,
+		size_t __line = __LINE__)
 	{
+		import core.exception;
 		import std.algorithm;
 		import std.array;
+		import std.conv;
 		import std.file;
 		import std.stdio;
 
 		int noTested = 0;
 		foreach (testFile; dirEntries(dir, SpanMode.shallow))
 		{
-			auto testCode = appender!string;
-			bool inCode = true;
-			if (onFileStart)
-				onFileStart();
-			foreach (line; File(testFile, "r").byLine)
+			int lineNo = 0;
+			try
 			{
-				if (line == "__EOF__")
+				auto testCode = appender!string;
+				bool inCode = true;
+				if (onFileStart)
+					onFileStart();
+				foreach (line; File(testFile, "r").byLine)
 				{
-					inCode = false;
-					continue;
-				}
-
-				if (inCode)
-				{
-					testCode ~= line;
-					testCode ~= '\n'; // normalize CRLF to LF
-				}
-				else if (!line.length || line.startsWith("//"))
-				{
-					continue;
-				}
-				else if (line[0] == ':')
-				{
-					auto variable = line[1 .. $].idup.findSplit("=");
-					if (setVariable)
-						setVariable(testCode.data, variable[0], parseJSON(variable[2]));
-				}
-				else
-				{
-					if (onTestLine)
+					lineNo++;
+					if (line == "__EOF__")
 					{
-						string lineDup = line.idup;
-						onTestLine(testCode.data, lineDup.split("\t"), lineDup);
+						inCode = false;
+						continue;
+					}
+
+					if (inCode)
+					{
+						testCode ~= line;
+						testCode ~= '\n'; // normalize CRLF to LF
+					}
+					else if (!line.length || line.startsWith("//"))
+					{
+						continue;
+					}
+					else if (line[0] == ':')
+					{
+						auto variable = line[1 .. $].idup.findSplit("=");
+						if (setVariable)
+							setVariable(testCode.data, variable[0], parseJSON(variable[2]));
+					}
+					else
+					{
+						if (onTestLine)
+						{
+							string lineDup = line.idup;
+							onTestLine(testCode.data, lineDup.split("\t"), lineDup);
+						}
 					}
 				}
-			}
 
-			if (onFileFinished)
-				onFileFinished(testCode.data);
-			noTested++;
+				if (onFileFinished)
+					onFileFinished(testCode.data);
+				noTested++;
+			}
+			catch (AssertError e)
+			{
+				e.file = __file;
+				e.line = __line;
+				e.msg = "in " ~ testFile ~ "(" ~ lineNo.to!string ~ "): " ~ e.msg;
+				throw e;
+			}
 		}
 
 		assert(noTested > 0);

@@ -70,16 +70,46 @@ class SnippetsComponent : ComponentWrapper
 		scope tokens = getTokensForParser(cast(ubyte[]) code, config, &workspaced.stringCache);
 		auto loc = tokens.tokenIndexAtByteIndex(position);
 
-		// nudge in next token if position is not exactly on the start of it
-		if (loc < tokens.length && tokens[loc].index < position)
-			loc++;
-		// determine info from before start of identifier (so you can start typing something and it still finds a snippet scope)
-		if (loc > 0 && loc < tokens.length && tokens[loc].type == tok!"identifier" && tokens[loc].index >= position)
+		// first check if at end of identifier, move current location to that
+		// identifier.
+		if (loc > 0
+			&& loc < tokens.length
+			&& tokens[loc - 1].isLikeIdentifier
+			&& tokens[loc - 1].index <= position
+			&& tokens[loc - 1].index + tokens[loc - 1].textLength >= position)
+			loc--;
+		// also determine info from before start of identifier (so you can start
+		// typing something and it still finds a snippet scope)
+		// > double decrement when at end of identifier, start of other token!
+		if (loc > 0
+			&& loc < tokens.length
+			&& tokens[loc].isLikeIdentifier
+			&& tokens[loc].index <= position
+			&& tokens[loc].index + tokens[loc].textLength >= position)
 			loc--;
 
+		// nudge in next token if position is after this token
+		if (loc < tokens.length && tokens[loc].isLikeIdentifier
+			&& position > tokens[loc].index + tokens[loc].textLength)
+		{
+			// cursor must not be glued to the end of identifiers
+			loc++;
+		}
+		else if (loc < tokens.length && !tokens[loc].isLikeIdentifier
+			&& position >= tokens[loc].index + tokens[loc].textLength)
+		{
+			// but next token if end of non-identifiers (eg `""`, `;`, `.`, `(`)
+			loc++;
+		}
+
 		int contextIndex;
+		int checkLocation = position;
 		if (loc >= 0 && loc < tokens.length)
+		{
 			contextIndex = cast(int) tokens[loc].index;
+			if (tokens[loc].index < position)
+				checkLocation = contextIndex;
+		}
 
 		if (loc == 0 || loc == tokens.length)
 			return SnippetInfo(contextIndex, [SnippetLevel.global]);
@@ -91,45 +121,86 @@ class SnippetsComponent : ComponentWrapper
 			auto last = leading[$ - 1];
 			switch (last.type)
 			{
-			case tok!"comment":
-				size_t len = max(0, cast(ptrdiff_t)position
-					- cast(ptrdiff_t)last.index);
-				// TODO: currently never called because we would either need to
-				// use the DLexer struct as parser immediately or wait until
-				// libdparse >=0.15.0 which contains trivia, where this switch
-				// needs to be modified to check the exact trivia token instead
-				// of the associated token with it.
-				if (last.text[0 .. len].startsWith("///", "/++", "/**"))
-					return SnippetInfo(contextIndex, [SnippetLevel.docComment]);
-				else if (len >= 2)
-					return SnippetInfo(contextIndex, [SnippetLevel.comment]);
-				else
-					break;
+			case tok!".":
+			case tok!")":
+			case tok!"characterLiteral":
 			case tok!"dstringLiteral":
 			case tok!"wstringLiteral":
 			case tok!"stringLiteral":
-				if (position <= last.index)
-					break;
-
-				auto textSoFar = last.text[1 .. position - last.index];
-				// no string complete if we are immediately after escape or
-				// quote character
-				// TODO: properly check if this is an unescaped escape
-				if (textSoFar.endsWith('\\', last.text[0]))
-					return SnippetInfo(contextIndex, [SnippetLevel.strings, SnippetLevel.other]);
-				else
-					return SnippetInfo(contextIndex, [SnippetLevel.strings]);
+				// no snippets immediately after these tokens (needs some other
+				// token inbetween)
+				return SnippetInfo(contextIndex, [SnippetLevel.other]);
 			case tok!"(":
+				// current token is something like `)`, check for previous
+				// tokens like `__traits` `(`
 				if (leading.length >= 2)
 				{
-					auto beforeLast = leading[$ - 2];
-					if (beforeLast.type.among(tok!"__traits", tok!"version", tok!"debug"))
+					switch (leading[$ - 2].type)
+					{
+					case tok!"__traits":
+					case tok!"version":
+					case tok!"debug":
 						return SnippetInfo(contextIndex, [SnippetLevel.other]);
+					default: break;
+					}
 				}
+				break;
+			case tok!"__traits":
+			case tok!"version":
+			case tok!"debug":
+				return SnippetInfo(contextIndex, [SnippetLevel.other]);
+			case tok!"typeof":
+			case tok!"if":
+			case tok!"while":
+			case tok!"for":
+			case tok!"foreach":
+			case tok!"foreach_reverse":
+			case tok!"switch":
+			case tok!"with":
+			case tok!"catch":
+				// immediately after these tokens, missing opening parentheses
+				if (tokens[loc].type != tok!"(")
+					return SnippetInfo(contextIndex, [SnippetLevel.other]);
 				break;
 			default:
 				break;
 			}
+		}
+
+		auto current = tokens[loc];
+		switch (current.type)
+		{
+		case tok!"comment":
+			size_t len = max(0, cast(ptrdiff_t)position
+				- cast(ptrdiff_t)current.index);
+			// TODO: currently never called because we would either need to
+			// use the DLexer struct as parser immediately or wait until
+			// libdparse >=0.15.0 which contains trivia, where this switch
+			// needs to be modified to check the exact trivia token instead
+			// of the associated token with it.
+			if (current.text[0 .. len].startsWith("///", "/++", "/**"))
+				return SnippetInfo(contextIndex, [SnippetLevel.docComment]);
+			else if (len >= 2)
+				return SnippetInfo(contextIndex, [SnippetLevel.comment]);
+			else
+				break;
+		case tok!"characterLiteral":
+		case tok!"dstringLiteral":
+		case tok!"wstringLiteral":
+		case tok!"stringLiteral":
+			if (position <= current.index)
+				break;
+
+			auto textSoFar = current.text[1 .. position - current.index];
+			// no string complete if we are immediately after escape or
+			// quote character
+			// TODO: properly check if this is an unescaped escape
+			if (textSoFar.endsWith('\\', current.text[0]))
+				return SnippetInfo(contextIndex, [SnippetLevel.strings, SnippetLevel.other]);
+			else
+				return SnippetInfo(contextIndex, [SnippetLevel.strings]);
+		default:
+			break;
 		}
 
 		foreach_reverse (t; leading)
@@ -153,9 +224,9 @@ class SnippetsComponent : ComponentWrapper
 		RollbackAllocator rba;
 		scope parsed = parseModule(tokens, cast(string) file, &rba);
 
-		//trace("determineSnippetInfo at ", position);
+		//trace("determineSnippetInfo at ", contextIndex);
 
-		scope gen = new SnippetInfoGenerator(position);
+		scope gen = new SnippetInfoGenerator(checkLocation);
 		gen.value.contextTokenIndex = contextIndex;
 		gen.variableStack.reserve(64);
 		gen.visit(parsed);

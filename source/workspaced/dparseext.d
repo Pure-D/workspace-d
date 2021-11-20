@@ -71,6 +71,25 @@ string tokenText(const Token token)
 	}
 }
 
+size_t textLength(const Token token)
+{
+	return token.tokenText.length;
+}
+
+bool isSomeString(const Token token)
+{
+	switch (token.type)
+	{
+	case tok!"characterLiteral":
+	case tok!"dstringLiteral":
+	case tok!"stringLiteral":
+	case tok!"wstringLiteral":
+		return true;
+	default:
+		return false;
+	}
+}
+
 bool isLikeIdentifier(const Token token)
 {
 	import workspaced.helpers;
