@@ -38,5 +38,5 @@ void main()
 			|| dub.path.toString.endsWith("tc_fsworkspace/")
 			|| dub.path.toString.endsWith("tc_fsworkspace\\"));
 	if (dub.canBuild)
-		assert(dub.build.getBlocking.count!(a => a.type == ErrorType.Deprecation) == 0);
+		assert(dub.build.getBlocking.count!(a => a.type == ErrorType.Warning || a.type == ErrorType.Error) == 0);
 }

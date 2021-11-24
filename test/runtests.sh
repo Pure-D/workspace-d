@@ -20,16 +20,29 @@ pushd ..
 dub build --build=release --compiler="${COMPILER}"
 popd
 
+tests="${@:2}"
+if [ -z "$tests" ]; then
+	tests=tc*
+fi
+
 echo "Running tests with ${COMPILER}..."
 
-for testCase in tc*; do
-	cd $testCase
+for testCase in $tests; do
+	echo -e "${YELLOW}$testCase${NORMAL}"
+	pushd $testCase
 
-	dub upgrade
-	dub --compiler="${COMPILER}" >testout.txt 2>&1
+	if [ -f .needs_dcd ]; then
+		pushd ../data/dcd
+		dmd -I../../../source -run download_dcd.d
+		popd
+		cp ../data/dcd/dcd-server* .
+		cp ../data/dcd/dcd-client* .
+	fi
+
+	dub upgrade >testout.txt 2>&1
+	dub --compiler="${COMPILER}" >>testout.txt 2>&1
 	if [[ $? -eq 0 ]]; then
 		echo -e "${YELLOW}$testCase:${NORMAL} ... ${GREEN}Pass${NORMAL}";
-		rm testout.txt
 		let pass_count=pass_count+1
 	else
 		echo -e "${YELLOW}$testCase:${NORMAL} ... ${RED}Fail${NORMAL}";
@@ -37,7 +50,7 @@ for testCase in tc*; do
 		let fail_count=fail_count+1
 	fi
 
-	cd - > /dev/null;
+	popd
 done
 
 if [[ $fail_count -eq 0 ]]; then

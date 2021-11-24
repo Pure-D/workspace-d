@@ -8,35 +8,6 @@ import std.process;
 import workspaced.api;
 import workspaced.coms;
 
-void downloadFile(string path, string url)
-{
-	import std.net.curl : download;
-
-	if (exists(path))
-		return;
-
-	stderr.writeln("Downloading ", url, " to ", path);
-
-	download(url, path);
-}
-
-void extractZip(string path)
-{
-	import std.zip : ZipArchive;
-
-	auto zip = new ZipArchive(read(path));
-	foreach (name, am; zip.directory)
-	{
-		stderr.writeln("Unpacking ", name);
-		zip.expand(am);
-
-		if (exists(name))
-			remove(name);
-
-		std.file.write(name, am.expandedData);
-	}
-}
-
 int main(string[] args)
 {
 	string dir = getcwd;
@@ -48,31 +19,14 @@ int main(string[] args)
 
 	version (Windows)
 	{
-		downloadFile("dcd-0.12.0.zip", "https://github.com/dlang-community/DCD/releases/download/v0.12.0/dcd-v0.12.0-windows-x86_64.zip");
-		extractZip("dcd-0.12.0.zip");
-
 		if (exists("dcd-client.exe"))
 			backend.globalConfiguration.set("dcd", "clientPath", "dcd-client.exe");
 
 		if (exists("dcd-server.exe"))
 			backend.globalConfiguration.set("dcd", "serverPath", "dcd-server.exe");
 	}
-	else version (linux)
+	else
 	{
-		downloadFile("dcd-0.12.0.tar.gz", "https://github.com/dlang-community/DCD/releases/download/v0.12.0/dcd-v0.12.0-linux-x86_64.tar.gz");
-		spawnShell("tar -xzvf dcd-0.12.0.tar.gz").wait;
-
-		if (exists("dcd-client"))
-			backend.globalConfiguration.set("dcd", "clientPath", "dcd-client");
-
-		if (exists("dcd-server"))
-			backend.globalConfiguration.set("dcd", "serverPath", "dcd-server");
-	}
-	else version (OSX)
-	{
-		downloadFile("dcd-0.12.0.tar.gz", "https://github.com/dlang-community/DCD/releases/download/v0.12.0/dcd-v0.12.0-linux-x86_64.tar.gz");
-		spawnShell("tar -xzvf dcd-0.12.0.tar.gz").wait;
-
 		if (exists("dcd-client"))
 			backend.globalConfiguration.set("dcd", "clientPath", "dcd-client");
 
@@ -82,12 +36,7 @@ int main(string[] args)
 
 	bool verbose = args.length > 1 && (args[1] == "-v" || args[1] == "--v" || args[1] == "--verbose");
 
-	if (!backend.attachSilent(instance, "dcd"))
-	{
-		// dcd not installed
-		stderr.writeln("WARNING: skipping test tc_implement_interface because DCD is not installed");
-		return 0;
-	}
+	assert(backend.attachSilent(instance, "dcd"), "failed to attach DCD, is it not installed correctly?");
 
 	auto fsworkspace = backend.get!FSWorkspaceComponent(dir);
 	auto dcd = backend.get!DCDComponent(dir);

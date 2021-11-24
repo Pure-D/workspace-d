@@ -2,3 +2,5 @@
 testout.txt
 *.zip
 *.tar.gz
+dcd-client*
+dcd-server*
