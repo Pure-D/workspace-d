@@ -6,7 +6,7 @@ import std.process;
 
 static import std.stdio;
 
-import source.workspaced.info;
+import workspaced.info;
 
 void main()
 {

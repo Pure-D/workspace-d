@@ -24,12 +24,14 @@ import workspaced.api;
 import workspaced.helpers;
 import workspaced.dcd.client;
 
+import workspaced.info : latestKnownDCDVersion;
+
 @component("dcd")
 class DCDComponent : ComponentWrapper
 {
 	mixin DefaultComponentWrapper;
 
-	enum latestKnownVersion = [0, 13, 6];
+	enum latestKnownVersion = latestKnownDCDVersion;
 	void load()
 	{
 		installedVersion = workspaced.globalConfiguration.get("dcd", "_installedVersion", "");

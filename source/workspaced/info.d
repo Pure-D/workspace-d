@@ -1,4 +1,4 @@
-module source.workspaced.info;
+module workspaced.info;
 
 import Compiler = std.compiler;
 import OS = std.system;
@@ -7,6 +7,8 @@ import std.json;
 
 static immutable Version = [3, 6, 1];
 static immutable string BundledDependencies = "dub, dfmt and dscanner are bundled within (compiled in)";
+
+static immutable latestKnownDCDVersion = [0, 13, 6];
 
 version (Windows) version (DigitalMars) static assert(false,
 		"DMD not supported on Windows. Please use LDC.");

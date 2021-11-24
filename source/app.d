@@ -96,7 +96,7 @@ void handleRequest(int id, JSONValue request)
 			sendResponse(id, JSONValue(null));
 		else
 		{
-			import source.workspaced.info : getVersionInfoJson;
+			import workspaced.info : getVersionInfoJson;
 
 			sendResponse(id, getVersionInfoJson);
 		}
@@ -298,7 +298,7 @@ else
 {
 	int main(string[] args)
 	{
-		import source.workspaced.info;
+		import workspaced.info;
 
 		import std.file;
 		import etc.linux.memoryerror;
