@@ -379,16 +379,23 @@ class DubComponent : ComponentWrapper
 
 		string compilerName = _compiler.name;
 
-		version (Windows)
-		{
 			if (compilerName == "dmd")
 			{
-				types ~= "x86_mscoff";
+			// https://github.com/dlang/dub/blob/master/source/dub/compilers/dmd.d#L110
+			version (Windows)
+			{
+				types ~= ["x86_omf", "x86_mscoff"];
 			}
 		}
-		if (compilerName == "gdc")
+		else if (compilerName == "gdc")
 		{
-			types ~= ["arm", "arm_thumb"];
+			// https://github.com/dlang/dub/blob/master/source/dub/compilers/gdc.d#L69
+			types ~= ["aarch64", "arm", "arm_thumb"];
+		}
+		else if (compilerName == "ldc")
+		{
+			// https://github.com/dlang/dub/blob/master/source/dub/compilers/ldc.d#L80
+			types ~= ["aarch64", "powerpc64"];
 		}
 
 		return types;
