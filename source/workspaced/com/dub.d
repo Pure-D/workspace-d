@@ -390,7 +390,7 @@ class DubComponent : ComponentWrapper
 		else if (compilerName == "gdc")
 		{
 			// https://github.com/dlang/dub/blob/master/source/dub/compilers/gdc.d#L69
-			types ~= ["aarch64", "arm", "arm_thumb"];
+			types ~= ["arm", "arm_thumb"];
 		}
 		else if (compilerName == "ldc")
 		{
