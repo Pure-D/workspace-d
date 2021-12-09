@@ -344,7 +344,7 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Lists all build types defined in the package description AND the predefined ones from dub ("plain", "debug", "release", "release-debug", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov")
-	string[] buildTypes() @property
+	string[] buildTypes() const @property
 	{
 		string[] types = [
 			"plain", "debug", "release", "release-debug", "release-nobounds",
@@ -356,7 +356,7 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Gets the current selected configuration
-	string configuration() @property
+	string configuration() const @property
 	{
 		return _configuration;
 	}
@@ -448,7 +448,7 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Returns the current selected compiler
-	string compiler() @property
+	string compiler() const @property
 	{
 		return _compilerBinaryName;
 	}
@@ -472,19 +472,19 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Returns the project name
-	string name() @property
+	string name() const @property
 	{
 		return _dub.projectName;
 	}
 
 	/// Returns the project path
-	auto path() @property
+	auto path() const @property
 	{
 		return _dub.projectPath;
 	}
 
 	/// Returns whether there is a target set to build. If this is false then build will throw an exception.
-	bool canBuild() @property
+	bool canBuild() const @property
 	{
 		if (_settings.targetType == TargetType.none || _settings.targetType == TargetType.sourceLibrary
 				|| !_dub.project.configurations.canFind(_configuration))
