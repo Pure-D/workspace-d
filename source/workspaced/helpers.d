@@ -3,7 +3,7 @@ module workspaced.helpers;
 import std.ascii;
 import std.string;
 
-string determineIndentation(scope const(char)[] code)
+string determineIndentation(scope const(char)[] code) @safe
 {
 	const(char)[] indent = null;
 	foreach (line; code.lineSplitter)
@@ -15,22 +15,30 @@ string determineIndentation(scope const(char)[] code)
 	return indent.idup;
 }
 
-int stripLineEndingLength(scope const(char)[] code)
+int stripLineEndingLength(scope const(char)[] code) @safe @nogc
 {
-	if (code.endsWith("\r\n"))
-		return 2;
-	else if (code.endsWith("\r", "\n"))
-		return 1;
-	else
-		return 0;
+	switch (code.length)
+	{
+		case 0:
+			return 0;
+		case 1:
+			return code[0] == '\r' || code[0] == '\n' ? 1 : 0;
+		default:
+			if (code[$ - 2 .. $] == "\r\n")
+				return 2;
+			else if (code[$ - 1] == '\r' || code[$ - 1] == '\n')
+				return 1;
+			else
+				return 0;
+	}
 }
 
-bool isIdentifierChar(dchar c)
+bool isIdentifierChar(dchar c) @safe @nogc
 {
 	return c.isAlphaNum || c == '_';
 }
 
-ptrdiff_t indexOfKeyword(scope const(char)[] code, string keyword, ptrdiff_t start = 0)
+ptrdiff_t indexOfKeyword(scope const(char)[] code, string keyword, ptrdiff_t start = 0) @safe @nogc
 {
 	ptrdiff_t index = start;
 	while (true)
@@ -51,13 +59,13 @@ ptrdiff_t indexOfKeyword(scope const(char)[] code, string keyword, ptrdiff_t sta
 	return index;
 }
 
-bool endsWithKeyword(scope const(char)[] code, string keyword)
+bool endsWithKeyword(scope const(char)[] code, string keyword) @safe @nogc
 {
 	return code == keyword || (code.endsWith(keyword) && code[$ - 1 - keyword.length]
 			.isIdentifierChar);
 }
 
-bool isIdentifierSeparatingChar(dchar c)
+bool isIdentifierSeparatingChar(dchar c) @safe @nogc
 {
 	return c < 48 || (c > 57 && c < 65) || c == '[' || c == '\\' || c == ']'
 		|| c == '`' || (c > 122 && c < 128) || c == '\u2028' || c == '\u2029'; // line separators
