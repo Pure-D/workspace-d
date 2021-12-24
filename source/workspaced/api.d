@@ -106,7 +106,10 @@ mixin template DefaultComponentWrapper(bool withDtor = true)
 			if (!_threads)
 				synchronized (this)
 					if (!_threads)
+					{
 						_threads = new TaskPool(max(minSize, min(maxSize, defaultPoolThreads)));
+						_threads.isDaemon = true;
+					}
 			return _threads;
 		}
 
