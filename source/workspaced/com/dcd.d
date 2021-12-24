@@ -228,15 +228,32 @@ class DCDComponent : ComponentWrapper
 		serverThreads.create({
 			mixin(traceTask);
 			if (quietServer)
+			{
 				foreach (block; serverPipes.stderr.byChunk(4096))
 				{
 				}
+			}
 			else
-				while (serverPipes.stderr.isOpen && !serverPipes.stderr.eof)
+			{
+				try
 				{
-					auto line = serverPipes.stderr.readln();
-					trace("Server: ", line); // evaluates lazily, so read before
+					while (running)
+					{
+						auto line = serverPipes.stderr.readln();
+						if (line !is null)
+							trace("Server: ", line); // evaluates lazily, so read before
+						else
+						{
+							running = false;
+							break;
+						}
+					}
 				}
+				catch (Throable t)
+				{
+					running = false;
+				}
+			}
 			auto code = serverPipes.pid.wait();
 			info("DCD-Server stopped with code ", code);
 			if (code != 0)
