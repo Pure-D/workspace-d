@@ -249,7 +249,7 @@ class DCDComponent : ComponentWrapper
 						}
 					}
 				}
-				catch (Throable t)
+				catch (Throwable t)
 				{
 					running = false;
 				}
