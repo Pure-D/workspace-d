@@ -623,7 +623,10 @@ class WorkspaceD
 		if (!_gthreads)
 			synchronized (this)
 				if (!_gthreads)
+				{
 					_gthreads = new TaskPool(max(2, min(6, defaultPoolThreads)));
+					_gthreads.isDaemon = true;
+				}
 		return _gthreads;
 	}
 }
