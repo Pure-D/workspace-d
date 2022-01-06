@@ -227,16 +227,28 @@ class DCDComponent : ComponentWrapper
 		running = true;
 		serverThreads.create({
 			mixin(traceTask);
-			if (quietServer)
-				foreach (block; serverPipes.stderr.byChunk(4096))
-				{
-				}
-			else
-				while (serverPipes.stderr.isOpen && !serverPipes.stderr.eof)
-				{
-					auto line = serverPipes.stderr.readln();
-					trace("Server: ", line); // evaluates lazily, so read before
-				}
+			scope (exit)
+				running = false;
+
+			try
+			{
+				if (quietServer)
+					foreach (block; serverPipes.stderr.byChunk(4096))
+					{
+					}
+				else
+					while (serverPipes.stderr.isOpen && !serverPipes.stderr.eof)
+					{
+						auto line = serverPipes.stderr.readln();
+						trace("Server: ", line); // evaluates lazily, so read before
+					}
+			}
+			catch (Exception e)
+			{
+				error("Reading/clearing stderr from dcd-server crashed (-> killing dcd-server): ", e);
+				serverPipes.pid.kill();
+			}
+
 			auto code = serverPipes.pid.wait();
 			info("DCD-Server stopped with code ", code);
 			if (code != 0)
@@ -246,7 +258,6 @@ class DCDComponent : ComponentWrapper
 						"type": JSONValue("crash"),
 						"component": JSONValue("dcd")
 					]));
-				running = false;
 			}
 		});
 	}
