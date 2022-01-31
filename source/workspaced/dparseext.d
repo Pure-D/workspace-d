@@ -2,6 +2,7 @@ module workspaced.dparseext;
 
 import std.algorithm;
 import std.array;
+import std.experimental.logger;
 import std.string;
 
 import dparse.ast;
@@ -281,7 +282,7 @@ in (expr !is null)
 /// ditto
 string evaluateExpressionString(const Token token)
 {
-	import dparse.strings : unescapeString;
+	import dparse.strings : unescapeString, isStringLiteral;
 
 	switch (token.type)
 	{
@@ -306,7 +307,22 @@ string evaluateExpressionString(const Token token)
 			case tok!"stringLiteral":
 			case tok!"wstringLiteral":
 			case tok!"dstringLiteral":
-				ret ~= unescapeString(t.text);
+				if (t.text.isStringLiteral)
+				{
+					ret ~= unescapeString(t.text);
+				}
+				else
+				{
+					debug
+					{
+						throw new Exception("Invalid stringLiteral in stringLiteral token: `" ~ t.text ~ '`');
+					}
+					else
+					{
+						warningf("Invalid stringLiteral in stringLiteral token: `%s`", t.text);
+						return str;
+					}
+				}
 				break;
 			default:
 				// unexpected token, return input because it might already be
