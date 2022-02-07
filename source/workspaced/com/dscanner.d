@@ -770,13 +770,10 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const FunctionDeclaration dec)
 	{
-		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody
-				|| !dec.functionBody.specifiedFunctionBody.blockStatement)
-			return;
 		auto def = makeDefinition(dec.name.text, dec.name.line, "f", context,
 				[
-					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
-					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
+					cast(int) dec.functionBody.startLocation,
+					cast(int) dec.functionBody.endLocation
 				]);
 		def.attributes["signature"] = paramsToString(dec);
 		if (dec.returnType !is null)
@@ -786,13 +783,10 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const Constructor dec)
 	{
-		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody
-				|| !dec.functionBody.specifiedFunctionBody.blockStatement)
-			return;
 		auto def = makeDefinition("this", dec.line, "f", context,
 				[
-					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
-					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
+					cast(int) dec.functionBody.startLocation,
+					cast(int) dec.functionBody.endLocation
 				]);
 		def.attributes["signature"] = paramsToString(dec);
 		definitions ~= def;
@@ -800,13 +794,10 @@ final class DefinitionFinder : ASTVisitor
 
 	override void visit(const Destructor dec)
 	{
-		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody
-				|| !dec.functionBody.specifiedFunctionBody.blockStatement)
-			return;
 		definitions ~= makeDefinition("~this", dec.line, "f", context,
 				[
-					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
-					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
+					cast(int) dec.functionBody.startLocation,
+					cast(int) dec.functionBody.endLocation
 				]);
 	}
 
@@ -815,13 +806,10 @@ final class DefinitionFinder : ASTVisitor
 		if (!verbose)
 			return;
 
-		if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody
-				|| !dec.functionBody.specifiedFunctionBody.blockStatement)
-			return;
 		definitions ~= makeDefinition("this(this)", dec.line, "f", context,
 				[
-					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
-					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
+					cast(int) dec.functionBody.startLocation,
+					cast(int) dec.functionBody.endLocation
 				]);
 	}
 
@@ -1043,13 +1031,10 @@ final class DefinitionFinder : ASTVisitor
 			if (!verbose)
 				return;
 
-			if (!dec.functionBody || !dec.functionBody.specifiedFunctionBody
-					|| !dec.functionBody.specifiedFunctionBody.blockStatement)
-				return;
 			definitions ~= makeDefinition(CtorNames[i], dec.line, CtorTypes[i], context,
 				[
-					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.startLocation,
-					cast(int) dec.functionBody.specifiedFunctionBody.blockStatement.endLocation
+					cast(int) dec.functionBody.startLocation,
+					cast(int) dec.functionBody.endLocation
 				]);
 		}
 	}
@@ -1170,4 +1155,14 @@ unittest
 			auto defs = dscanner.listDefinitions("stdin", code, verbose).getBlocking();
 			assert(defs == expectedDefinitions);
 		});
+}
+
+size_t startLocation(const FunctionBody b)
+{
+	return b.tokens.length > 0 ? b.tokens[0].index : 0;
+}
+
+size_t endLocation(const FunctionBody b)
+{
+	return b.tokens.length > 0 ? (b.tokens[$ - 1].index + b.tokens[$ - 1].tokenText.length) : 0;
 }
