@@ -178,33 +178,44 @@ private struct CompileCommand
 	{
 		import std.algorithm : startsWith;
 
-		enum importMark = "-I=";
-		enum stringImportMark = "-J=";
+		enum importMark = "-I"; // optional =
+		enum stringImportMark = "-J"; // optional =
 		enum fileImportMark = "-i=";
 		enum versionMark = "-version=";
 		enum debugMark = "-debug=";
 
 		foreach (arg; args)
 		{
-			if (arg.startsWith(importMark))
+			const mark = arg.startsWith(
+				importMark, stringImportMark, fileImportMark, versionMark, debugMark
+			);
+
+			switch (mark)
 			{
-				imports.put(getPath(arg[importMark.length .. $]));
-			}
-			else if (arg.startsWith(stringImportMark))
-			{
-				stringImports.put(getPath(arg[stringImportMark.length .. $]));
-			}
-			else if (arg.startsWith(fileImportMark))
-			{
+			case 0:
+				break;
+			case 1:
+			case 2:
+				if (arg.length == 2)
+					break; // ill-formed flag, we don't need to care here
+				const st = arg[2] == '=' ? 3 : 2;
+				const path = getPath(arg[st .. $]);
+				if (mark == 1)
+					imports.put(path);
+				else
+					stringImports.put(path);
+				break;
+			case 3:
 				fileImports.put(getPath(arg[fileImportMark.length .. $]));
-			}
-			else if (arg.startsWith(versionMark))
-			{
+				break;
+			case 4:
 				versions.put(getPath(arg[versionMark.length .. $]));
-			}
-			else if (arg.startsWith(debugMark))
-			{
+				break;
+			case 5:
 				debugVersions.put(getPath(arg[debugMark.length .. $]));
+				break;
+			default:
+				break;
 			}
 		}
 	}
