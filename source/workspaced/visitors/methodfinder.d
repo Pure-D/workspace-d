@@ -130,6 +130,12 @@ struct InterfaceDetails
 	size_t[2] blockRange;
 	/// A (name-based) sorted set of referenced types with first occurences of every type or alias not including built-in types, but including object.d types and aliases.
 	ReferencedType[] referencedTypes;
+
+	/// Returns true if there are no non-whitespace characters inside the block.
+	bool isEmpty() const
+	{
+		return !code.substr(blockRange).strip.length;
+	}
 }
 
 class InterfaceMethodFinder : AttributesVisitor

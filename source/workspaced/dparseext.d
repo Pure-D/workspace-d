@@ -415,3 +415,23 @@ unittest
 	assert(getIfElse(p("if (x) {} else if (y) {} else {}")) !is null);
 	assert(cast(IfStatement)getIfElse(p("if (x) {} else if (y) {} else {}")) is null);
 }
+
+C[] substr(C)(C[] s, size_t[2] range)
+{
+	return substr(s, range[0], range[1]);
+}
+
+C[] substr(C)(C[] s, size_t start, size_t end)
+{
+	if (!s.length)
+		return s;
+	if (start < 0)
+		start = 0;
+	if (start >= s.length)
+		start = s.length - 1; // @suppress(dscanner.suspicious.length_subtraction)
+	if (end > s.length)
+		end = s.length;
+	if (end < start)
+		return s[start .. start];
+	return s[start .. end];
+}
