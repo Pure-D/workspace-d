@@ -25,6 +25,7 @@ import dub.project;
 
 import dub.compilers.buildsettings;
 import dub.compilers.compiler;
+import dub.dependency;
 import dub.generators.build;
 import dub.generators.generator;
 
@@ -104,7 +105,8 @@ class DubComponent : ComponentWrapper
 		foreach (ref pkg; _dub.project.getTopologicalPackageList())
 		{
 			optionalifyRecipe(pkg);
-			foreach (dep; pkg.getAllDependencies().filter!(a => optionalified.canFind(a.name)))
+			foreach (dep; pkg.getAllDependencies()
+				.filter!(a => optionalified.canFind(a.name)))
 			{
 				auto d = _dub.project.getDependency(dep.name, true);
 				if (!d)
@@ -172,7 +174,9 @@ class DubComponent : ComponentWrapper
 
 	bool isRunning()
 	{
-		return _dub !is null && _dub.project !is null && _dub.project.rootPackage !is null
+		return _dub !is null
+			&& _dub.project !is null
+			&& _dub.project.rootPackage !is null
 			&& _dubRunning;
 	}
 
@@ -338,9 +342,9 @@ class DubComponent : ComponentWrapper
 		auto pkg = _dub.project.rootPackage;
 		BuildSettings settings = pkg.getBuildSettings(_platform, _configuration);
 		return PackageBuildSettings(settings,
-			pkg.path.toString,
-			pkg.name,
-			_dub.project.rootPackage.recipePath.toNativeString());
+				pkg.path.toString,
+				pkg.name,
+				_dub.project.rootPackage.recipePath.toNativeString());
 	}
 
 	/// Lists all build types defined in the package description AND the predefined ones from dub ("plain", "debug", "release", "release-debug", "release-nobounds", "unittest", "docs", "ddox", "profile", "profile-gc", "cov", "unittest-cov")
@@ -373,14 +377,15 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// List all possible arch types for current set compiler
-	string[] archTypes() @property
+	string[] archTypes() const @property
 	{
-		string[] types = ["x86_64", "x86"];
+		auto types = appender!(string[]);
+		types ~= ["x86_64", "x86"];
 
 		string compilerName = _compiler.name;
 
-			if (compilerName == "dmd")
-			{
+		if (compilerName == "dmd")
+		{
 			// https://github.com/dlang/dub/blob/master/source/dub/compilers/dmd.d#L110
 			version (Windows)
 			{
@@ -398,11 +403,59 @@ class DubComponent : ComponentWrapper
 			types ~= ["aarch64", "powerpc64"];
 		}
 
-		return types;
+		return types.data;
 	}
 
-	/// Returns the current selected arch type
-	string archType() @property
+	/// ditto
+	ArchType[] extendedArchTypes() const @property
+	{
+		auto types = appender!(ArchType[]);
+		string compilerName = _compiler.name;
+
+		if (compilerName == "dmd")
+		{
+			types ~= [
+				ArchType("", "(compiler default)"),
+				ArchType("x86_64"),
+				ArchType("x86")
+			];
+			// https://github.com/dlang/dub/blob/master/source/dub/compilers/dmd.d#L110
+			version (Windows)
+			{
+				types ~= [ArchType("x86_omf"), ArchType("x86_mscoff")];
+			}
+		}
+		else if (compilerName == "gdc")
+		{
+			// https://github.com/dlang/dub/blob/master/source/dub/compilers/gdc.d#L69
+			types ~= [
+				ArchType("", "(compiler default)"),
+				ArchType("x86_64", "64-bit (current platform)"),
+				ArchType("x86", "32-bit (current platform)"),
+				ArchType("arm"),
+				ArchType("arm_thumb")
+			];
+		}
+		else if (compilerName == "ldc")
+		{
+			types ~= [
+				ArchType("", "(compiler default)"),
+				ArchType("x86_64"),
+				ArchType("x86")
+			];
+			// https://github.com/dlang/dub/blob/master/source/dub/compilers/ldc.d#L80
+			types ~= [
+				ArchType("aarch64"),
+				ArchType("powerpc64"),
+				ArchType("wasm32-unknown-unknown-wasm", "WebAssembly")
+			];
+		}
+
+		return types.data;
+	}
+
+	/// Returns the current selected arch type, or empty string for compiler default.
+	string archType() const @property
 	{
 		return _archType;
 	}
@@ -413,19 +466,22 @@ class DubComponent : ComponentWrapper
 	{
 		enforce(request.type == JSONType.object && "arch-type" in request, "arch-type not in request");
 		auto type = request["arch-type"].fromJSON!string;
-		if (archTypes.canFind(type))
+
+		try
 		{
-			_archType = type;
-			return updateImportPaths(false);
+			_platform = _compiler.determinePlatform(_settings, _compilerBinaryName, type);
 		}
-		else
+		catch (Exception e)
 		{
 			return false;
 		}
+
+		_archType = type;
+		return updateImportPaths(false);
 	}
 
 	/// Returns the current selected build type
-	string buildType() @property
+	string buildType() const @property
 	{
 		return _buildType;
 	}
@@ -454,7 +510,11 @@ class DubComponent : ComponentWrapper
 	}
 
 	/// Selects a new compiler for building
-	/// Returns: `false` if the compiler does not exist
+	/// Returns: `false` if the compiler does not exist or some setting is
+	/// invalid.
+	///
+	/// If the current architecture does not exist with this compiler it will be
+	/// reset to the compiler default. (empty string)
 	bool setCompiler(string compiler)
 	{
 		try
@@ -466,8 +526,23 @@ class DubComponent : ComponentWrapper
 		{
 			return false;
 		}
-		_platform = _compiler.determinePlatform(_settings, _compilerBinaryName, _archType);
-		_settingsTemplate.getPlatformSettings(_settings, _platform, _dub.project.rootPackage.path);
+
+		try
+		{
+			_platform = _compiler.determinePlatform(_settings, _compilerBinaryName, _archType);
+		}
+		catch (UnsupportedArchitectureException e)
+		{
+			if (_archType.length)
+			{
+				_archType = "";
+				return setCompiler(compiler);
+			}
+			return false;
+		}
+
+		_settingsTemplate.getPlatformSettings(_settings, _platform,
+			_dub.project.rootPackage.path);
 		return _compiler !is null;
 	}
 
@@ -589,7 +664,7 @@ class DubComponent : ComponentWrapper
 	/// Returns: `[pos, pos]` if not found, otherwise range in bytes which might
 	/// not contain the position at all.
 	int[2] resolveDiagnosticRange(scope const(char)[] code, int position,
-		scope const(char)[] diagnostic)
+			scope const(char)[] diagnostic)
 	{
 		import dparse.lexer : getTokensForParser, LexerConfig;
 		import dparse.parser : parseModule;
@@ -608,7 +683,7 @@ private:
 	Dub _dub;
 	bool _dubRunning = false;
 	string _configuration;
-	string _archType = "x86_64";
+	string _archType = "";
 	string _buildType = "debug";
 	string _compilerBinaryName;
 	Compiler _compiler;
@@ -801,4 +876,13 @@ string[] listDependencies(scope const Package pkg)
 	foreach (dep; deps)
 		dependencies ~= dep.name;
 	return dependencies;
+}
+
+///
+struct ArchType
+{
+	/// Value to pass into other calls
+	string value;
+	/// UI label override or null if none
+	string label;
 }
