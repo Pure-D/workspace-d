@@ -1,3 +1,17 @@
+# THIS PROJECT IS NO LONGER MAINTAINED
+
+workspace-d started out as executable for different IDEs to implement D functionality within them back before LSP was a thing. Over time all functionality got exposed using workspace-d as a library in a new program called [serve-d](https://github.com/Pure-D/serve-d) which is a server implementation of the Microsoft Language Server Protocol. (LSP)
+
+As the LSP server has been very stable for a while and workspace-d as a standalone not being used anymore I decided to deprecate the workspace-d command line interface with its proprietary RPC protocol.
+
+The source code of workspace-d now lives in serve-d as a subpackage ([serve-d:workspace-d](https://github.com/Pure-D/serve-d/tree/master/workspace-d)).
+
+As the proprietary RPC protocol has been removed a lot of template code has been removed and compilation times as library have sped up. Furthermore it's possible to use all of D's features in workspace-d APIs now, without needing to take care of the custom RPC protocol.
+
+---
+
+Old README:
+
 # workspace-d [![Build Status](https://travis-ci.org/Pure-D/workspace-d.svg?branch=master)](https://travis-ci.org/Pure-D/workspace-d)
 
 Join the chat: [![Join on Discord](https://discordapp.com/api/guilds/242094594181955585/widget.png?style=shield)](https://discord.gg/Bstj9bx)
