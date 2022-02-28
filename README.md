@@ -1,4 +1,4 @@
-# THIS PROJECT IS NO LONGER MAINTAINED
+# THE workspace-d CLI IS NO LONGER MAINTAINED - API/LIBRARY USERS SEE [serve-d:workspace-d](https://github.com/Pure-D/serve-d/tree/master/workspace-d)
 
 workspace-d started out as executable for different IDEs to implement D functionality within them back before LSP was a thing. Over time all functionality got exposed using workspace-d as a library in a new program called [serve-d](https://github.com/Pure-D/serve-d) which is a server implementation of the Microsoft Language Server Protocol. (LSP)
 
